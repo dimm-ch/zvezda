@@ -176,22 +176,22 @@ S32 DisplayDacTraceText(int loop, int dacIdx);
 //
 // WORKMODE.CPP
 //
-S32 WorkMode(void);
-S32 WorkMode0(void);
-S32 WorkMode1(void);
-S32 WorkMode2(void);
-S32 WorkMode3(void);
-S32 WorkMode4(void);
-S32 WorkMode5(void);
-S32 WorkMode6(void);
-S32 WorkMode7(void);
-S32 WorkMode8(void);
+S32 WorkMode(bool& stop);
+S32 WorkMode0(bool& stop);
+S32 WorkMode1(bool& stop);
+S32 WorkMode2(bool& stop);
+S32 WorkMode3(bool& stop);
+S32 WorkMode4(bool& stop);
+S32 WorkMode5(bool& stop);
+S32 WorkMode6(bool& stop);
+S32 WorkMode7(bool& stop);
+S32 WorkMode8(bool& stop);
 
 S32 FifoOutputCPU(void);
 S32 FifoOutputCPUStart(S32 isCycle);
 S32 FifoOutputDMA(void);
-S32 FifoOutputCycleDMA(void);
-S32 SdramLikeFifoOutputCycleDMA(void);
+S32 FifoOutputCycleDMA(bool& stop);
+S32 SdramLikeFifoOutputCycleDMA(bool& stop);
 
 S32 SdramSetParam(int idxDac);
 S32 SdramWriteDMA(void);

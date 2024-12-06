@@ -11,6 +11,7 @@ BRD_Handle x_hREG = 0; // сервис REG0
 int x_lid = 1;
 BRD_Handle x_handleDevice = 0;
 int x_mode = BRDopen_SHARED;
+std::thread* workerThread;
 
 int main()
 try {
@@ -206,7 +207,7 @@ json FastRegsAccess::execute(const json& request)
             x_hREG = BRD_capture(x_handleDevice, 0, &mode, _BRDC("REG0"), 5000);
         }
         if (x_hREG <= 0) {
-            BRDC_printf(_BRDC("REG0 NOT capture (%X)\n"), hSrv);
+            BRDC_printf(_BRDC("REG0 NOT capture (%X)\n"), x_hREG);
             response["error"] = "REG0 NOT capture !!";
             return response;
         }
@@ -261,12 +262,44 @@ bool FastRegsAccess::parsingLine(std::string& line, commandLineParams& params)
 std::mutex mtx;
 std::condition_variable cv;
 bool isWorkerRunning = true; // Флаг состояния рабочего потока
+std::string filenameDac = "fileoutDac.txt";
+
+#include <fstream>
+#include <iostream>
+#include <sstream>
+
+// Глобальная переменная для хранения старого буфера cout
+std::streambuf* old_cout_buffer = nullptr;
+
+void redirect_stdout(std::ostringstream& oss)
+{
+    old_cout_buffer = std::cout.rdbuf(oss.rdbuf());
+}
+
+void restore_stdout()
+{
+    if (old_cout_buffer != nullptr) {
+        std::cout.rdbuf(old_cout_buffer);
+    }
+}
 
 void dacWork()
 {
-    while (isWorkerRunning) {
-        WorkMode();
-    }
+    printf("Thread for DAC created ..\n");
+    std::ostringstream s;
+    redirect_stdout(s);
+    //
+    printf("<DEBUG> Debug string for check working redirect\n");
+    //
+    WorkMode(isWorkerRunning);
+    //
+    std::ofstream file(filenameDac);
+    if (file.is_open()) {
+        file << s.str();
+        file.close();
+    } else
+        printf("File %s not save!\n", filenameDac.c_str());
+    restore_stdout();
 
     // Сигнализируем основному потоку о завершении работы
     {
@@ -274,6 +307,7 @@ void dacWork()
         isWorkerRunning = false;
     }
     cv.notify_one(); // Пробуждаем основной поток
+    printf("Thread for DAC stoped ..\n");
 }
 
 json DacControl::execute(const json& request)
@@ -342,7 +376,10 @@ json DacControl::execute(const json& request)
             std::string ms = request["mode"];
             g_nWorkMode = atoi(ms.c_str());
         }
-        std::thread workerThread(dacWork);
+        if (request.contains("file")) {
+            filenameDac = request["file"];
+        }
+        workerThread = new std::thread(dacWork);
         // WorkMode();
     } else if (scmd == "release") {
         // Остановка рабочего потока
@@ -353,10 +390,10 @@ json DacControl::execute(const json& request)
         std::unique_lock<std::mutex> lk(mtx);
         cv.wait(lk, [] { return !isWorkerRunning; });
         // Завершение рабочего потока
-        if (workerThread.joinable()) {
-            workerThread.join();
+        if (workerThread->joinable()) {
+            workerThread->join();
         }
-
+        // Освобождение ЦАПов
         ReleaseAllDac();
 
     } else if (scmd == "list-parameters") {
