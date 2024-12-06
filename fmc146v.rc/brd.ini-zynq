@@ -1,0 +1,8 @@
+
+[LID:1]
+type=bzynq
+pid=0
+#begin SUBUNIT
+ btype1=devreg
+#end
+[]

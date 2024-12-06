@@ -1,0 +1,3 @@
+[submodule "CoNCoL"]
+	path = CoNCoL
+	url = http://devlab.insys.local:3000/utils/CoNCoL.git

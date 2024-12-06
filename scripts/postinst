@@ -1,0 +1,14 @@
+#!/bin/bash
+
+INSTALL_DIR=/opt/insys/bardy
+
+make_exec() {
+    echo "#!/bin/sh" > /usr/bin/$1
+    echo "cd $INSTALL_DIR && ./$1 \$@" >> /usr/bin/$1
+    chmod +x /usr/bin/$1
+}
+
+make_exec "exam-adc"
+make_exec "exam-edac"
+make_exec "exam-fdds"
+make_exec "exam-sync"

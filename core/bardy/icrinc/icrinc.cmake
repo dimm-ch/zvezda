@@ -1,0 +1,29 @@
+set(PROJECT_INCLUDE_DIRS ${PROJECT_INCLUDE_DIRS}
+    ${PROJECT_SOURCE_DIR}/icrinc
+)
+set(PROJECT_INCLUDES ${PROJECT_INCLUDES}
+    ${PROJECT_SOURCE_DIR}/icrinc/icr.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr00A2.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr00A4.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr00A5.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr00A7.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr009D.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr009E.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr0086.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr0087.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr0088.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr0097.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr0098.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr6678.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icr00A6.h
+    ${PROJECT_SOURCE_DIR}/icrinc/IcrAdp201x1.h
+    ${PROJECT_SOURCE_DIR}/icrinc/icramb3uv.h
+    ${PROJECT_SOURCE_DIR}/icrinc/IcrAmbp.h
+    ${PROJECT_SOURCE_DIR}/icrinc/IcrAmbpex.h
+    ${PROJECT_SOURCE_DIR}/icrinc/IcrC520F1.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icrfmc105p.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icrfmc112cp.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icrfmc119e.h
+    ${PROJECT_SOURCE_DIR}/icrinc/Icrfmc127p.h
+    ${PROJECT_SOURCE_DIR}/icrinc/icrxm416x250m.h
+)

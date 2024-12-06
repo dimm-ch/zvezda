@@ -1,0 +1,30 @@
+set(PROJECT_INCLUDE_DIRS ${PROJECT_INCLUDE_DIRS}
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro
+)
+set(PROJECT_INCLUDES ${PROJECT_INCLUDES}
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrladc.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrladmpro.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlbasef.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlcmpsc.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrldac.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrldac1624x192.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrldatainout.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlddc.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlddc4x16.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrldds.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrldio32in.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrldio32out.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlfm214x1gtrf.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlfm401s.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlfm402s.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrl_jesd.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlpio.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlreg.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlsdram.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrl_sync.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlsysmon.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrltest.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlgc5016.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlfm112x2g6da.h
+    ${PROJECT_SOURCE_DIR}/brdinc/ctrladmpro/ctrlfm212x4gda.h
+)

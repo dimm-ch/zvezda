@@ -1,0 +1,50 @@
+#ifndef _CTRL_FM402S_H
+	#define _CTRL_FM402S_H
+
+#include "ctrladmpro.h"
+enum {
+	BRDctrl_FM402S_SETCLKMODE = BRDctrl_FM402S + 0,
+	BRDctrl_FM402S_GETCLKMODE = BRDctrl_FM402S + 1,
+	BRDctrl_FM402S_GETSTATUS = BRDctrl_FM402S + 2,
+	BRDctrl_FM402S_SETTESTMODE = BRDctrl_FM402S + 3,
+	BRDctrl_FM402S_GETTESTMODE = BRDctrl_FM402S + 4,
+	BRDctrl_FM402S_START = BRDctrl_FM402S + 5,
+	BRDctrl_FM402S_STOP = BRDctrl_FM402S + 6,
+	BRDctrl_FM402S_GETTESTRESULT = BRDctrl_FM402S + 7,
+	BRDctrl_FM402S_SETDIR = BRDctrl_FM402S + 8,
+	BRDctrl_FM402S_GETDIR = BRDctrl_FM402S + 9,
+	BRDctrl_FM402S_SETCHANMASK = BRDctrl_FM402S + 10,
+	BRDctrl_FM402S_GETCHANMASK = BRDctrl_FM402S + 11,
+	BRDctrl_FM402S_GETRXTXSTATUS = BRDctrl_FM402S + 12,
+	BRDctrl_FM402S_PREPARE = BRDctrl_FM402S + 13,
+	BRDctrl_FM402S_ILLEGAL
+};
+
+typedef struct _FM402S_GETTESTRESULT {
+	U32					nChan;
+	unsigned long long	lReadWord[32];
+	unsigned long long	lExpectWord[32];
+	U32					nIndex[32];
+	U32					nBlock[32];
+	U32					nTotalError;
+} FM402S_GETTESTRESULT, * PFM402S_GETTESTRESULT;
+
+typedef struct _FM402S_GETSTATUS {
+	U08 isQSFPLineUp[4];
+	U08 isChanUp;
+	U08 isPLL_Lock;
+} FM402S_GETSTATUS, *PFM402S_GETSTATUS;
+
+typedef struct _FM402S_GETRXTXSTATUS {
+	U32 nBlockRead;
+	U32 nBlockOk;
+	U32 nBlockErr;
+	U32 nBlockWrite;
+} FM402S_GETRXTXSTATUS, * PFM402S_GETRXTXSTATUS;
+
+typedef struct _FM402S_TESTMODE {
+	U08 isGenEnable;
+	U08 isCntEnable;
+}FM402S_TESTMODE, * PFM402S_TESTMODE;
+
+#endif

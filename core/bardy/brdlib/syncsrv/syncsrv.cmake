@@ -1,0 +1,11 @@
+set(PROJECT_INCLUDE_DIRS ${PROJECT_INCLUDE_DIRS}
+	${PROJECT_SOURCE_DIR}/syncsrv
+)
+set(PROJECT_INCLUDES ${PROJECT_INCLUDES}
+	${PROJECT_SOURCE_DIR}/syncsrv/sync_regs.h
+	${PROJECT_SOURCE_DIR}/syncsrv/sync_srv.h
+)
+set(PROJECT_SOURCES ${PROJECT_SOURCES}
+	${PROJECT_SOURCE_DIR}/syncsrv/sync_ctrl.cpp
+	${PROJECT_SOURCE_DIR}/syncsrv/sync_srv.cpp
+)

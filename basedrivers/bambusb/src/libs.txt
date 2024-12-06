@@ -1,0 +1,7 @@
+For Windows :: https://github.com/kategray/CyUSB
+For Linux   :: https://github.com/libusb/libusb.git
+
+Static libusb for Linux:
+  x64 :: http://ftp.altlinux.org/pub/distributions/ALTLinux/Sisyphus/x86_64/RPMS.classic/libusb-devel-1.0.24-alt1.x86_64.rpm
+  x64 :: http://ftp.altlinux.org/pub/distributions/ALTLinux/Sisyphus/x86_64/RPMS.classic/libusb-devel-static-1.0.24-alt1.x86_64.rpm
+  ARM :: http://ftp.altlinux.org/pub/distributions/ALTLinux/Sisyphus/armh/RPMS.classic/libusb-devel-static-1.0.24-alt1.armh.rpm

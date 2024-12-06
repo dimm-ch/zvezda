@@ -1,0 +1,68 @@
+#ifndef _CTRL_FM401S_H
+	#define _CTRL_FM401S_H
+
+#include "ctrladmpro.h"
+enum {
+	BRDctrl_FM401S_SETCLKMODE = BRDctrl_FM402S + 32,
+	BRDctrl_FM401S_GETCLKMODE = BRDctrl_FM402S + 33,
+	BRDctrl_FM401S_GETSTATUS = BRDctrl_FM402S + 34,
+	BRDctrl_FM401S_SETTESTMODE = BRDctrl_FM402S + 35,
+	BRDctrl_FM401S_GETTESTMODE = BRDctrl_FM402S + 36,
+	BRDctrl_FM401S_START = BRDctrl_FM402S + 37,
+	BRDctrl_FM401S_STOP = BRDctrl_FM402S + 38,
+	BRDctrl_FM401S_GETTESTRESULT = BRDctrl_FM402S + 39,
+	BRDctrl_FM401S_SETDIR = BRDctrl_FM402S + 40,
+	BRDctrl_FM401S_GETDIR = BRDctrl_FM402S + 41,
+	BRDctrl_FM401S_SETCHANMASK = BRDctrl_FM402S + 42,
+	BRDctrl_FM401S_GETCHANMASK = BRDctrl_FM402S + 43,
+	BRDctrl_FM401S_GETRXTXSTATUS = BRDctrl_FM402S + 44,
+	BRDctrl_FM401S_SETCLKSRC = BRDctrl_FM402S + 45,
+	BRDctrl_FM401S_GETCLKSRC = BRDctrl_FM402S + 46,
+	BRDctrl_FM401S_SETCLKVALUE = BRDctrl_FM402S + 47,
+	BRDctrl_FM401S_GETCLKVALUE = BRDctrl_FM402S + 48,
+	BRDctrl_FM401S_PREPARE = BRDctrl_FM402S + 49,
+	BRDctrl_FM401S_SETDECIM = BRDctrl_FM402S + 50,
+	BRDctrl_FM401S_GETDECIM = BRDctrl_FM402S + 51,
+	BRDctrl_FM401S_ILLEGAL = BRDctrl_FM402S + 52,
+};
+
+typedef struct _FM401S_CHANMASK {
+	U32 nChanMask;
+	U32 nStreamChan;
+} FM401S_CHANMASK, * PFM401S_CHANMASK;
+
+typedef struct _FM401S_DIR {
+	U08 nChan[8]; //0-Rx, 1-Tx
+} FM401S_DIR, * PFM401S_DIR;
+
+typedef struct _FM401S_GETTESTRESULT {
+	U32					nChan;
+	unsigned long long	lReadWord[32];
+	unsigned long long	lExpectWord[32];
+	U32					nIndex[32];
+	U32					nBlock[32];
+	U32					nTotalError;
+} FM401S_GETTESTRESULT, * PFM401S_GETTESTRESULT;
+
+typedef struct _FM401S_GETSTATUS {
+	U08 isLaneUp[8];
+	U08 isPLL_Lock[8];
+	U08 isLineUp[8];
+	U08 isLinkUp[8];
+	U08 isData[8];
+	U16 wLinkErrCorr[8];
+} FM401S_GETSTATUS, *PFM401S_GETSTATUS;
+
+typedef struct _FM401S_GETRXTXSTATUS {
+	U32 nBlockRead[8];
+	U32 nBlockOk[8];
+	U32 nBlockErr[8];
+	U32 nBlockWrite[8];
+} FM401S_GETRXTXSTATUS, * PFM401S_GETRXTXSTATUS;
+
+typedef struct _FM401S_TESTMODE {
+	U08 isGenEnable;
+	U08 isCntEnable;
+}FM401S_TESTMODE, * PFM401S_TESTMODE;
+
+#endif

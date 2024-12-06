@@ -1,6 +1,4 @@
-# Prerequisites
-*.d
-
+# ---> C++
 # Compiled Object files
 *.slo
 *.lo
@@ -18,7 +16,6 @@
 
 # Fortran module files
 *.mod
-*.smod
 
 # Compiled Static libraries
 *.lai
@@ -30,3 +27,26 @@
 *.exe
 *.out
 *.app
+
+# Visual Studio
+**/.vs
+**/.vscode
+**/Debug
+**/Release
+**/packages
+*.*user
+/resource.h
+
+# GCC
+*.d
+**.build*
+build
+
+# doxygen
+**/.doxygen
+
+# Others
+**.files
+tmp
+CMakeUserPresets.json
+_distr

@@ -1,0 +1,55 @@
+#!/bin/sh 
+
+# 
+# This script is loading modules in the kernel. 
+# 
+
+kernel=`uname -r | grep 2.4`
+
+if [ ${kernel} ]
+    then
+        module=ipcdrv.o
+        mname=${module%.o}
+    else
+        module=`find *.ko`
+        mname=${module%.ko}
+fi
+
+if [ ${module} ]
+    then
+        echo Find ${module} - kernel module.
+    else
+        echo No kernel module found. ${module}
+        exit
+fi
+
+was_loaded=`/sbin/lsmod | cut -c 1-6 | grep ipcdrv`
+
+if [ ${was_loaded} ]
+    then
+        echo Remove loaded module: ${module}
+        /sbin/rmmod ipcdrv
+    else
+        echo Loading module: ${module}
+fi
+
+/sbin/insmod ./$module $* || exit 1
+
+sleep 1
+
+if [ ${kernel} ]
+    then
+        rm -f /dev/ipc_driver
+        str=`cat /proc/devices | grep ipc_driver`
+        major=`expr match "$str" '\([0-9]*\)'`
+        echo ${module} loaded successfuly. Major number ${major}.
+        mknod /dev/ipc_driver c ${major} 0
+        chmod -v 666 /dev/ipc_driver
+    else
+        devfiles=`ls /dev/* | grep ipc`
+        chmod -v 666 ${devfiles}
+fi
+
+#echo ${devfiles}
+
+

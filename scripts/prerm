@@ -1,0 +1,6 @@
+#!/bin/bash
+
+rm /usr/bin/exam-adc
+rm /usr/bin/exam-edac
+rm /usr/bin/exam-fdds
+rm /usr/bin/exam-sync
