@@ -131,6 +131,21 @@ json CommandProcessor::execute(const json& request)
     return response;
 }
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
+void sleep_for_milliseconds(int milliseconds)
+{
+#ifdef _WIN32
+    Sleep(milliseconds);
+#else
+    usleep(milliseconds * 1000); // Преобразуем миллисекунды в микросекунды
+#endif
+}
+
 bool CommandProcessor::isCommand(const json& request, json& response, std::string& cmd, std::string& param, commandLineParams& params)
 {
     if (cmd == "init") {
@@ -178,6 +193,14 @@ bool CommandProcessor::isCommand(const json& request, json& response, std::strin
         std::string ver = std::to_string(version_srv_hi) + "." + std::to_string(version_srv_lo);
         printf("Server version %s \n", ver.c_str());
         response["version"] = ver;
+    } else if (cmd == "pause" || cmd == "pause-ms") { //
+        int time = 1000;
+        if (request.contains("time")) {
+            std::string ts = request["time"];
+            time = atoi(ts.c_str());
+        }
+        printf("<Command> pause  %d ms \n", time);
+        sleep_for_milliseconds(time);
     } else {
         response["error"] = "Unrecognized command!!";
         return false;
