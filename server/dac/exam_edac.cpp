@@ -159,7 +159,8 @@ S32 CaptureAllDac( int modeOpen, int modeCapture )
 		//
 		// Открыть устройство
 		//
-		g_hDev[g_nDevNum] = BRD_open( rLidList.pLID[iDev], modeOpen, NULL); // открыть устройство		
+		//g_hDev[g_nDevNum] = BRD_open( rLidList.pLID[iDev], modeOpen, NULL); // открыть устройство		
+		g_hDev[g_nDevNum] = x_handleDevice;
 		if( g_hDev[g_nDevNum ]<=0)
 		{
             BRDC_printf( _BRDC("CaptureAllDac:   Open Device Error!\n"));
@@ -220,8 +221,6 @@ S32 ReleaseAllDac( void )
 	for( ii = 0; ii < g_nDacNum; ii++ )
 		err = BRD_release( g_aDac[ii].handle, 0 );
 
-	for( ii = 0; ii < g_nDevNum; ii++ )
-		err = BRD_close( g_hDev[ii] );
 
 	return 0;
 }
