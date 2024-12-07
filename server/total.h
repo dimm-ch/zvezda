@@ -14,4 +14,4 @@ extern BRD_Handle x_handleDevice;
 extern int x_mode;
 
 static int version_srv_hi = 0;
-static int version_srv_lo = 3;
+static int version_srv_lo = 4;

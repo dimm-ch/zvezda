@@ -325,7 +325,7 @@ S32 WorkMode2(bool& stop)
     nblock = 0;
     if (0 < SdramWriteDMA()) {
         PrepareStart();
-        while (!IPC_kbhit()) {
+        while (!IPC_kbhit() || !stop) {
             if (g_nIsAlwaysWriteSdram) {
                 if (0 > SdramWriteDMA())
                     break;
@@ -1183,10 +1183,15 @@ S32 SdramSetParam(int idxDac)
     if (rSdramConfig.MemType == 11 || // DDR3
         rSdramConfig.MemType == 12) // DDR4
         nPhysMemSizew = (ULONG)((
-                                    (((__int64)rSdramConfig.CapacityMbits * 1024 * 1024) >> 3) * (__int64)rSdramConfig.PrimWidth / rSdramConfig.ChipWidth * rSdramConfig.ModuleBanks * rSdramConfig.ModuleCnt)
-            >> 2); // в 32-битных словах
+        (((__int64)rSdramConfig.CapacityMbits * 1024 * 1024) >> 3) *
+         (__int64)rSdramConfig.PrimWidth / rSdramConfig.ChipWidth * rSdramConfig.ModuleBanks *
+         rSdramConfig.ModuleCnt) >> 2); // в 32-битных словах
     else
-        nPhysMemSizew = (1 << rSdramConfig.RowAddrBits) * (1 << rSdramConfig.ColAddrBits) * rSdramConfig.ModuleBanks * rSdramConfig.ChipBanks * rSdramConfig.ModuleCnt * 2; // size (U32)
+        nPhysMemSizew = (1 << rSdramConfig.RowAddrBits) *
+         (1 << rSdramConfig.ColAddrBits) * 
+         rSdramConfig.ModuleBanks * 
+         rSdramConfig.ChipBanks *
+         rSdramConfig.ModuleCnt * 2; // size (U32)
     nPhysMemSizeb = (__int64)nPhysMemSizew * 4;
 
     BRDC_printf(_BRDC("SDRAM total size = %d Mbytes\n"), (nPhysMemSizew / (1024 * 1024)) * 4);

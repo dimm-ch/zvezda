@@ -431,8 +431,7 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
             return status;
         }
 
-    // RegProg(hADC, (g_lid_adc != -1) ? g_lid_adc : 0, g_AdcSrvNum);
-    RegProg(hADC, 0, g_AdcSrvNum);
+    // RegProg(hADC, 0, g_AdcSrvNum);
 
     g_bBlkNum = 1;
     // PVOID pSig = NULL;
@@ -1120,9 +1119,10 @@ S32 RegProg(BRD_Handle hAdc, int idx, int isx)
     // GetInifileString(iniFilePath, iniSectionName, _BRDC("RegFileName"), _BRDC("spd_dev.ini"), regfname, sizeof(regfname));
     GetInifileString(iniFilePath, iniSectionName, _BRDC("RegFileName"), _BRDC(""), regfname, sizeof(regfname));
 
+    std::string fname = regfname;
     // Если указан файл, то подгрузить регистры из файла
-    if (regfname[0]) {
-        printf("Load SPD registers from file - %s\n", regfname);
+    if (!regfname.empty()) {
+        printf("Load SPD registers from file - %s\n", fname.c_str());
         status = RegRwSpd(hAdc & 0xFFFF, regfname); // hAdc & 0xFFFF - из дескриптора службы делаем дескриптор устройства
     }
 
