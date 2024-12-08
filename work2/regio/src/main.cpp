@@ -79,7 +79,7 @@ int BRDC_main(int argc, BRDCHAR* argv[])
 
     U32 frmList = aLidList[mainUtilParams.numLid];
 
-    hDev = BRD_open(frmList, BRDopen_EXCLUSIVE, &mainUtilParams.mode);
+    hDev = BRD_open(frmList, BRDopen_SHARED, &mainUtilParams.mode);
     if (hDev <= 0) {
         BRDC_printf(_BRDC("BRD_open error 0x%X\n"), hDev);
         BRD_cleanup();
