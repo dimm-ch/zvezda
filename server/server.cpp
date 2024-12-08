@@ -406,6 +406,28 @@ json DacControl::execute(const json& request)
             calcSpi(response);
         }
 
+    } else if (scmd == "nco-channel" || scmd == "nco-main") {
+        std::string sch, frq, phs;
+        int ch = 0;
+        double fr = 0.0, ph = 0.0;
+        if (request.contains("ch")) {
+            sch = request["ch"];
+            ch = atoi(sch.c_str());
+        }
+        if (request.contains("frq")) {
+            frq = request["frq"];
+            fr = atof(frq.c_str());
+        }
+        if (request.contains("phase")) {
+            phs = request["phase"];
+            ph = atof(phs.c_str());
+        }
+
+        if (scmd == "nco-channel")
+            nco_channel_setup(ch, fr, ph);
+        else
+            nco_main_setup(ch, fr, ph);
+
     } else if (scmd == "set-dac") {
         ReadIniFileDevice();
         SetAllDac();
@@ -538,28 +560,6 @@ json AdcControl::execute(const json& request)
             calcSpi(response);
         }
 
-    } else if (scmd == "nco-channel" || scmd == "nco-main") {
-        std::string sch, frq, phs;
-        int ch = 0;
-        double fr = 0.0, ph = 0.0;
-        if (request.contains("ch")) {
-            sch = request["ch"];
-            ch = atoi(sch.c_str());
-        }
-        if (request.contains("frq")) {
-            frq = request["frq"];
-            fr = atof(frq.c_str());
-        }
-        if (request.contains("phase")) {
-            phs = request["phase"];
-            ph = atof(phs.c_str());
-        }
-
-        if (scmd == "nco-channel")
-            nco_channel_setup(ch, fr, ph);
-        else
-            nco_main_setup(ch, fr, ph);
-
     } else if (scmd == "release") {
         //        ReleaseAllDac();
         releaseAdc();
@@ -613,7 +613,7 @@ void AdcControl::calcSpi(json& resp)
     BRD_release(hSrv, 0);
 }
 
-void AdcControl::nco_main_setup(std::size_t chan, double freq, double phase)
+void DacControl::nco_main_setup(std::size_t chan, double freq, double phase)
 {
     freq_clk = 12000.0; // ???
     auto DDSM_FTW = uint64_t(round((freq / (freq_clk * 1'000'000)) * std::pow(2, 48)));
@@ -666,7 +666,7 @@ void AdcControl::nco_main_setup(std::size_t chan, double freq, double phase)
 ///
 /// \return     void
 ///
-void AdcControl::nco_channel_setup(std::size_t chan, double freq, double phase)
+void DacControl::nco_channel_setup(std::size_t chan, double freq, double phase)
 {
     freq_clk = 12000.0; // ???
     U32 mode = BRDcapt_SHARED;

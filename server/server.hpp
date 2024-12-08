@@ -954,8 +954,7 @@ public:
     json execute(const json& request) final;
     bool parsSpiCommand(const std::string es);
     void calcSpi(json& resp);
-    void nco_main_setup(std::size_t chan, double freq, double phase);
-    void nco_channel_setup(std::size_t chan, double freq, double phase);
+
     size_t findTetrad() { return 4; }
 };
 
@@ -973,6 +972,8 @@ public:
     json execute(const json& request) final;
     void calcSpi(json& resp);
     size_t findTetrad() { return 7; }
+    void nco_main_setup(std::size_t chan, double freq, double phase);
+    void nco_channel_setup(std::size_t chan, double freq, double phase);
     bool parsSpiCommand(const std::string es);
 };
 

@@ -146,7 +146,7 @@ extern S32 g_nMsTimeout;
 //
 // EXAM_EDAC.CPP
 //
-S32 ParseCommandLine(int argc, BRDCHAR* argv[]);
+// S32 ParseCommandLine(int argc, BRDCHAR* argv[]);
 S32 DisplayErrorDac(S32 status, const char* func_name, const BRDCHAR* cmd_str);
 S32 CaptureAllDac(int modeOpen, int modeCapture);
 S32 ReleaseAllDac(void);
