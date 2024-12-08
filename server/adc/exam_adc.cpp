@@ -50,7 +50,7 @@ BRDCHAR g_pldFileName[MAX_PATH];
 int g_isPldLoadAlways = 0;
 int g_OnlySetParams = 0; // 1 - только установка параметров АЦП
 
-int g_lid_adc = -1;
+// int g_lid_adc = -1;
 int g_subNo = 0; // номер службы АЦП из командной строки
 ULONG g_times = 0;
 
@@ -1121,7 +1121,7 @@ S32 RegProg(BRD_Handle hAdc, int idx, int isx)
 
     std::string fname = regfname;
     // Если указан файл, то подгрузить регистры из файла
-    if (!regfname.empty()) {
+    if (!fname.empty()) {
         printf("Load SPD registers from file - %s\n", fname.c_str());
         status = RegRwSpd(hAdc & 0xFFFF, regfname); // hAdc & 0xFFFF - из дескриптора службы делаем дескриптор устройства
     }
@@ -1253,8 +1253,8 @@ void ListParametersAdc(void)
     printf("g_pldFileName = %s\n", g_pldFileName);
     printf("g_isPldLoadAlways = %d\n", g_isPldLoadAlways);
     printf("g_OnlySetParams = %d\n", g_OnlySetParams);
-    printf("g_lid_adc = %d\n", g_lid_adc);
-    printf("g_lid_adc = %d\n", g_lid_adc);
+    // printf("g_lid_adc = %d\n", g_lid_adc);
+    // printf("g_lid_adc = %d\n", g_lid_adc);
     printf("g_SwitchOutMask = %lu\n", g_SwitchOutMask);
     printf("g_bBufSize = %d\n", g_bBufSize);
     printf("g_bMemBufSize = %d\n", g_bMemBufSize);

@@ -146,6 +146,13 @@ void sleep_for_milliseconds(int milliseconds)
 #endif
 }
 
+#include <cstdlib>
+
+void launch_application(const std::string& command)
+{
+    std::system(command.c_str());
+}
+
 bool CommandProcessor::isCommand(const json& request, json& response, std::string& cmd, std::string& param, commandLineParams& params)
 {
     if (cmd == "init") {
@@ -193,6 +200,16 @@ bool CommandProcessor::isCommand(const json& request, json& response, std::strin
         std::string ver = std::to_string(version_srv_hi) + "." + std::to_string(version_srv_lo);
         printf("Server version %s \n", ver.c_str());
         response["version"] = ver;
+    } else if (cmd == "system") { //
+        if (request.contains("launch")) {
+            std::string e = request["launch"];
+            std::thread t(launch_application, e);
+            t.detach();
+            printf("Launch execute: %s\n", e.c_str());
+            return true;
+        }
+        response["error"] = "Error of launch execute";
+        return false;
     } else if (cmd == "pause" || cmd == "pause-ms") { //
         int time = 1000;
         if (request.contains("time")) {

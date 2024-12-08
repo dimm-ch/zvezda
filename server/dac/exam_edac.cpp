@@ -17,6 +17,7 @@
 #include	"gipcy.h"
 
 #include "../../work2/common/dev_util.h"
+#include "total.h"
 
 //
 // Globals

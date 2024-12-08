@@ -75,15 +75,6 @@ void startFmc(const std::string inifile, S32 DevNum)
     // инициализация работы с клавиатурой
     CKeyboard keyboard {};
     bool verboseInfo = true;
-    // включаем нужный уровень оповещения
-    // CBardy::displayMode(DisplayMode::Console, verboseInfo);
-    // CBardy::displayMode(DisplayMode::Info, verboseInfo);
-    // CBardy::displayMode(DisplayMode::Warning, verboseInfo);
-    // CBardy::displayMode(DisplayMode::Error, verboseInfo);
-    // CBardy::displayMode(DisplayMode::Visible, verboseInfo);
-    // не инициализируем управляющую бибилиотеку
-    // число зарегистрированных устройств
-    // const auto deviceNums = CBardy::getDeviceNums();
     // получаем информацию об обнаруженных устройствах
     const auto deviceInfoList = getDevInfoList(DevNum);
     // список устройств
