@@ -262,7 +262,8 @@ public:
                     _socket = accept(_server, reinterpret_cast<sockaddr*>(&client_addr),
                         &client_addr_len);
                     if (_socket == 0) {
-                        continue;
+                        cont
+                            inue;
                     } else {
                         // обработка соединения
                         int result {}; // результат операций с сокетом

@@ -54,9 +54,9 @@ try {
     std::signal(SIGABRT, signal_handler);
 
     // инициализируем управляющую библиотеку Bardy
-    auto deviceStore = BRD_DeviceStore(_BRDC("brd.ini"));
+    // auto deviceStore = BRD_DeviceStore(_BRDC("brd.ini"));
     // получаем ссылку на список обнаруженных устройств
-    auto& deviceList = deviceStore.deviceList();
+    // auto& deviceList = deviceStore.deviceList();
 
     // изменение IP-адреса
     const auto ifname = get_interface();
@@ -73,14 +73,14 @@ try {
     printf("Create ServerExecutor w. IP=%s Port=%d\n", serverIP.c_str(), serverPort);
     ServerExecutor serverExecutor(serverIP, serverPort);
     // добавляем обработчики команд
-    serverExecutor.add_command<WriteSpdExecutor>(deviceList);
-    serverExecutor.add_command<ReadSpdExecutor>(deviceList);
-    serverExecutor.add_command<GetSysmonExecutor>(deviceList);
-    serverExecutor.add_command<CommandProcessor>(deviceList);
-    serverExecutor.add_command<FastRegsAccess>(deviceList);
-    serverExecutor.add_command<DacControl>(deviceList);
-    serverExecutor.add_command<AdcControl>(deviceList);
-    serverExecutor.add_command<FmcSync>(deviceList);
+    // serverExecutor.add_command<WriteSpdExecutor>();
+    // serverExecutor.add_command<ReadSpdExecutor>();
+    serverExecutor.add_command<GetSysmonExecutor>();
+    serverExecutor.add_command<CommandProcessor>();
+    serverExecutor.add_command<FastRegsAccess>();
+    serverExecutor.add_command<DacControl>();
+    serverExecutor.add_command<AdcControl>();
+    serverExecutor.add_command<FmcSync>();
 
     // запускаем поток обработки команд
     serverExecutor.start();
@@ -615,7 +615,7 @@ void AdcControl::calcSpi(json& resp)
 
 void DacControl::nco_main_setup(std::size_t chan, double freq, double phase)
 {
-    freq_clk = 12000.0; // ???
+    double freq_clk = 12000.0; // частота тактирования ЦАП в МГц
     auto DDSM_FTW = uint64_t(round((freq / (freq_clk * 1'000'000)) * std::pow(2, 48)));
     auto DDSM_PHASE = uint16_t(round((phase / 180.) * std::pow(2, 15)));
 
@@ -668,7 +668,7 @@ void DacControl::nco_main_setup(std::size_t chan, double freq, double phase)
 ///
 void DacControl::nco_channel_setup(std::size_t chan, double freq, double phase)
 {
-    freq_clk = 12000.0; // ???
+    double freq_clk = 12000.0; // частота тактирования ЦАП в МГц
     U32 mode = BRDcapt_SHARED;
     BRD_Handle hSrv = BRD_capture(x_handleDevice, 0, &mode, _BRDC("REG0"), 5000);
     if (hSrv <= 0) {

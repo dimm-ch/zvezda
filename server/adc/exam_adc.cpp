@@ -431,7 +431,7 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
             return status;
         }
 
-    // RegProg(hADC, 0, g_AdcSrvNum);
+    RegProg(hADC, 0, g_AdcSrvNum);
 
     g_bBlkNum = 1;
     // PVOID pSig = NULL;
@@ -1115,7 +1115,7 @@ S32 RegProg(BRD_Handle hAdc, int idx, int isx)
     BRDC_strcat(iniFilePath, g_iniFileNameAdc);
     BRDC_sprintf(iniSectionName, _BRDC("device%d_%s%d"), idx, g_SrvName, (g_subNo < 0) ? isx : 0);
 
-    BRDCHAR regfname[128];
+    BRDCHAR regfname[512];
     // GetInifileString(iniFilePath, iniSectionName, _BRDC("RegFileName"), _BRDC("spd_dev.ini"), regfname, sizeof(regfname));
     GetInifileString(iniFilePath, iniSectionName, _BRDC("RegFileName"), _BRDC(""), regfname, sizeof(regfname));
 
