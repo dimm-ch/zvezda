@@ -159,26 +159,24 @@ S32 CaptureAllDac( int modeOpen, int modeCapture )
 
 		//
 		// Открыть устройство
-		//
-		//g_hDev[g_nDevNum] = BRD_open( rLidList.pLID[iDev], modeOpen, NULL); // открыть устройство		
-		g_hDev[g_nDevNum] = x_handleDevice;
-		if( g_hDev[g_nDevNum ]<=0)
+	
+		BRD_Handle hDev = x_handleDevice;
+		if( hDev<=0)
 		{
-            BRDC_printf( _BRDC("CaptureAllDac:   Open Device Error!\n"));
+            BRDC_printf( _BRDC("CaptureAllDac:  Device not opened!\n"));
 			// continue;
 		}
-		else
-			printf(" - Device open in mode %s\n", getStrOpenModeDevice(modeOpen).c_str());
+
 
 		//
 		// Захватить все подходящие службы на данном устройстве
 		//
-		U32			mode = modeCapture; //BRDcapt_EXCLUSIVE;
-		U32			nItemReal, iSrv;
+		U32	mode = modeCapture; //BRDcapt_EXCLUSIVE;
+		U32	nItemReal, iSrv;
 		BRD_ServList srvList[MAX_SERVICE_ON_DEVICE];
-		S32			len = (S32)BRDC_strlen( g_sServiceName );
+		S32	len = (S32)BRDC_strlen( g_sServiceName );
 
-		err = BRD_serviceList( g_hDev[g_nDevNum], 0, srvList, MAX_SERVICE_ON_DEVICE, &nItemReal);
+		err = BRD_serviceList( hDev, 0, srvList, MAX_SERVICE_ON_DEVICE, &nItemReal);
 		for( ii = 0; ii < (S32)nItemReal; ii++)
 			BRDC_printf( _BRDC("        Srv %d:  %15s, Attr = %X.\n"),ii, srvList[ii].name, srvList[ii].attr);
 
@@ -192,7 +190,7 @@ S32 CaptureAllDac( int modeOpen, int modeCapture )
 				continue;
 
             BRDC_printf( _BRDC( "   Try capture %s in mode %s ..."), g_sServiceName, getStrCaptureModeService(mode).c_str() );
-			BRD_Handle hSrv = BRD_capture( g_hDev[g_nDevNum], 0, &mode,srvList[iSrv].name, 10000);
+			BRD_Handle hSrv = BRD_capture( hDev, 0, &mode,srvList[iSrv].name, 10000);
 			if(hSrv > 0)
 			{
                 printf(" - Service captured in mode %s\n", getStrCaptureModeService(mode).c_str());

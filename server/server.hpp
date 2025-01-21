@@ -230,9 +230,15 @@ public:
         std::fprintf(stdout, "ServerExecutor: ip=%s ip_in=0x%X \n", ip.c_str(), server_addr.sin_addr.s_addr);
         if (bind(_server, reinterpret_cast<sockaddr*>(&server_addr),
                 sizeof(server_addr))
-            == -1)
-            throw std::runtime_error("ERROR: bind function failed");
-
+            == -1) {
+            // if_down();
+            // if_up();
+            //_server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+            if (bind(_server, reinterpret_cast<sockaddr*>(&server_addr),
+                    sizeof(server_addr))
+                == -1)
+                throw std::runtime_error("ERROR: bind function failed");
+        }
         if (listen(_server, SOMAXCONN) == -1)
             throw std::runtime_error("ERROR: listen function failed");
     }
@@ -259,6 +265,7 @@ public:
             std::fflush(stdout);
             while (true) {
                 try {
+                m1:
                     _socket = accept(_server, reinterpret_cast<sockaddr*>(&client_addr),
                         &client_addr_len);
                     if (_socket == 0) {
@@ -289,7 +296,10 @@ public:
                             len = recv(_socket, reinterpret_cast<char*>(buffer.data()),
                                 buffer.size(), 0);
                             if (len <= 0) {
-                                printf("Packet data lenght = %d, exit from server\n", len);
+                                printf("Packet data lenght = %d, client disconnected ..\n", len);
+                                // shutdown(_socket, SHUT_RDWR);
+                                // close(_socket);
+                                goto m1;
                                 break; // тайм-аут ожидания данных или закрытый сокет
                             }
                             std::printf("---------------------------------------------------\n");

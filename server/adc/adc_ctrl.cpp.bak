@@ -128,13 +128,7 @@ int SetMuRun(BRD_Handle hSrv)
 // ADC28X800M, ADC28X1G, ADC10X2G, ADC210X1G, ADC212X1G, FM814X125M
 int CheckClock(BRD_Handle hADC, BRDCHAR* AdcSrvName)
 {
-	if(BRDC_stricmp(AdcSrvName, _BRDC("ADC28X800M")) &&
-	   BRDC_stricmp(AdcSrvName, _BRDC("ADC28X1G")) &&
-	   BRDC_stricmp(AdcSrvName, _BRDC("ADC10X2G")) &&
-	   BRDC_stricmp(AdcSrvName, _BRDC("ADC210X1G")) &&
-	   BRDC_stricmp(AdcSrvName, _BRDC("ADC212X1G")) &&
-	   BRDC_stricmp(AdcSrvName, _BRDC("FM814X125M"))
-	   )
+    if (BRDC_stricmp(AdcSrvName, _BRDC("ADC28X800M")) && BRDC_stricmp(AdcSrvName, _BRDC("ADC28X1G")) && BRDC_stricmp(AdcSrvName, _BRDC("ADC10X2G")) && BRDC_stricmp(AdcSrvName, _BRDC("ADC210X1G")) && BRDC_stricmp(AdcSrvName, _BRDC("ADC212X1G")) && BRDC_stricmp(AdcSrvName, _BRDC("FM814X125M")))
         return 1; // если ни одна из этих служб
     BRDC_printf(_BRDC("Clock checking...\r"));
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)

@@ -13,5 +13,5 @@ extern int x_lid;
 extern BRD_Handle x_handleDevice;
 extern int x_mode;
 
-static int version_srv_hi = 0;
-static int version_srv_lo = 7;
+static int version_srv_hi = 1;
+static int version_srv_lo = 0;

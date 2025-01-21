@@ -12,6 +12,7 @@ int x_lid = 1;
 BRD_Handle x_handleDevice = 0;
 int x_mode = BRDopen_SHARED;
 std::thread* workerThread;
+std::thread* workerThreadA;
 
 int main()
 try {
@@ -195,7 +196,8 @@ bool CommandProcessor::isCommand(const json& request, json& response, std::strin
     } else if (cmd == "stop-server") { // команда остановки сервера
         //
         BRD_cleanup();
-        std::abort();
+        // std::abort();
+        exit(1);
     } else if (cmd == "version") { //
         std::string ver = std::to_string(version_srv_hi) + "." + std::to_string(version_srv_lo);
         printf("Server version %s \n", ver.c_str());
@@ -300,8 +302,11 @@ bool FastRegsAccess::parsingLine(std::string& line, commandLineParams& params)
 ////////////////////////////////////////////////////////////////// DacControl
 
 std::mutex mtx;
+std::mutex mtxa;
 std::condition_variable cv;
+std::condition_variable cva;
 bool isWorkerRunning = true; // Флаг состояния рабочего потока
+bool isWorkerRunningA = true; // Флаг состояния рабочего потока ADC
 std::string filenameDac = "fileoutDac.txt";
 
 #include <fstream>
@@ -325,21 +330,22 @@ void restore_stdout()
 
 void dacWork()
 {
-    printf("Thread for DAC created ..\n");
-    std::ostringstream s;
-    redirect_stdout(s);
+    printf("<SRV> Thread for DAC created ..\n");
+    // std::ostringstream s;
+    // redirect_stdout(s);
     //
-    printf("<DEBUG> Debug string for check working redirect\n");
+    // printf("<DEBUG> Debug string for check working redirect\n");
     //
+    isWorkerRunning = true;
     WorkMode(isWorkerRunning);
     //
-    std::ofstream file(filenameDac);
-    if (file.is_open()) {
-        file << s.str();
-        file.close();
-    } else
-        printf("File %s not save!\n", filenameDac.c_str());
-    restore_stdout();
+    // std::ofstream file(filenameDac);
+    // if (file.is_open()) {
+    //    file << s.str();
+    //    file.close();
+    //} else
+    //    printf("File %s not save!\n", filenameDac.c_str());
+    // restore_stdout();
 
     // Сигнализируем основному потоку о завершении работы
     {
@@ -347,7 +353,7 @@ void dacWork()
         isWorkerRunning = false;
     }
     cv.notify_one(); // Пробуждаем основной поток
-    printf("Thread for DAC stoped ..\n");
+    printf("<SRV> Thread for DAC stoped ..\n");
 }
 
 json DacControl::execute(const json& request)
@@ -443,20 +449,27 @@ json DacControl::execute(const json& request)
         }
         workerThread = new std::thread(dacWork);
         // WorkMode();
-    } else if (scmd == "release") {
+    } else if (scmd == "release" || scmd == "stop") {
         // Остановка рабочего потока
         std::lock_guard<std::mutex> lock(mtx);
+        // printf("<**> DAC mutex unlock ..\n");
         isWorkerRunning = false;
+        // printf("<**> DAC isWorkerRunning = false ..\n");
         cv.notify_one(); // Пробуждаем рабочий поток, если он спит
-        // Ожидание завершения рабочего потока
+        // printf("<**> DAC notify_one ..\n");
+        //  Ожидание завершения рабочего потока
         std::unique_lock<std::mutex> lk(mtx);
+        // printf("<**> DAC thread wakeup ..\n");
         cv.wait(lk, [] { return !isWorkerRunning; });
-        // Завершение рабочего потока
+        // printf("<**> DAC thread touch ..\n");
+        //  Завершение рабочего потока
         if (workerThread->joinable()) {
             workerThread->join();
         }
         // Освобождение ЦАПов
+        // printf("<**> DAC start function ReleaseAllDac() ..\n");
         ReleaseAllDac();
+        printf("<SRV> DAC released ..\n");
 
     } else if (scmd == "list-parameters") {
         ListParameters();
@@ -508,6 +521,23 @@ bool DacControl::parsSpiCommand(const std::string es)
 }
 
 ////////////////////////////////////////////////////////////////// AdcControl
+
+void AdcWork()
+{
+    printf("<SRV> Thread for ADC created ..\n");
+
+    isWorkerRunningA = true;
+    workFlow(/*isWorkerRunningA*/);
+
+    // Сигнализируем основному потоку о завершении работы
+    {
+        std::lock_guard<std::mutex> lock(mtxa);
+        isWorkerRunningA = false;
+    }
+    cva.notify_one(); // Пробуждаем основной поток
+    printf("<SRV> Thread for ADC stoped ..\n");
+}
+
 json AdcControl::execute(const json& request)
 {
     // printf("##### MARKER: ADC:execute begin\n");
@@ -533,20 +563,24 @@ json AdcControl::execute(const json& request)
         }
         adcGetOptions(sfile);
 
-    } else if (scmd == "setupADC") {
+    } else if (scmd == "setupADC" || scmd == "power") {
         int mode = BRDopen_EXCLUSIVE;
         if (request.contains("mode")) {
             std::string sm = request["mode"];
             mode = atoi(sm.c_str());
         }
+        bool powerOk = false;
         if (x_handleDevice > 0)
-            checkLoadFpgaAndPower(x_handleDevice, mode);
+            powerOk = checkPower(x_handleDevice, mode);
         else
             response["error"] = "the device is not open!";
+        if (!powerOk)
+            printf("<ERR> ADC power error .. /n");
 
-    } else if (scmd == "startWorkFlow") {
+    } else if (scmd == "startWorkFlow" || scmd == "work") {
         if (x_handleDevice > 0)
-            workFlow();
+            workerThreadA = new std::thread(AdcWork);
+        // workFlow();
         else
             response["error"] = "the device is not open!";
 
@@ -652,7 +686,7 @@ void DacControl::nco_main_setup(std::size_t chan, double freq, double phase)
     for (auto& addr_val : sequence) {
         // spi_write(addr_val.first, addr_val.second);
         SpdWrite(hSrv, findTetrad(), 0, 0, addr_val.first, addr_val.second);
-        printf("  SPI %s  reg=0x%4.4X  val=0x%4.4X\n", write_ ? "write" : "read", regNum_, value_);
+        printf("  SPI %s  reg=0x%4.4X  val=0x%4.4X\n", "write", addr_val.first, addr_val.second);
     }
     BRD_release(hSrv, 0);
     /**/
@@ -719,7 +753,7 @@ void DacControl::nco_channel_setup(std::size_t chan, double freq, double phase)
     for (auto& addr_val : sequence) {
         // spi_write(addr_val.first, addr_val.second);
         SpdWrite(hSrv, findTetrad(), 0, 0, addr_val.first, addr_val.second);
-        printf("  SPI %s  reg=0x%4.4X  val=0x%4.4X\n", write_ ? "write" : "read", regNum_, value_);
+        printf("  SPI %s  reg=0x%4.4X  val=0x%4.4X\n", "write", addr_val.first, addr_val.second);
     }
     BRD_release(hSrv, 0);
     /**/

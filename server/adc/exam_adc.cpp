@@ -34,6 +34,8 @@ void WriteIsviParams(IPC_handle hfile, BRD_Handle hADC, unsigned long long nNumb
 void WriteIsviParams(HANDLE hfile, BRD_Handle hADC, unsigned long long nNumberOfBytes);
 #endif
 
+extern bool isWorkerRunningA;
+
 S32 SetParamSrv(BRD_Handle handle, BRD_ServList* srv, int idx);
 S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long bMemBufSize);
 
@@ -431,7 +433,7 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
             return status;
         }
 
-    RegProg(hADC, 0, g_AdcSrvNum);
+    // RegProg(hADC, 0, g_AdcSrvNum);
 
     g_bBlkNum = 1;
     // PVOID pSig = NULL;
@@ -545,6 +547,8 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
                 // releaseAdc(); // // прерывает сбор данных
                 loop = -1;
             }
+            if (!isWorkerRunningA)
+                loop = -1;
 
             if (!g_DmaOn) { // программная передача данных
                 if (g_MemOn) { // сбор в память и программная передача данных
@@ -1166,8 +1170,9 @@ void printLids(void)
     }
 }
 
-void checkLoadFpgaAndPower(BRD_Handle handleDevice, int mode)
+bool checkPower(BRD_Handle handleDevice, int mode)
 {
+    bool retVal = false;
     modeAdcServiceCapture = mode;
     if (handleDevice > 0) {
         BRD_PuList PuList[MAX_PU];
@@ -1213,34 +1218,22 @@ void checkLoadFpgaAndPower(BRD_Handle handleDevice, int mode)
             {
                 BRDC_printf(_BRDC("Service %s is not found!!!\n"), g_AdcSrvName);
                 mode = BRDcapt_SPY; // это для того, чтобы обойти код сбора данных
+                return false;
             }
-        } else
+        } else {
             BRDC_printf(_BRDC("BRD_serviceList: Real Items = %d (> %d - ERROR!!!)\n"), ItemReal, MAX_SRV);
+            return false;
+        }
     }
     modeAdcServiceCapture = mode;
+    return true;
 }
 
 void workFlow(void)
 {
-    S32 md = modeAdcServiceCapture;
-    if (g_OnlySetParams) {
-        BRDC_printf(_BRDC("Only Set Parameters Mode!!\n"));
-        md = BRDcapt_SPY;
-    }
-    {
-        if (md != BRDcapt_SPY)
-            if (g_DirWriteFile) {
-                if (g_DirWriteFile == -1)
-                    ContinueDaq(g_FileBufSize, g_FileBlkNum);
-                else {
-                    DirectFile(g_IsSysMem, g_FileBufSize, g_DirWriteFile, g_FileBlkNum);
-                    if (g_IsWriteFile == 1)
-                        WriteIsviParamDirFile();
-                }
-            } else {
-                GetAdcData(x_hADC, g_bBufSize, g_bMemBufSize);
-            }
-    }
+    printf("Start work ADC ..\n");
+    // S32 md = modeAdcServiceCapture;
+    GetAdcData(x_hADC, g_bBufSize, g_bMemBufSize);
 }
 
 void ListParametersAdc(void)
@@ -1271,5 +1264,25 @@ void ListParametersAdc(void)
     printf("g_transRate = %d\n", g_transRate);
     printf("g_PretrigMode = %d\n", g_PretrigMode);
     printf("g_bPostTrigSize = %lld\n", g_bPostTrigSize);
+
+    printf("g_Pause = %d\n", g_Pause);
+    printf("g_samplesOfChannel = %d\n", g_samplesOfChannel);
+    printf("g_memorySamplesOfChannel = %d\n", g_memorySamplesOfChannel);
+    printf("g_IsSysMem = %d\n", g_IsSysMem);
+    printf("g_info.busType = %d (BRDbus_ETHERNET = %d)\n", g_info.busType, BRDbus_ETHERNET);
+    printf("g_FileBufSize = %d\n", g_FileBufSize);
+    printf("g_AdcDrqFlag = %d\n", g_AdcDrqFlag);
+    printf("g_DirWriteFile = %d\n", g_DirWriteFile);
+    printf("g_FileBlkNum = %d\n", g_FileBlkNum);
+    printf("g_dirFileName = %s\n", g_dirFileName);
+    printf("g_MemDrqFlag = %d\n", g_MemDrqFlag);
+    printf("g_IoDelay = %d\n", g_IoDelay);
+    printf("g_transRate = %d\n", g_transRate);
+    printf("g_MsTimeout = %d\n", g_MsTimeout);
+    printf("g_regdbg = %d\n", g_regdbg);
+    printf("g_adjust_mode = %d\n", g_adjust_mode);
+    printf("g_quick_quit = %d\n", g_quick_quit);
+    printf("g_iniFileNameAdc = %s\n", g_iniFileNameAdc);
+
     printf("/n");
 }

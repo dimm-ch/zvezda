@@ -50,7 +50,7 @@ S32 MapDataFromMemWriteData(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBu
 void ContinueDaq(ULONG BlkSize, ULONG BlkNum);
 void printLids(void);
 void adcGetOptions(const std::string inifile);
-void checkLoadFpgaAndPower(BRD_Handle handleDevice, int mode);
+bool checkPower(BRD_Handle handleDevice, int mode);
 void workFlow(void);
 S32 releaseAdc();
 void ListParametersAdc(void);

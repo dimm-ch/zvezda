@@ -1441,7 +1441,8 @@ S32 RegProg(BRD_Handle hAdc, int idx, int isx)
 
     // Если указан файл, то подгрузить регистры из файла
     if (regfname[0])
-        status = RegRwSpd(hAdc & 0xFFFF, regfname); // hAdc & 0xFFFF - из дескриптора службы делаем дескриптор устройства
+        printf("<***>   Load SPD registers from file - %s\n", regfname);
+    status = RegRwSpd(hAdc & 0xFFFF, regfname); // hAdc & 0xFFFF - из дескриптора службы делаем дескриптор устройства
 
     return status;
 }
