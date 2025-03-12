@@ -395,8 +395,8 @@ void dacWork(int lid)
     //
     // printf("<DEBUG> Debug string for check working redirect\n");
     //
-    DevicesLid[lid].dacCtrlThr.stop.store(false);
     DevicesLid[lid].dacCtrlThr.isStoped.store(false);
+    DevicesLid[lid].dacCtrlThr.stop.store(false);    
     WorkMode(lid);
     //
     // std::ofstream file(filenameDac);
