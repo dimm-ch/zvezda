@@ -329,58 +329,6 @@ public:
                                     jsonResponseTree = obj->execute(jsonRequestTree);
                                 }
                             }
-                            /*
-                                                        if (jsonRequestTree.contains("com")) {
-                                                            auto command = jsonRequestTree["com"].get<std::string>();
-                                                            jsonResponseTree["com"] = command;
-                                                            // jsonResponseTree["error"] = "unknown command";
-                                                            auto CE_icom = commandMap.find("com");
-                                                            if (CE_icom != commandMap.end()) {
-                                                                jsonResponseTree = CE_icom->second.get()->execute(jsonRequestTree);
-                                                                // std::printf("Select com\n");
-                                                            }
-                                                        } else if (jsonRequestTree.contains("reg")) {
-                                                            auto command = jsonRequestTree["reg"].get<std::string>();
-                                                            jsonResponseTree["reg"] = command;
-                                                            // jsonResponseTree["error"] = "unknown command";
-                                                            auto CE_sreg = commandMap.find("reg");
-                                                            if (CE_sreg != commandMap.end()) {
-                                                                jsonResponseTree = CE_sreg->second.get()->execute(jsonRequestTree);
-                                                                // std::printf("Select reg\n");
-                                                            }
-                                                        } else if (jsonRequestTree.contains("dac")) {
-                                                            auto command = jsonRequestTree["dac"].get<std::string>();
-                                                            jsonResponseTree["dac"] = command;
-                                                            // jsonResponseTree["error"] = "unknown command";
-                                                            auto commandExecutor = commandMap.find("dac");
-                                                            if (commandExecutor != commandMap.end()) {
-                                                                jsonResponseTree = commandExecutor->second.get()->execute(jsonRequestTree);
-                                                                // std::printf("Select dac\n");
-                                                            } else
-                                                                std::printf("Debug - commandExecutor dac not found ...\n");
-
-                                                        } else if (jsonRequestTree.contains("adc")) {
-                                                            auto command = jsonRequestTree["adc"].get<std::string>();
-                                                            jsonResponseTree["adc"] = command;
-                                                            // jsonResponseTree["error"] = "unknown command";
-                                                            auto comEx = commandMap.find("adc");
-                                                            if (comEx != commandMap.end()) {
-                                                                jsonResponseTree = comEx->second.get()->execute(jsonRequestTree);
-                                                                // std::printf("Select adc\n");
-                                                            }
-                                                        } else if (jsonRequestTree.contains("sync")) {
-                                                            auto command = jsonRequestTree["sync"].get<std::string>();
-                                                            jsonResponseTree["sync"] = command;
-                                                            // jsonResponseTree["error"] = "unknown command";
-                                                            auto comEx = commandMap.find("sync");
-                                                            if (comEx != commandMap.end()) {
-                                                                jsonResponseTree = comEx->second.get()->execute(jsonRequestTree);
-                                                                // std::printf("Select sync\n");
-                                                            }
-                                                        } else {
-                                                            jsonResponseTree["error"] = "unknown command";
-                                                        }
-                            */
                             // формируем из дерева запроса строку JSON для клиента
                             auto jsonStringToClient = CommandExecutor::toClient(jsonResponseTree);
                             send(_socket,
@@ -441,6 +389,7 @@ public:
     static std::string command() { return "com"; }
     using CommandExecutor::CommandExecutor;
     json execute(const json& request) final;
+    void clearAll();
     bool isCommand(const json& request, json& response, std::string& cmd, std::string& param, commandLineParams& params);
 };
 
