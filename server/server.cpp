@@ -3,18 +3,11 @@
 #include "server.hpp"
 #include "total.h"
 
-
-
-
 S32 x_DevNum = -1; // кол-во у-в
 
-FuDev DevicesLid[10]; // допускаем до 10 лид идентификаторов
-// BRD_Handle x_hADC = 0; // сервис АЦП
-// BRD_Handle x_hDAC = 0; // сервис ЦAП
-// BRD_Handle x_hREG = 0; // сервис REG0
+FuDevs DevicesLid[MAX_LID_DEVICES];
 int x_lid = 1;
 BRD_Handle x_handleDevice = 0;
-// int x_mode = BRDopen_SHARED;
 
 
 std::thread* workerThreadA;
@@ -161,6 +154,22 @@ void launch_application(const std::string& command)
 
 bool CommandProcessor::isCommand(const json& request, json& response, std::string& cmd, std::string& param, commandLineParams& params)
 {
+    U32 x_mode = 0;
+
+    std::string slid;
+    x_lid = 1;
+    if (request.contains("lid")) {
+        slid = request["lid"];
+    }    
+    if (!slid.empty()) {
+        x_lid = atoi(slid.c_str());
+        if (x_lid <= 0 || x_lid >= MAX_LID_DEVICES) {
+            BRDC_printf("<ERR> Bad LID number!\n");
+            response["error"] = "Bad LID!";
+            return response;
+        }
+    }
+
     if (cmd == "init") {
         std::string fileini = "brd.ini";
         if (request.contains("path")) {
@@ -172,26 +181,23 @@ bool CommandProcessor::isCommand(const json& request, json& response, std::strin
             BRDC_printf(_BRDC("<ERR> BARDY Initialization = 0x%X \n"), status);
             exit(0);
         }
+        else
+            printf("<SRV> Library BARDY - is initialize, device found : %d \n", x_DevNum);
         BRD_displayMode(BRDdm_VISIBLE | BRDdm_CONSOLE); // режим вывода информационных сообщений : отображать все уровни на консоле
 
-    } else if (cmd == "lid") {
+    } else if (cmd == "open") {
         printLids();
-        if (param.empty()) {
-            response["error"] = "Bad param in key-groupe com:lid";
-            return false;
-        }
         if (request.contains("mode")) {
             std::string sm = request["mode"];
             x_mode = atoi(sm.c_str());
         } else
             x_mode = BRDopen_EXCLUSIVE;
-
-        x_lid = atoi(param.c_str());
-        DevicesLid[x_lid].setMode(x_mode);
-        x_handleDevice = DevicesLid[x_lid].open(x_lid); 
+        
+        DevicesLid[x_lid].device.setMode(x_mode);
+        x_handleDevice = DevicesLid[x_lid].device.open(x_lid); 
         if (x_handleDevice <= 0) {
             BRDC_printf("<ERR> Error open device  %d in mode %s\n", x_lid, getStrOpenModeDevice(x_mode).c_str());
-            response["error"] = DevicesLid[x_lid].error();            
+            response["error"] = DevicesLid[x_lid].device.error();            
             return false;
         } else 
             BRDC_printf("<SRV> Current LID = %d in mode %s \n", x_lid, getStrOpenModeDevice(x_mode).c_str());
@@ -200,30 +206,27 @@ bool CommandProcessor::isCommand(const json& request, json& response, std::strin
         //
     } else if (cmd == "close") {
         //
-        x_lid = atoi(param.c_str());
-        if (x_lid < 0 || x_lid >= MAX_LID_DEVICES) {
-            BRDC_printf("<ERR> Bad LID number!\n");
-            response["error"] = "Bad LID!";
-            return false;
-        }
         DevicesLid[x_lid].device.close();
     
     } else if (cmd == "info") {
         BRD_Version ver;
-        BRD_version(hDev, &ver);
+        BRD_version(x_handleDevice, &ver);
         BRDC_printf("--------------------- INFO ------------------------- \n");
         BRDC_printf("-- Version: Shell v.%d.%d, Driver v.%d.%d --\n",
             ver.brdMajor, ver.brdMinor, ver.drvMajor, ver.drvMinor);
         for (size_t i = 0; i < MAX_LID_DEVICES; i++) {
-            if (DevicesLid[i].device.ok)
-                BRDC_printf(" LID=%d open in %s mode (handle=%X)\n", i,
-                    getStrOpenModeDevice(DevicesLid[i].mode), DevicesLid[i].handle);
+            if (DevicesLid[i].device.isOpen()) {
+                U32 v = 0;
+                BRDC_printf("* LID=%d open in %s mode (handle=%X), ver.%d \n", i,
+                    getStrOpenModeDevice(DevicesLid[i].device.mode()).c_str(), DevicesLid[i].device.handle(), v);
+                
+            }
         }
         BRDC_printf("---------------------------------------------------- \n");
     } else if (cmd == "release" || cmd == "cleanup") {
-        for (size_t i = 0; i < MAX_LID_DEVICES; i++) {
-            if (DevicesLid[i].device.ok)
-                BRD_close(DevicesLid[i].device.handle);
+        for (size_t i = 1; i < MAX_LID_DEVICES; i++) {
+            if (DevicesLid[i].device.isOpen())
+                BRD_close(DevicesLid[i].device.handle());
         }
         clearAll();
 
@@ -287,16 +290,17 @@ json FastRegsAccess::execute(const json& request)
     if (!parsingLine(line, paramReg)) {
         printf("<ERR> .. the input >%s< is not recognized ..\n", line.c_str());
         response["error"] ="The input is not recognized (reg = ?)";
-        retrun response;
+        return response;
     }
 
+    // Определяем LID устройства
     std::string slid;
     if (request.contains("lid"))
         slid = request["lid"];
     x_lid = 1;
     if (!slid.empty()) {
         x_lid = atoi(slid.c_str());
-        if (x_lid < 0 || x_lid >= MAX_LID_DEVICES) {
+        if (x_lid <= 0 || x_lid >= MAX_LID_DEVICES) {
             BRDC_printf("<ERR> Bad LID number!\n");
             response["error"] = "Bad LID!";
             return response;
@@ -309,7 +313,7 @@ json FastRegsAccess::execute(const json& request)
         U32 mode = BRDcapt_SHARED;
         DevicesLid[x_lid].servRegs.setMode(mode);
         x_handleDevice = DevicesLid[x_lid].device.handle();
-        DevicesLid[x_lid].servRegs.setHandle( BRD_capture(x_handleDevice, 0, &mode, _BRDC("REG0"), 5000));
+        DevicesLid[x_lid].servRegs.capture(x_handleDevice, "REG0", 5000); //
     }
     if(!DevicesLid[x_lid].servRegs.isOpen()){
         BRDC_printf(_BRDC("REG0 NOT capture (%X)\n"), DevicesLid[x_lid].servRegs.handle());
@@ -360,14 +364,6 @@ bool FastRegsAccess::parsingLine(std::string& line, commandLineParams& params)
 
 ////////////////////////////////////////////////////////////////// DacControl
 
-//std::mutex mtx;
-//std::mutex mtxa;
-//std::condition_variable cv;
-//std::condition_variable cva;
-//bool isWorkerRunning = true; // Флаг состояния рабочего потока
-//bool isWorkerRunningA = true; // Флаг состояния рабочего потока ADC
-//std::string filenameDac = "fileoutDac.txt";
-
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -389,38 +385,20 @@ void restore_stdout()
 
 void dacWork(int lid)
 {
-    printf("<SRV> Thread for DAC created ..\n");
-    // std::ostringstream s;
-    // redirect_stdout(s);
-    //
-    // printf("<DEBUG> Debug string for check working redirect\n");
-    //
+    printf("<SRV> Thread for DAC-%d created ..\n", lid);
+
     DevicesLid[lid].dacCtrlThr.isStoped.store(false);
     DevicesLid[lid].dacCtrlThr.stop.store(false);    
     WorkMode(lid);
-    //
-    // std::ofstream file(filenameDac);
-    // if (file.is_open()) {
-    //    file << s.str();
-    //    file.close();
-    //} else
-    //    printf("File %s not save!\n", filenameDac.c_str());
-    // restore_stdout();
-
-    // Сигнализируем основному потоку о завершении работы
-    {
-        std::lock_guard<std::mutex> lock(mtx);
-        DevicesLid[lid].dacCtrlThr.isStoped.store(true);
-        //isWorkerRunning = false;
-    }
-    cv.notify_one(); // Пробуждаем основной поток
-    printf("<SRV> Thread for DAC stoped ..\n");
+    DevicesLid[lid].dacCtrlThr.isStoped.store(true);
+    printf("<SRV> Thread for DAC-%d stoped ..\n", lid);
 }
 
 json DacControl::execute(const json& request)
 {
-
+    int x_mode = BRDopen_SHARED;
     json response = request;
+    error_ = "";
     std::string message = "Parameter is missing: ";
     if (!request.contains("dac")) {
         response["error"] = message + "dac";
@@ -441,25 +419,19 @@ json DacControl::execute(const json& request)
     x_lid = 1;
     if (!slid.empty()) {
         x_lid = atoi(slid.c_str());
-        if (x_lid < 0 || x_lid >= MAX_LID_DEVICES) {
+        if (x_lid <= 0 || x_lid >= MAX_LID_DEVICES) {
             BRDC_printf("<ERR> Bad LID number!\n");
             response["error"] = "Bad LID!";
             return false;
         }
     }
-    if (!DevicesLid[x_lid].device.ok) {
-        x_mode = BRDopen_SHARED;
-        DevicesLid[x_lid].device.mode = x_mode;
-        x_handleDevice = DevicesLid[x_lid].device.open(x_lid);
-        if (x_handleDevice <= 0) {
-            BRDC_printf("<ERR> Error open device  %d in mode %s\n", x_lid, getStrOpenModeDevice(x_mode).c_str());
-            response["error"] = "Device not opened!";
-            return false;
-        } else 
-            BRDC_printf("<SRV> Current LID = %d in mode %s \n", x_lid, getStrOpenModeDevice(x_mode).c_str());
-
-    } else
-        x_handleDevice = DevicesLid[x_lid].device.handle;
+    printf("<DEBUG:DAC> LID= %d\n", x_lid);
+    if (!DevicesLid[x_lid].device.isOpen()) {
+        BRDC_printf("<ERR> Device d'nt opened!\n");
+        response["error"] = "Device d'nt opened!";
+        return false;
+    } 
+    x_handleDevice = DevicesLid[x_lid].device.handle();
 
     if (scmd == "config") {
         if (sfile.empty()) {
@@ -468,16 +440,8 @@ json DacControl::execute(const json& request)
         }
         ReadIniFileOption(sfile, x_lid);
 
-    } else if (scmd == "capture") {
-        int mode = 1; // BRDopen_SHARED
+    } else if (scmd == "capture") {        
         int capt = 1; // BRDcapt_SHARED
-        if (request.contains("device")) {
-            std::string sm = request["device"];
-            if (sm == "excl")
-                mode = BRDopen_EXCLUSIVE;
-            else
-                mode = atoi(sm.c_str());
-        }
         if (request.contains("service")) {
             std::string sm = request["service"];
             if (sm == "excl")
@@ -485,22 +449,25 @@ json DacControl::execute(const json& request)
             else
                 capt = atoi(sm.c_str());
         }
-        CaptureAllDac(x_lid, mode, capt);
+        CaptureAllDac(x_lid, capt);
 
     } else if (scmd == "get-dac-num") {
         // вернуть g_nDacNum
-        response["value"] = g_nDacNum;
-
+        int ndc = DevicesLid[x_lid].dac.size();
+        response["value"] = ndc;
+        BRDC_printf("<SRV> Number of DACs : %d \n", ndc);
+        //
     } else if (scmd == "spi-reg") {
+        //
         if (request.contains("expr")) { // от expression
             std::string es = request["expr"];
             if (!parsSpiCommand(es)) {
                 response["error"] = "spi-reg : parser error!!";
                 return response;
             }
-            calcSpi(response);
+            calcSpi(x_lid, response);
         }
-
+        //
     } else if (scmd == "nco-channel" || scmd == "nco-main") {
         std::string sch, frq, phs;
         int ch = 0;
@@ -519,11 +486,14 @@ json DacControl::execute(const json& request)
         }
 
         if (scmd == "nco-channel")
-            nco_channel_setup(ch, fr, ph);
+            nco_channel_setup(x_lid, ch, fr, ph);
         else
-            nco_main_setup(ch, fr, ph);
-
-    } else if (scmd == "set-dac") {
+            nco_main_setup(x_lid, ch, fr, ph);
+        if(!error_.empty()) {
+            response["error"] = error_.c_str();
+            return response;
+        }
+    } else if (scmd == "setup") {
         ReadIniFileDevice(x_lid);
         SetAllDac(x_lid);
         SetMasterSlave(x_lid);
@@ -533,34 +503,37 @@ json DacControl::execute(const json& request)
             std::string ms = request["mode"];
             g_nWorkMode = atoi(ms.c_str());
         }
-        if (request.contains("file")) {
-            filenameDac = request["file"];
-        }
-        DevicesLid[lid].dacCtrlThr.thread = new std::thread(dacWork, x_lid);
+        DevicesLid[x_lid].dacCtrlThr.isStoped.store(true);
+        DevicesLid[x_lid].dacCtrlThr.thread = new std::thread(dacWork, x_lid);
+        while (DevicesLid[x_lid].dacCtrlThr.isStoped.load())
+            usleep(100);
         // WorkMode();
-    } else if (scmd == "release" || scmd == "stop") {
+    } else if (scmd == "stop") {
         // Остановка рабочего потока
-        std::lock_guard<std::mutex> lock(mtx);
-        // printf("<**> DAC mutex unlock ..\n");
-       DevicesLid[lid].dacCtrlThr.stop.store(true);
-        // printf("<**> DAC isWorkerRunning = false ..\n");
-        cv.notify_one(); // Пробуждаем рабочий поток, если он спит
-        // printf("<**> DAC notify_one ..\n");
+        DevicesLid[x_lid].dacCtrlThr.stop.store(true);
         //  Ожидание завершения рабочего потока
-        std::unique_lock<std::mutex> lk(mtx);
-        // printf("<**> DAC thread wakeup ..\n");
-        while(!DevicesLid[lid].dacCtrlThr.isStoped.load(););
-            Sleep(100);
-        //cv.wait(lk, [] { return !isWorkerRunning; });
-        // printf("<**> DAC thread touch ..\n");
-        //  Завершение рабочего потока
-        if (workerThread->joinable()) {
-            workerThread->join();
+        bool wt = false;
+        while(!wt) {
+            wt = DevicesLid[x_lid].dacCtrlThr.isStoped.load();
+            usleep(100);
         }
-        // Освобождение ЦАПов
-        // printf("<**> DAC start function ReleaseAllDac() ..\n");
         ReleaseAllDac(x_lid);
-        printf("<SRV> DAC released ..\n");
+        printf("<SRV> DAC of lid#%d released ..\n", x_lid);
+
+    }else if (scmd == "release") {
+        // Остановка всех рабочих потоков
+        for (size_t i = 1; i < MAX_LID_DEVICES; i++) {
+            if (DevicesLid[i].device.isOpen() && !DevicesLid[i].dacCtrlThr.isStoped.load()) {
+                DevicesLid[i].dacCtrlThr.stop.store(true);
+                bool wt = false;
+                while(!wt) {
+                    wt = DevicesLid[i].dacCtrlThr.isStoped.load();
+                    usleep(100);
+                }
+                ReleaseAllDac(i);
+                printf("<SRV> DAC of lid#%d released ..\n", i);
+            }         
+        }        
 
     } else if (scmd == "list-parameters") {
         ListParameters();
@@ -571,11 +544,17 @@ json DacControl::execute(const json& request)
     return response;
 }
 
-void DacControl::calcSpi(json& resp)
+void DacControl::calcSpi(int lid, json& resp)
 {
     S32 status;
     U32 mode = BRDcapt_SHARED;
-    BRD_Handle hSrv = BRD_capture(x_handleDevice, 0, &mode, _BRDC("REG0"), 5000);
+    if(!DevicesLid[lid].device.isOpen()) {
+        BRDC_printf(_BRDC("Device LID=(%d) d'nt opened\n"), lid);
+        error_ = "Device d'nt opened !!";
+        return;
+    }
+
+    BRD_Handle hSrv = BRD_capture(DevicesLid[lid].device.handle(), 0, &mode, _BRDC("REG0"), 5000);
     if (hSrv <= 0) {
         BRDC_printf(_BRDC("REG0 NOT capture (%X)\n"), hSrv);
         resp["error"] = "REG0 NOT capture !!";
@@ -611,161 +590,18 @@ bool DacControl::parsSpiCommand(const std::string es)
     return true;
 }
 
-////////////////////////////////////////////////////////////////// AdcControl
-
-void AdcWork(int lid)
-{
-    printf("<SRV> Thread for ADC created ..\n");
-
-    DevicesLid[lid].
-    isWorkerRunningA = true;
-    workFlow(/*isWorkerRunningA*/);
-
-    // Сигнализируем основному потоку о завершении работы
-    {
-        std::lock_guard<std::mutex> lock(mtxa);
-        isWorkerRunningA = false;
-    }
-    cva.notify_one(); // Пробуждаем основной поток
-    printf("<SRV> Thread for ADC stoped ..\n");
-}
-
-json AdcControl::execute(const json& request)
-{
-    // printf("##### MARKER: ADC:execute begin\n");
-    json response = request;
-    std::string message = "Parameter is missing: ";
-    if (!request.contains("adc")) {
-        response["error"] = message + "adc";
-        return response;
-    }
-
-    std::string scmd = request["adc"];
-    std::string sfile;
-    if (request.contains("path")) {
-        sfile = request["path"];
-    }
-    // printf("Receive command adc> %s: %s  \n", scmd.c_str(), sfile.c_str());
-    // printf("##### MARKER: adc:%s, path=%s\n", scmd.c_str(), sfile.c_str());
-    // Определяем LID устройства
-    std::string slid = "1";
-    if (request.contains("lid")) {
-        slid = request["lid"];
-    }
-    x_lid = 1;
-    if (!slid.empty()) {
-        x_lid = atoi(slid.c_str());
-        if (x_lid < 0 || x_lid >= MAX_LID_DEVICES) {
-            BRDC_printf("<ERR> Bad LID number!\n");
-            response["error"] = "Bad LID!";
-            return false;
-        }
-    }
-
-    if (scmd == "config") {
-        if (sfile.empty()) {
-            response["error"] = "ini-file dn't found ..";
-            return response;
-        }
-        adcGetOptions(sfile);
-
-    } else if (scmd == "setupADC" || scmd == "setup") {
-        int mode = BRDopen_EXCLUSIVE;
-        if (request.contains("mode")) {
-            std::string sm = request["mode"];
-            mode = atoi(sm.c_str());
-        }
-        if (x_handleDevice <= 0) {
-            response["error"] = "the device is not open!";
-            return response;
-        }
-        if (!DevicesLid[x_lid].device.ok) {
-            // устройство не открыто, делаем попытку открыть
-        }
-        if (!checkPower(x_handleDevice)) {
-            printf("<ERR> ADC power error .. /n");
-            response["error"] = "ADC power error";
-        }
-        if (!captureService(x_handleDevice, mode)) {
-            printf("<ERR> Capture service & setup error .. /n");
-            response["error"] = "Capture service & setup error";
-        }
-
-    } else if (scmd == "startWorkFlow" || scmd == "work") {
-        if (x_handleDevice > 0)
-            DevicesLid[x_lid].adcCtrlThr.thread = new std::thread(AdcWork, x_lid);
-        // workFlow();
-        else
-            response["error"] = "the device is not open!";
-
-    } else if (scmd == "spi-reg") {
-        if (request.contains("expr")) { // от expression
-            std::string es = request["expr"];
-            if (!parsSpiCommand(es)) {
-                response["error"] = "spi-reg : parser error!!";
-                return response;
-            }
-            calcSpi(response);
-        }
-
-    } else if (scmd == "release") {
-        //        ReleaseAllDac();
-        releaseAdc();
-
-    } else if (scmd == "list-parameters") {
-        ListParametersAdc();
-
-    } else {
-        response["error"] = "Unrecognized error!!";
-    };
-
-    return response;
-}
-
-bool AdcControl::parsSpiCommand(const std::string es)
-{
-    if (es.empty())
-        return false;
-    write_ = false;
-    std::string s, sreg, sval;
-    int n = 0;
-    s = es;
-    n = s.find('=');
-    sreg = s.substr(0, n);
-    if (n > 0) {
-        write_ = true;
-        sval = s.substr(n + 1);
-    }
-    regNum_ = strtoull(sreg.c_str(), NULL, 0);
-    value_ = strtoull(sval.c_str(), NULL, 0);
-    return true;
-}
-
-void AdcControl::calcSpi(json& resp)
-{
-    S32 status;
-    U32 mode = BRDcapt_SHARED;
-    BRD_Handle hSrv = BRD_capture(x_handleDevice, 0, &mode, _BRDC("REG0"), 5000);
-    if (hSrv <= 0) {
-        BRDC_printf(_BRDC("REG0 NOT capture (%X)\n"), hSrv);
-        resp["error"] = "REG0 NOT capture !!";
-        return;
-    }
-    if (!write_) {
-        U32 val = SpdRead(hSrv, findTetrad(), 0, 0, regNum_);
-    } else {
-        S32 err = SpdWrite(hSrv, findTetrad(), 0, 0, regNum_, value_);
-    }
-    // response["result"] =  (write_ ? ("SPI-write: "):("SPI-read: ")) + ("reg=");
-    printf("SPI %s  reg=0x%4.4X  val=0x%4.4X\n", write_ ? "write" : "read", regNum_, value_);
-    BRD_release(hSrv, 0);
-}
-
-void DacControl::nco_main_setup(std::size_t chan, double freq, double phase)
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void DacControl::nco_main_setup(int lid, std::size_t chan, double freq, double phase)
 {
     double freq_clk = 12000.0; // частота тактирования ЦАП в МГц
     auto DDSM_FTW = uint64_t(round((freq / (freq_clk * 1'000'000)) * std::pow(2, 48)));
     auto DDSM_PHASE = uint16_t(round((phase / 180.) * std::pow(2, 15)));
+
+    if(!DevicesLid[lid].device.isOpen()) {
+        BRDC_printf(_BRDC("Device LID=(%d) d'nt opened\n"), lid);
+        error_ = "Device d'nt opened !!";
+        return;
+    }
 
     printf("[ADC] Main NCO's Setup: DAC%zd = %.0f Hz [%012zXh], Phase = %.0f [%04Xh]", chan, freq, DDSM_FTW, phase, DDSM_PHASE);
 
@@ -790,8 +626,9 @@ void DacControl::nco_main_setup(std::size_t chan, double freq, double phase)
         { 0x11C, DDSM_PHASE >> 0 & 0xFF }, { 0x11D, DDSM_PHASE >> 8 & 0xFF },
         { 0x113, 0x01 }, // Enable Update NCO
     };
+
     U32 mode = BRDcapt_SHARED;
-    BRD_Handle hSrv = BRD_capture(x_handleDevice, 0, &mode, _BRDC("REG0"), 5000);
+    BRD_Handle hSrv = BRD_capture(DevicesLid[lid].device.handle(), 0, &mode, _BRDC("REG0"), 5000);
     if (hSrv <= 0) {
         BRDC_printf(_BRDC("REG0 NOT capture (%X)\n"), hSrv);
         return;
@@ -814,11 +651,17 @@ void DacControl::nco_main_setup(std::size_t chan, double freq, double phase)
 ///
 /// \return     void
 ///
-void DacControl::nco_channel_setup(std::size_t chan, double freq, double phase)
+void DacControl::nco_channel_setup(int lid, std::size_t chan, double freq, double phase)
 {
     double freq_clk = 12000.0; // частота тактирования ЦАП в МГц
+    if(!DevicesLid[lid].device.isOpen()) {
+        BRDC_printf(_BRDC("Device LID=(%d) d'nt opened\n"), lid);
+        error_ = "Device d'nt opened !!";
+        return;
+    }
+
     U32 mode = BRDcapt_SHARED;
-    BRD_Handle hSrv = BRD_capture(x_handleDevice, 0, &mode, _BRDC("REG0"), 5000);
+    BRD_Handle hSrv = BRD_capture(DevicesLid[lid].device.handle(), 0, &mode, _BRDC("REG0"), 5000);
     if (hSrv <= 0) {
         BRDC_printf(_BRDC("REG0 NOT capture (%X)\n"), hSrv);
         return;
@@ -872,6 +715,180 @@ void DacControl::nco_channel_setup(std::size_t chan, double freq, double phase)
     BRD_release(hSrv, 0);
     /**/
 }
+
+
+////////////////////////////////////////////////////////////////// AdcControl
+
+void AdcWork(int lid)
+{
+    printf("<SRV> Thread for ADC created ..\n");
+
+    DevicesLid[lid].adcCtrlThr.isStoped.store(false);
+    DevicesLid[lid].adcCtrlThr.stop.store(false);    
+    workFlow(lid);
+
+    DevicesLid[lid].adcCtrlThr.isStoped.store(true);
+
+    printf("<SRV> Thread for ADC stoped ..\n");
+}
+
+json AdcControl::execute(const json& request)
+{
+    // printf("##### MARKER: ADC:execute begin\n");
+    U32 x_mode = 0;
+    json response = request;
+    std::string message = "Parameter is missing: ";
+    if (!request.contains("adc")) {
+        response["error"] = message + "adc";
+        return response;
+    }
+
+    std::string scmd = request["adc"];
+    std::string sfile, slid;
+    if (request.contains("path")) {
+        sfile = request["path"];
+    }
+    if (request.contains("lid")) {
+        slid = request["lid"];
+    }    
+    x_lid = 1;
+    if (!slid.empty()) {
+        x_lid = atoi(slid.c_str());
+        if (x_lid <= 0 || x_lid >= MAX_LID_DEVICES) {
+            BRDC_printf("<ERR> Bad LID number!\n");
+            response["error"] = "Bad LID!";
+            return response;
+        }
+    }
+    printf("<DEBUG:ADC> LID= %d\n", x_lid);
+    if (!DevicesLid[x_lid].device.isOpen()) {
+        response["error"] = "Device d'nt opened!";
+        return response;
+    } 
+    x_handleDevice = DevicesLid[x_lid].device.handle();
+
+    if (scmd == "config") {
+        if (sfile.empty()) {
+            response["error"] = "ini-file dn't found ..";
+            return response;
+        }
+        adcGetOptions(sfile);
+
+    } else if (scmd == "setup") {
+        int mode = BRDopen_EXCLUSIVE;
+        if (request.contains("mode")) {
+            std::string sm = request["mode"];
+            mode = atoi(sm.c_str());
+        }
+        if (!checkPower(x_lid)) {
+            printf("<ERR> ADC power error .. /n");
+            response["error"] = "ADC power error";
+        }
+        if (!captureService(x_lid, mode)) {
+            printf("<ERR> Capture service & setup error .. /n");
+            response["error"] = "Capture service & setup error";
+        }
+
+    } else if ( scmd == "work" || scmd == "start") {        
+        if (x_handleDevice > 0) {
+            DevicesLid[x_lid].adcCtrlThr.isStoped.store(true);
+            DevicesLid[x_lid].adcCtrlThr.thread = new std::thread(AdcWork, x_lid);
+            while (DevicesLid[x_lid].adcCtrlThr.isStoped.load())
+                usleep(100);
+        }
+        else
+            response["error"] = "the device is not open!";
+    }       
+
+    else if (scmd == "stop") {
+
+        DevicesLid[x_lid].adcCtrlThr.stop.store(true);
+        while(!DevicesLid[x_lid].adcCtrlThr.isStoped.load());
+                usleep(100);
+        releaseAdc(x_lid);
+        printf("<SRV> ADC lid#%d released ..\n", x_lid);
+    
+    }         
+
+    else if (scmd == "spi-reg") {
+        if (request.contains("expr")) { // от expression
+            std::string es = request["expr"];
+            if (!parsSpiCommand(es)) {
+                response["error"] = "spi-reg : parser error!!";
+                return response;
+            }
+            calcSpi(x_lid, response);
+        }
+
+    } else if (scmd == "release") {
+       // Остановка всех рабочих потоков
+       for (size_t i = 1; i < MAX_LID_DEVICES; i++) {
+            if (DevicesLid[i].device.isOpen() && !DevicesLid[i].adcCtrlThr.isStoped.load()) {
+                DevicesLid[i].adcCtrlThr.stop.store(true);
+                bool wt = false;
+                while(!wt) {
+                    wt = DevicesLid[i].adcCtrlThr.isStoped.load();
+                    usleep(100);
+                }
+                releaseAdc(i);
+                printf("<SRV> ADC of lid#%d released ..\n", i);
+            }         
+        }
+    } else if (scmd == "list-parameters") {
+        ListParametersAdc();
+
+    } else {
+        response["error"] = "Unrecognized error!!";
+    };
+
+    return response;
+}
+
+bool AdcControl::parsSpiCommand(const std::string es)
+{
+    if (es.empty())
+        return false;
+    write_ = false;
+    std::string s, sreg, sval;
+    int n = 0;
+    s = es;
+    n = s.find('=');
+    sreg = s.substr(0, n);
+    if (n > 0) {
+        write_ = true;
+        sval = s.substr(n + 1);
+    }
+    regNum_ = strtoull(sreg.c_str(), NULL, 0);
+    value_ = strtoull(sval.c_str(), NULL, 0);
+    return true;
+}
+
+void AdcControl::calcSpi(int lid, json& resp)
+{
+    S32 status;
+    U32 mode = BRDcapt_SHARED;
+    if(!DevicesLid[lid].device.isOpen()) {
+        BRDC_printf(_BRDC("Device LID=(%d) d'nt opened\n"), lid);
+        resp["error"] = "Device d'nt opened !!";
+        return;
+    }
+    BRD_Handle hSrv = BRD_capture(DevicesLid[lid].device.handle(), 0, &mode, _BRDC("REG0"), 5000);
+    if (hSrv <= 0) {
+        BRDC_printf(_BRDC("REG0 NOT capture (%X)\n"), hSrv);
+        resp["error"] = "REG0 NOT capture !!";
+        return;
+    }
+    if (!write_) {
+        U32 val = SpdRead(hSrv, findTetrad(), 0, 0, regNum_);
+    } else {
+        S32 err = SpdWrite(hSrv, findTetrad(), 0, 0, regNum_, value_);
+    }
+    // response["result"] =  (write_ ? ("SPI-write: "):("SPI-read: ")) + ("reg=");
+    printf("SPI %s  reg=0x%4.4X  val=0x%4.4X\n", write_ ? "write" : "read", regNum_, value_);
+    BRD_release(hSrv, 0);
+}
+
+
 
 ////////////////////////////////////////////////////////////////// FmcSync
 json FmcSync::execute(const json& request)

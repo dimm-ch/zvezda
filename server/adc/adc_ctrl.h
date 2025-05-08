@@ -6,6 +6,7 @@
 #include "ctrlcmpsc.h"
 #include "ctrlsdram.h" // only for base module with SDRAM on board (e.g. AMBPCD)
 #include "ctrlstrm.h"
+#include "total.h"
 #include <string>
 
 // #include	"ctrldspnode.h" // only for DSP PLD on AMBPCD
@@ -47,11 +48,11 @@ void MapWrFlagSinc(int flg, int isNewParam);
 int MapRdFlagSinc();
 S32 MapDataFromMemWriteData(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBufSize, unsigned long long bMemBufSize, ULONG DmaOn);
 
-void ContinueDaq(ULONG BlkSize, ULONG BlkNum);
+void ContinueDaq(int lid, ULONG BlkSize, ULONG BlkNum);
 void printLids(void);
 void adcGetOptions(const std::string inifile);
-bool checkPower(BRD_Handle handleDevice);
-bool captureService(BRD_Handle handleDevice, int mode);
-void workFlow(void);
-S32 releaseAdc();
+bool checkPower(int lid);
+bool captureService(int lid, int mode);
+void workFlow(int lid);
+S32 releaseAdc(int lid);
 void ListParametersAdc(void);

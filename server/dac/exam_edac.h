@@ -19,6 +19,7 @@
 // #include	"ctrlreg.h"
 #include "ctrlbasef.h"
 #include <string>
+
 //
 // Macros
 //
@@ -107,10 +108,10 @@ extern BRDCHAR g_sFullName[MAX_PATH];
 
 // extern int g_lid;
 extern int g_exitRightAway;
-extern S32 g_nDevNum;
-extern BRD_Handle g_hDev[MAX_DEVICE];
-extern S32 g_nDacNum;
-extern TDacParam g_aDac[MAX_DAC];
+// extern S32 g_nDevNum;
+// extern BRD_Handle g_hDev[MAX_DEVICE];
+// extern S32 g_nDacNum;
+// extern TDacParam g_aDac[MAX_DAC];
 extern S32 g_idx[MAX_DAC];
 
 // extern BRD_Handle		g_hCaptSrv[10];
@@ -148,30 +149,30 @@ extern S32 g_nMsTimeout;
 //
 // S32 ParseCommandLine(int argc, BRDCHAR* argv[]);
 S32 DisplayErrorDac(S32 status, const char* func_name, const BRDCHAR* cmd_str);
-S32 CaptureAllDac(int lid, int modeOpen, int modeCapture);
-S32 ReleaseAllDac(void);
+S32 CaptureAllDac(int lid, int modeCapture);
+S32 ReleaseAllDac(int lid);
 S32 SetAllDac(int lid);
 S32 SetSwitch(BRD_Handle handle, TDacParam param);
 void ListParameters(void);
 
-S32 SetMasterSlave(void);
-S32 CalcSignal(void* pvBuf, SBIG nSamples, int idxDac, int cnt);
+S32 SetMasterSlave(int lid);
+S32 CalcSignal(void* pvBuf, SBIG nSamples, TDacParam& pDac, int cnt);
 S32 CalcSignalToBuf(void* pvBuf, SBIG nSamples, S32 signalType,
     S32 sampleWidth, S32 chanMask, S32 chanMaxNum,
     double twiddle, double* aAmpl, double* aPhase);
 S32 CalcSignalToChan(void* pvBuf, SBIG nSamples, S32 signalType,
     S32 sampleWidth, S32 chanIdx, S32 chanNum,
     double twiddle, double ampl, double* pPhase);
-S32 FillSignalFromFile(void* pvBuf, SBIG nSamples, int idxDac, int cnt);
+S32 FillSignalFromFile(void* pvBuf, SBIG nSamples, TDacParam& pDac, int cnt);
 
-S32 CorrectOutFreq(int idxDac);
+S32 CorrectOutFreq(TDacParam& dac);
 S32 ReadIniFile2(TCHAR* pFileName);
 S32 GetInifileString(const BRDCHAR* FileName, const BRDCHAR* SectionName,
     const BRDCHAR* ParamName, BRDCHAR* defValue,
     BRDCHAR* strValue, int strSize);
 S32 ReadIniFileOption(const std::string fileIni, int lid);
 S32 ReadIniFileDevice(int lid);
-S32 DisplayDacTraceText(int loop, int dacIdx);
+S32 DisplayDacTraceText(int loop, int lid);
 
 //
 // WORKMODE.CPP
@@ -187,18 +188,18 @@ S32 WorkMode6(int lid);
 S32 WorkMode7(int lid);
 S32 WorkMode8(int lid);
 
-S32 FifoOutputCPU(void);
-S32 FifoOutputCPUStart(S32 isCycle);
-S32 FifoOutputDMA(void);
+S32 FifoOutputCPU(int lid);
+S32 FifoOutputCPUStart(int lid, S32 isCycle);
+S32 FifoOutputDMA(int lid);
 S32 FifoOutputCycleDMA(int lid);
 S32 SdramLikeFifoOutputCycleDMA(int lid);
 
-S32 SdramSetParam(int idxDac);
-S32 SdramWriteDMA(void);
-S32 SdramModulWriteDMA(int idxDac);
-S32 SdramOutToDAC(void);
-S32 SdramCycleOutput(S32 cycle);
-S32 PrepareStart(void);
+S32 SdramSetParam(TDacParam& dac);
+S32 SdramWriteDMA(int lid);
+S32 SdramModulWriteDMA(TDacParam& pDac);
+S32 SdramOutToDAC(int lid);
+S32 SdramCycleOutput(int lid, S32 cycle);
+S32 PrepareStart(int lid);
 
 //
 // TMP.CPP
@@ -210,8 +211,9 @@ S32 DacSettings(BRD_Handle hDAC, int idx, BRDCHAR* srvName, BRDCHAR* iniFileName
 S32 WorkSrv(void);
 S32 CalcSignalOld(S32* samples, S32 nsamples);
 S32 CalcSignalSDRAM(S32* samples, S32 nsamples, double* phase, S32* iphase);
-S32 OldCorrectOutFreq(void);
 
+/*
+S32 OldCorrectOutFreq(void);
 S32 OldFifoOutputCPU(PVOID pSig, ULONG bBufSize);
 S32 OldFifoOutputCPUCycleFIFO(PVOID pSig, ULONG bBufSize, S32 cycle);
 S32 OldFifoOutputDMA(void);
@@ -221,6 +223,7 @@ S32 OldSdramOutToDAC(void);
 S32 OldCycleSdramOutput(S32 cycle);
 S32 OldFifoOutputCycleDMA(void);
 bool OldSetParamSDRAM(BRD_Handle hSrv);
+*/
 
 #endif // _EXAM_EDAC_H
 

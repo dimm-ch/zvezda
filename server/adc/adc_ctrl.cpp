@@ -3,7 +3,7 @@
 #include "mu_ctrl.h"
 #include <chrono>
 
-#include "total.h"
+#include "../total.h"
 #include <math.h>
 #include <stdexcept>
 
@@ -25,6 +25,8 @@ HANDLE g_hFlgFileMap = NULL;
 HANDLE g_hPostfixFileMap = NULL;
 #endif
 
+// extern FuDevs DevicesLid[10];
+
 extern int g_subNo; // номер службы АЦП из командной строки
 extern int g_fileMap;
 ULONG* g_pFlags;
@@ -33,7 +35,7 @@ char* g_pPostfix;
 extern ULONG g_MsTimeout;
 
 BRDctrl_StreamCBufAlloc g_buf_dscr;
-extern BRD_Handle x_hADC;
+// extern BRD_Handle x_hADC;
 extern ULONG g_MemAsFifo;
 extern ULONG g_AdcDrqFlag;
 extern ULONG g_MemDrqFlag;
@@ -128,13 +130,7 @@ int SetMuRun(BRD_Handle hSrv)
 // ADC28X800M, ADC28X1G, ADC10X2G, ADC210X1G, ADC212X1G, FM814X125M
 int CheckClock(BRD_Handle hADC, BRDCHAR* AdcSrvName)
 {
-	if(BRDC_stricmp(AdcSrvName, _BRDC("ADC28X800M")) &&
-	   BRDC_stricmp(AdcSrvName, _BRDC("ADC28X1G")) &&
-	   BRDC_stricmp(AdcSrvName, _BRDC("ADC10X2G")) &&
-	   BRDC_stricmp(AdcSrvName, _BRDC("ADC210X1G")) &&
-	   BRDC_stricmp(AdcSrvName, _BRDC("ADC212X1G")) &&
-	   BRDC_stricmp(AdcSrvName, _BRDC("FM814X125M"))
-	   )
+    if (BRDC_stricmp(AdcSrvName, _BRDC("ADC28X800M")) && BRDC_stricmp(AdcSrvName, _BRDC("ADC28X1G")) && BRDC_stricmp(AdcSrvName, _BRDC("ADC10X2G")) && BRDC_stricmp(AdcSrvName, _BRDC("ADC210X1G")) && BRDC_stricmp(AdcSrvName, _BRDC("ADC212X1G")) && BRDC_stricmp(AdcSrvName, _BRDC("FM814X125M")))
         return 1; // если ни одна из этих служб
     BRDC_printf(_BRDC("Clock checking...\r"));
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
@@ -1196,7 +1192,7 @@ ULONG g_fileBufSize;
 ULONG g_fileBufNum;
 ULONG g_fileBlkNum;
 
-void DirectFile(ULONG bufType, ULONG FileBufSize, ULONG FileBufNum, ULONG FileBlkNum)
+void DirectFile(int lid, ULONG bufType, ULONG FileBufSize, ULONG FileBufNum, ULONG FileBlkNum)
 {
     THREAD_PARAM thread_par;
 
@@ -1212,7 +1208,7 @@ void DirectFile(ULONG bufType, ULONG FileBufSize, ULONG FileBufNum, ULONG FileBl
     g_fileBlkNum = FileBlkNum;
 
     g_flbreak = 0;
-    thread_par.handle = x_hADC;
+    thread_par.handle = DevicesLid[lid].adc.handle(); // x_hADC;
     thread_par.idx = 0;
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
     IPC_handle hThread = IPC_createThread(_BRDC("DirWriteIntoFile"), &DirWriteIntoFile, &thread_par);

@@ -39,6 +39,7 @@ add_subdirectory(apps)
 add_subdirectory(server)
 add_subdirectory(work)
 add_subdirectory(work2)
+add_subdirectory(work2/temp)
 
 message(STATUS ${Var1})
 if(DEFINED WINCOMPILE)

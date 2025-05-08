@@ -1,4 +1,5 @@
-
+//
+#include "../total.h"
 #include "adc_ctrl.h"
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
@@ -10,6 +11,7 @@
 #endif
 
 // extern BRD_Handle g_hSRV;
+
 extern ULONG g_MemDrqFlag;
 extern unsigned long long g_bMemBufSize;
 extern ULONG g_MsTimeout;
@@ -290,12 +292,9 @@ S32 EndDaqIntoSdramDMA()
 }
 #endif
 
-S32 releaseAdc()
+S32 releaseAdc(int lid)
 {
-    // CloseHandle(g_hUserEvent);
-    // CloseHandle(g_hThread);
-    // g_hUserEvent = NULL;
-    // g_hThread = NULL;
+    DevicesLid[lid].adc.release();
     return 0; // evt_status;
 }
 

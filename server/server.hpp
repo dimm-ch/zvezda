@@ -43,7 +43,6 @@
 #include "adc/adc_ctrl.h"
 #include "dac/exam_edac.h"
 #include "sync/fmc146v_sync.h"
-#include "total.h"
 
 using namespace std::chrono_literals;
 using namespace std::string_literals;
@@ -261,11 +260,12 @@ public:
             // ждём запрос соединения от клиента
             sockaddr_in client_addr {}; // адрес и порт клиента
             socklen_t client_addr_len = sizeof(client_addr);
-            std::fprintf(stdout, "\nServer Listening...\n");
-            std::fflush(stdout);
             while (true) {
                 try {
                 m1:
+                    std::fprintf(stdout, "\nServer Listening...\n");
+                    std::fflush(stdout);
+
                     _socket = accept(_server, reinterpret_cast<sockaddr*>(&client_addr),
                         &client_addr_len);
                     if (_socket == 0) {
@@ -405,7 +405,7 @@ public:
     using CommandExecutor::CommandExecutor;
     json execute(const json& request) final;
     bool parsSpiCommand(const std::string es);
-    void calcSpi(json& resp);
+    void calcSpi(int lid, json& resp);
 
     size_t findTetrad() { return 4; }
 };
@@ -416,15 +416,16 @@ class DacControl final : public CommandExecutor {
     S16 regNum_;
     S16 value_;
     bool write_;
+    std::string error_;
 
 public:
     static std::string command() { return "dac"; }
     using CommandExecutor::CommandExecutor;
     json execute(const json& request) final;
-    void calcSpi(json& resp);
+    void calcSpi(int lid, json& resp);
     size_t findTetrad() { return 7; }
-    void nco_main_setup(std::size_t chan, double freq, double phase);
-    void nco_channel_setup(std::size_t chan, double freq, double phase);
+    void nco_main_setup(int lid, std::size_t chan, double freq, double phase);
+    void nco_channel_setup(int lid, std::size_t chan, double freq, double phase);
     bool parsSpiCommand(const std::string es);
 };
 

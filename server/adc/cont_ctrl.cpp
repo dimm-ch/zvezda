@@ -13,6 +13,8 @@ static HANDLE g_hBufFileMap;
 static HANDLE g_hFlgFileMap;
 #endif
 
+#include "../total.h"
+
 extern BRD_Handle x_hADC;
 extern ULONG g_MemAsFifo;
 extern ULONG g_AdcDrqFlag;
@@ -37,7 +39,7 @@ ULONG g_BlkNum;
 static void* g_pBufFileMap;
 static ULONG* g_pFlags;
 
-void ContinueDaq(ULONG BlkSize, ULONG BlkNum)
+void ContinueDaq(int lid, ULONG BlkSize, ULONG BlkNum)
 {
     THREAD_PARAM thread_par;
 
@@ -50,7 +52,7 @@ void ContinueDaq(ULONG BlkSize, ULONG BlkNum)
     g_BlkNum = BlkNum;
 
     g_flbreak = 0;
-    thread_par.handle = x_hADC;
+    thread_par.handle = DevicesLid[lid].adc.handle(); // x_hADC;
     thread_par.idx = 0;
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
     IPC_handle hThread = IPC_createThread(_BRDC("ContinueDaq"), &ContDaqFileMapping, &thread_par);
