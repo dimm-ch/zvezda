@@ -170,43 +170,39 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
 {
     S32 status;
 
-    // ULONG master = BRDims_SINGLE; // реализован только независимый (одиночный) режим
-    // status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETMASTER, &master);
-
     BRD_AdcCfg adc_cfg;
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCFG, &adc_cfg);
-    BRDC_printf(_BRDC("ADC Config: FIFO size = %d kBytes\n"), adc_cfg.FifoSize / 1024);
-
-    // ULONG chan_mask = 3; // включаем оба канала
-    // status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETCHANMASK, &chan_mask);
-    // int num_chan = (chan_mask & 0x1) + ((chan_mask >> 1) & 0x1);
+    BRDC_printf(_BRDC("<SRV> AdcSettings: ADC Config: FIFO size = %d kBytes\n"), adc_cfg.FifoSize / 1024);
 
     // задать параметры из файла
     BRDCHAR iniFilePath[MAX_PATH];
     BRDCHAR iniSectionName[MAX_PATH];
+    /*
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
     IPC_getCurrentDir(iniFilePath, sizeof(iniFilePath) / sizeof(BRDCHAR));
 #else
     GetCurrentDirectory(sizeof(iniFilePath) / sizeof(BRDCHAR), iniFilePath);
 #endif
-    BRDC_strcat(iniFilePath, "/");
+    BRDC_strcat(iniFilePath, "//");
     BRDC_strcat(iniFilePath, iniFileName);
     BRDC_sprintf(iniSectionName, _BRDC("device%d_%s%d"), idx, srvName, (g_subNo < 0) ? isx : 0);
+    */
+    BRDC_sprintf(iniSectionName, _BRDC("device%d_%s%d"), idx, srvName, (g_subNo < 0) ? isx : 0);
+    S32 err = IPC_getFullPath(iniFileName, iniFilePath);
+    if (0 > err) {
+        BRDC_printf(_BRDC("ERROR: Can't find ini-file '%s'\n\n"), iniFileName);
+        return -1;
+    }
+    BRDC_printf(_BRDC("<SRV> AdcSettings: iniFileName = '%s'\n    iniFilePath = '%s'\n"), iniFileName, iniFilePath);
 
     BRD_IniFile ini_file;
-    // BRDC_strcpy(ini_file.fileName, iniFilePath);
-    BRDC_strcpy(ini_file.fileName, iniFileName);
-    printf("-D--- ini_file.fileName = %s\n", ini_file.fileName);
+    BRDC_strcpy(ini_file.fileName, iniFilePath);
     BRDC_strcpy(ini_file.sectionName, iniSectionName);
-    printf("-D-- ini_file.sectionName = %s\n", ini_file.sectionName);
     auto adc_start_time = std::chrono::high_resolution_clock::now();
 
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_READINIFILE, &ini_file);
-    if (!BRD_errcmp(status, BRDerr_OK)) {
-        // if (BRD_errext(status) != BRDerr_OK) {
-        printf("--- exception: BRDctrl_ADC_READINIFILE, status=0x%X \n", status);
-        throw std::invalid_argument("Side-Driver parameters bad");
-    }
+    if (BRD_errext(status) != BRDerr_OK)
+        throw std::invalid_argument("<ERR> AdcSettings: Side-Driver parameters bad!");
 
 #ifdef _WIN32
     // альтернативная установка параметров не из файла, а из структуры SetMU, которая индивидуальна для каждого субмодуля
@@ -217,6 +213,7 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
     BRD_SyncMode sync_mode;
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETSYNCMODE, &sync_mode);
     if (BRDC_strstr(srvName, _BRDC("ADC1624X192")) || BRDC_strstr(srvName, _BRDC("ADC1624X128")) || BRDC_strstr(srvName, _BRDC("ADC818X800"))) {
+
         if (BRD_errcmp(status, BRDerr_OK))
             BRDC_printf(_BRDC("BRDctrl_ADC_GETSYNCMODE: source = %d, value = %.2f MHz, rate = %.3f kHz\n"),
                 sync_mode.clkSrc, sync_mode.clkValue / 1000000, sync_mode.rate / 1000);
@@ -332,8 +329,10 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
     // получить маску включенных каналов
     ULONG chan_mask = 0;
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCHANMASK, &chan_mask);
+    printf("<DBG> AdcSettings: BRDctrl_ADC_GETCHANMASK = 0x%X\n", chan_mask);
     ULONG is_complex = 0;
     BRD_ctrl(hADC, 0, BRDctrl_ADC_ISCOMPLEX, &is_complex);
+    printf("<DBG> AdcSettings: BRDctrl_ADC_ISCOMPLEX = 0x%X\n", is_complex);
 
     // status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETCHANMASK, &chan_mask);
     if (BRD_errcmp(status, BRDerr_OK))
@@ -368,7 +367,7 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
 
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETINPRANGE, &value_chan);
         if (BRD_errcmp(status, BRDerr_OK))
-            //			printf("BRDctrl_ADC_GETINPRANGE: range of channel %d = %f\n", value_chan.chan, value_chan.value);
+            // printf("BRDctrl_ADC_GETINPRANGE: range of channel %d = %f\n", value_chan.chan, value_chan.value);
             BRDC_printf(_BRDC("Range = %f\n"), value_chan.value);
         else
             DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_ADC_GETINPRANGE"));
@@ -1195,6 +1194,8 @@ ULONG g_fileBlkNum;
 void DirectFile(int lid, ULONG bufType, ULONG FileBufSize, ULONG FileBufNum, ULONG FileBlkNum)
 {
     THREAD_PARAM thread_par;
+
+    printf("<DBG> DirectFile: ADC-%d, bufType=%lu, FileBufSize=%lu, FileBufNum=%lu? FileBlkNum=%ul \n", lid, bufType, FileBufSize, FileBufNum, FileBlkNum);
 
 #ifdef _WIN32
     SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);

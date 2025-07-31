@@ -149,10 +149,10 @@ extern S32 g_nMsTimeout;
 //
 // S32 ParseCommandLine(int argc, BRDCHAR* argv[]);
 S32 DisplayErrorDac(S32 status, const char* func_name, const BRDCHAR* cmd_str);
-S32 CaptureAllDac(int lid, int modeCapture);
+S32 CaptureAllDac(int lid, U32 modeCapture);
 S32 ReleaseAllDac(int lid);
 S32 SetAllDac(int lid);
-S32 SetSwitch(BRD_Handle handle, TDacParam param);
+S32 SetSwitch(BRD_Handle handle, TDacParam& param);
 void ListParameters(void);
 
 S32 SetMasterSlave(int lid);

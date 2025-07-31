@@ -51,8 +51,9 @@ S32 MapDataFromMemWriteData(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBu
 void ContinueDaq(int lid, ULONG BlkSize, ULONG BlkNum);
 void printLids(void);
 void adcGetOptions(const std::string inifile);
+void puListLoad(int lid);
 bool checkPower(int lid);
-bool captureService(int lid, int mode);
+bool captureServiceAndSetParams(int lid, int mode);
 void workFlow(int lid);
 S32 releaseAdc(int lid);
 void ListParametersAdc(void);

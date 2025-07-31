@@ -18,13 +18,12 @@ typedef struct FU_TriadSrv {
     FU_TriadSrv()
         : handle_(0)
         , ok(false)
-        , mode_(BRDcapt_SHARED)
+        , mode_(BRDcapt_EXCLUSIVE)
     {
     }
     BRD_Handle handle()
     {
         lastError = "";
-        printf("<DEBUG:handle()> Service %s captured! Handle = %X \n", servName.name, handle_);
         if (ok)
             return handle_;
         lastError = "<ERR> Bad handle ...";
@@ -33,7 +32,7 @@ typedef struct FU_TriadSrv {
 
     BRD_Handle capture(BRD_Handle devHndl, char* sname, int delay)
     {
-        printf("<DEBUG:capture()> Service %s captured! Handle = %X \n", sname, handle_);
+        // printf("<DEBUG:capture()> Service %s captured! Handle = %X \n", sname, handle_);
         lastError = "";
         if (ok) {
             if (!BRDC_stricmp(sname, servName.name))
@@ -44,11 +43,11 @@ typedef struct FU_TriadSrv {
         if (handle_ > 0) {
             ok = true;
             strcpy(servName.name, sname);
-            printf("<DEBUG> Service %s captured! Handle = %X \n", sname, handle_);
+            // printf("<DEBUG> Service %s captured! Handle = %X \n", sname, handle_);
             return handle_;
         }
         lastError = "<ERR> service (name=" + std::string(sname) + ") not captured!";
-        printf("<DEBUG> %s\n", lastError.c_str());
+        // printf("<DEBUG> %s\n", lastError.c_str());
         ok = false;
         strcpy(servName.name, "");
         return 0;
@@ -56,7 +55,7 @@ typedef struct FU_TriadSrv {
 
     bool release()
     {
-        printf("<DEBUG:release()> Service %s captured! Handle = %X \n", servName.name, handle_);
+        // printf("<DEBUG:release()> Service %s captured! Handle = %X \n", servName.name, handle_);
         lastError = "";
         if (ok) {
             BRD_release(handle_, 0);
@@ -77,7 +76,27 @@ typedef struct FU_TriadSrv {
         return lastError;
     }
 
-    bool isOpen() { return ok; }
+    bool isCaptured() { return ok; }
+
+    std::string strMode()
+    {
+        std::string retVal = std::string("Service ") + servName.name + " captured in mode - ";
+        switch (mode_) {
+        case BRDcapt_SHARED:
+            retVal += "SHARED";
+            break;
+        case BRDcapt_EXCLUSIVE:
+            retVal += "EXCLUSIVE";
+            break;
+        case BRDcapt_SPY:
+            retVal += "SPY";
+            break;
+        default:
+            retVal += "UNDEFINE";
+        }
+        retVal += "\n";
+        return retVal;
+    }
 
 protected:
     BRD_Handle handle_;
@@ -93,7 +112,6 @@ typedef struct FU_TriadDev {
     FU_TriadDev()
         : mode_(BRDopen_SHARED)
         , ok(false)
-        , curLid_(0)
         , handle_(0) { };
 
     BRD_Handle handle()
@@ -109,18 +127,12 @@ typedef struct FU_TriadDev {
         lastError = "";
         if (lid < 0 || lid >= MAX_LID_DEVICES) {
             lastError = "<ERR> Bad LID number!";
-        }
-        if (ok) {
-            if (lid != curLid_)
-                close();
-            else
-                return handle_;
+            return 0;
         }
         handle_ = BRD_open(lid, mode_, &mode_);
         ok = (handle_ > 0);
         if (!ok)
             lastError = "<ERR> device lid#" + std::to_string(lid) + " not opened!";
-        curLid_ = ok ? lid : 0;
         return handle_;
     }
 
@@ -129,6 +141,7 @@ typedef struct FU_TriadDev {
         lastError = "";
         if (lid <= 0 || lid >= MAX_LID_DEVICES) {
             lastError = "<ERR> Bad LID number!";
+            return 0;
         }
         if (ok)
             close();
@@ -140,17 +153,36 @@ typedef struct FU_TriadDev {
         U32 e = BRD_close(handle_);
         handle_ = 0;
         ok = false;
-        curLid_ = 0;
         return (e != 0);
     }
 
-    int curLid() { return curLid_; }
-
-    int mode() { return mode_; }
+    U32 mode() { return mode_; }
 
     void setMode(int md) { mode_ = md; };
 
     bool isOpen() { return ok; }
+
+    std::string strMode()
+    {
+        std::string retVal;
+        switch (mode_) {
+        case BRDopen_SHARED:
+            retVal += "SHARED";
+            break;
+        case BRDopen_EXCLUSIVE:
+            retVal += "EXCLUSIVE";
+            break;
+        case BRDopen_SPY:
+            retVal += "SPY";
+            break;
+        case BRDopen_HIGHEST:
+            retVal += "HIGHEST";
+            break;
+        default:
+            retVal += "UNDEFINE";
+        }
+        return retVal;
+    }
 
     std::string error() { return lastError; }
 
@@ -158,7 +190,6 @@ protected:
     BRD_Handle handle_;
     bool ok;
     int mode_;
-    int curLid_;
     std::string lastError;
 
 } TRIadsDevs;
@@ -169,13 +200,26 @@ typedef struct FU_Threads {
     std::atomic<bool> isStoped;
 } FuThread;
 
+typedef struct DacDevice {
+    TRIadSrv servDac;
+    TDacParam paramDac;
+    U32 dacMode;
+    BRD_Handle getService()
+    {
+        if (!servDac.isCaptured())
+            return 0;
+        return (paramDac.handle = servDac.handle());
+    }
+};
+
 typedef struct FU_Devices {
+    FU_Devices() { }
     TRIadsDevs device;
     //
     TRIadSrv adc;
     FuThread adcCtrlThr;
     // DAC
-    std::vector<TDacParam> dac;
+    std::vector<DacDevice> dac;
     FuThread dacCtrlThr;
     // REGs
     TRIadSrv servRegs;
@@ -187,4 +231,4 @@ extern int x_lid;
 extern BRD_Handle x_handleDevice;
 
 static int version_srv_hi = 3;
-static int version_srv_lo = 0;
+static int version_srv_lo = 89;

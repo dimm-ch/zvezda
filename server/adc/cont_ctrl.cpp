@@ -45,7 +45,7 @@ void ContinueDaq(int lid, ULONG BlkSize, ULONG BlkNum)
 
     // SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
     // DWORD prior_class = GetPriorityClass(GetCurrentProcess());
-    // BRDC_printf(_BRDC("Process Priority = %d\n"), prior_class);
+    printf("<DBG> ContinueDaq: ADC-%d, BlkSize=%lu, BlkNum=%lu  \n", lid, BlkSize, BlkNum);
 
     g_BlkSize = BlkSize;
     // g_fileBufNum = FileBufNum;
