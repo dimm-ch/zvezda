@@ -22,8 +22,9 @@
 //=********************************************************
 S32 WorkMode(int lid)
 {
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
 
-    switch (g_nWorkMode) {
+    switch (p.g_nWorkMode) {
     case 0:
         WorkMode0(lid);
         break;
@@ -62,46 +63,47 @@ S32 WorkMode0(int lid)
     int ii;
     volatile SBIG tmp;
     S32 nblock;
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
 
     BRDC_printf(_BRDC("\nWorkMode 0: -- One time  CPU (FIFO) -- \n\n"));
 
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
         //
         // Скорректировать количество отсчетов на канал
         //
-        dac.outBufSizeb = g_nSamplesPerChannel
-            * dac.sampleSizeb
-            * dac.chanNum;
+        dac.paramDac.outBufSizeb = p.g_nSamplesPerChannel
+            * dac.paramDac.sampleSizeb
+            * dac.paramDac.chanNum;
 
-        if (dac.outBufSizeb > 0x7FFFFFFF)
-            dac.outBufSizeb = 0x7FFFFFFF;
+        if (dac.paramDac.outBufSizeb > 0x7FFFFFFF)
+            dac.paramDac.outBufSizeb = 0x7FFFFFFF;
 
-        tmp = dac.outBufSizeb / FIFO_WIDTHB;
-        dac.outBufSizeb = tmp * FIFO_WIDTHB;
-        if (dac.outBufSizeb > (S32)dac.nFifoSizeb) {
-            dac.outBufSizeb = dac.nFifoSizeb;
+        tmp = dac.paramDac.outBufSizeb / FIFO_WIDTHB;
+        dac.paramDac.outBufSizeb = tmp * FIFO_WIDTHB;
+        if (dac.paramDac.outBufSizeb > (S32)dac.paramDac.nFifoSizeb) {
+            dac.paramDac.outBufSizeb = dac.paramDac.nFifoSizeb;
             BRDC_printf(_BRDC("WARNING: OutBufSizeb > DacFifoSizeb !\n"));
         }
 
-        dac.samplesPerChannel = dac.outBufSizeb
-            / dac.sampleSizeb
-            / dac.chanNum;
+        dac.paramDac.samplesPerChannel = dac.paramDac.outBufSizeb
+            / dac.paramDac.sampleSizeb
+            / dac.paramDac.chanNum;
 
-        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.outBufSizeb, (S64)dac.outBufSizeb);
-        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.samplesPerChannel, (S64)dac.samplesPerChannel);
-        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.dSignalFreq);
+        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.paramDac.outBufSizeb, (S64)dac.paramDac.outBufSizeb);
+        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.paramDac.samplesPerChannel, (S64)dac.paramDac.samplesPerChannel);
+        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.paramDac.dSignalFreq);
 
         //
         // Создать буфер для сигнала
         //
-        dac.pBuf = IPC_virtAlloc((int)dac.outBufSizeb);
-        if (NULL == dac.pBuf) {
+        dac.paramDac.pBuf = IPC_virtAlloc((int)dac.paramDac.outBufSizeb);
+        if (NULL == dac.paramDac.pBuf) {
             BRDC_printf(_BRDC("ERROR: No enougth memory, dacNo = %d"), ii);
             return -1;
         }
 
-        CalcSignal(dac.pBuf, dac.samplesPerChannel, dac, 0);
+        CalcSignal(lid, dac.paramDac.pBuf, dac.paramDac.samplesPerChannel, dac.paramDac, 0);
     }
 
     //
@@ -112,11 +114,11 @@ S32 WorkMode0(int lid)
     PrepareStart(lid);
     while (!IPC_kbhit() && !DevicesLid[lid].dacCtrlThr.stop.load()) {
         FifoOutputCPU(lid);
-        // OldFifoOutputCPU( g_aDac[0].pBuf, g_aDac[0].outBufSizeb );
+        // OldFifoOutputCPU( p.g_aDac[0].pBuf, p.g_aDac[0].outBufSizeb );
         nblock++;
         BRDC_printf(_BRDC("\rBlock %d"), nblock);
 
-        if ((1 != g_nCycle) && (nblock >= g_nCycle))
+        if ((1 != p.g_nCycle) && (nblock >= p.g_nCycle))
             break;
     }
 
@@ -124,10 +126,10 @@ S32 WorkMode0(int lid)
     // Освободить все буфера
     //
     for (auto dac : DevicesLid[lid].dac)
-        IPC_virtFree(dac.pBuf);
+        IPC_virtFree(dac.paramDac.pBuf);
 
     BRDC_printf(_BRDC("\n"));
-    if (g_nQuickQuit == 0)
+    if (p.g_nQuickQuit == 0)
         IPC_getch();
 
     return 0;
@@ -143,73 +145,73 @@ S32 WorkMode1(int lid)
     S32 nblock;
     U32 tetrad;
     U32 source;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     BRDC_printf(_BRDC("\nWorkMode 1: -- One time  DMA (FIFO) -- \n\n"));
 
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
         //
         // Скорректировать количество отсчетов на канал
         //
-        dac.outBufSizeb = g_nSamplesPerChannel
-            * dac.sampleSizeb
-            * dac.chanNum;
+        dac.paramDac.outBufSizeb = p.g_nSamplesPerChannel
+            * dac.paramDac.sampleSizeb
+            * dac.paramDac.chanNum;
 
-        if (dac.outBufSizeb > 0xFFFFFFFF)
-            dac.outBufSizeb = 0xFFFFFFFF;
+        if (dac.paramDac.outBufSizeb > 0xFFFFFFFF)
+            dac.paramDac.outBufSizeb = 0xFFFFFFFF;
 
-        tmp = dac.outBufSizeb / FIFO_WIDTHB;
-        dac.outBufSizeb = tmp * FIFO_WIDTHB;
+        tmp = dac.paramDac.outBufSizeb / FIFO_WIDTHB;
+        dac.paramDac.outBufSizeb = tmp * FIFO_WIDTHB;
 
-        tmp = dac.outBufSizeb / g_nDmaBufFactor;
-        if (0 != (dac.outBufSizeb % g_nDmaBufFactor))
+        tmp = dac.paramDac.outBufSizeb / p.g_nDmaBufFactor;
+        if (0 != (dac.paramDac.outBufSizeb % p.g_nDmaBufFactor))
             tmp++;
-        dac.outBufSizeb = tmp * g_nDmaBufFactor;
+        dac.paramDac.outBufSizeb = tmp * p.g_nDmaBufFactor;
 
-        if (dac.outBufSizeb > (S32)dac.nFifoSizeb) {
-            dac.outBufSizeb = dac.nFifoSizeb;
+        if (dac.paramDac.outBufSizeb > (S32)dac.paramDac.nFifoSizeb) {
+            dac.paramDac.outBufSizeb = dac.paramDac.nFifoSizeb;
             BRDC_printf(_BRDC("WARNING: OutBufSizeb > DacFifoSizeb !\n"));
         }
 
-        dac.samplesPerChannel = dac.outBufSizeb
-            / dac.sampleSizeb
-            / dac.chanNum;
+        dac.paramDac.samplesPerChannel = dac.paramDac.outBufSizeb
+            / dac.paramDac.sampleSizeb
+            / dac.paramDac.chanNum;
 
-        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.outBufSizeb, (S64)dac.outBufSizeb);
-        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.samplesPerChannel, (S64)dac.samplesPerChannel);
-        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.dSignalFreq);
+        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.paramDac.outBufSizeb, (S64)dac.paramDac.outBufSizeb);
+        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.paramDac.samplesPerChannel, (S64)dac.paramDac.samplesPerChannel);
+        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.paramDac.dSignalFreq);
 
         //
         // Создать составной буфер для стрима
         //
-        dac.rBufAlloc.dir = BRDstrm_DIR_OUT;
-        dac.rBufAlloc.isCont = g_nIsSystemMemory;
-        dac.rBufAlloc.blkNum = 1;
-        dac.rBufAlloc.blkSize = (U32)dac.outBufSizeb;
-        dac.rBufAlloc.ppBlk = new PVOID[dac.rBufAlloc.blkNum];
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.rBufAlloc));
+        dac.paramDac.rBufAlloc.dir = BRDstrm_DIR_OUT;
+        dac.paramDac.rBufAlloc.isCont = p.g_nIsSystemMemory;
+        dac.paramDac.rBufAlloc.blkNum = 1;
+        dac.paramDac.rBufAlloc.blkSize = (U32)dac.paramDac.outBufSizeb;
+        dac.paramDac.rBufAlloc.ppBlk = new PVOID[dac.paramDac.rBufAlloc.blkNum];
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.paramDac.rBufAlloc));
         if (0 > err) {
             BRDC_printf(_BRDC("\nERROR: BRDctrl_STREAM_CBUF_ALLOC = 0x%X, dacNo = %d\n\n"), err, ii);
             return -1;
         }
 
         source = 0; //  данные из   FIFO
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_SETSOURCE, &source);
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_GETSRCSTREAM, &tetrad);
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_SETSOURCE, &source);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_GETSRCSTREAM, &tetrad);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad);
 
-        CalcSignal(dac.rBufAlloc.ppBlk[0], dac.samplesPerChannel, dac, 0);
+        CalcSignal(lid, dac.paramDac.rBufAlloc.ppBlk[0], dac.paramDac.samplesPerChannel, dac.paramDac, 0);
 
-        S16 jj, arr0[100], *pBuf = (S16*)dac.rBufAlloc.ppBlk[0];
+        S16 jj, arr0[100], *pBuf = (S16*)dac.paramDac.rBufAlloc.ppBlk[0];
         for (jj = 0; jj < 100; jj++)
             arr0[jj] = pBuf[jj];
 
-        // S16		jj, arr0[16], arr1[16], *pBuf = (S16*)dac.rBufAlloc.ppBlk[0];
+        // S16		jj, arr0[16], arr1[16], *pBuf = (S16*)dac.paramDac.rBufAlloc.ppBlk[0];
 
-        // CalcSignalOld( (S32*)dac.rBufAlloc.ppBlk[0], dac.samplesPerChannel );
+        // CalcSignalOld( (S32*)dac.paramDac.rBufAlloc.ppBlk[0], dac.paramDac.samplesPerChannel );
         // for( jj=0;jj<16;jj++ ) arr0[jj] = pBuf[jj];
 
-        // CalcSignal( (S32*)dac.rBufAlloc.ppBlk[0], dac.samplesPerChannel, ii, 0 );
+        // CalcSignal( (S32*)dac.paramDac.rBufAlloc.ppBlk[0], dac.paramDac.samplesPerChannel, ii, 0 );
         // for( jj=0;jj<16;jj++ ) arr1[jj] = pBuf[jj];
 
         jj = 0;
@@ -227,21 +229,21 @@ S32 WorkMode1(int lid)
         BRDC_printf(_BRDC("Block "));
         DisplayDacTraceText(nblock++, lid);
 
-        if ((1 != g_nCycle) && (nblock >= g_nCycle))
+        if ((1 != p.g_nCycle) && (nblock >= p.g_nCycle))
             break;
     }
 
     //
     // Освободить все буфера
     //
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.rBufAlloc));
-        delete[] dac.rBufAlloc.ppBlk;
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.paramDac.rBufAlloc));
+        delete[] dac.paramDac.rBufAlloc.ppBlk;
     }
 
     BRDC_printf(_BRDC("\n"));
-    if (g_nQuickQuit == 0)
+    if (p.g_nQuickQuit == 0)
         IPC_getch();
 
     return 0;
@@ -257,64 +259,64 @@ S32 WorkMode2(int lid)
     S32 nblock;
     U32 tetrad;
     U32 source;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     BRDC_printf(_BRDC("\nWorkMode 2: -- One time  DMA (SDRAM) -- \n\n"));
 
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
         //
         // Скорректировать количество отсчетов на канал
         //
-        dac.outBufSizeb = g_nSamplesPerChannel
-            * dac.sampleSizeb
-            * dac.chanNum;
+        dac.paramDac.outBufSizeb = p.g_nSamplesPerChannel
+            * dac.paramDac.sampleSizeb
+            * dac.paramDac.chanNum;
 
-        tmp = dac.outBufSizeb / g_nSdramWriteBufSize;
+        tmp = dac.paramDac.outBufSizeb / p.g_nSdramWriteBufSize;
         if (tmp == 0)
             tmp = 1;
-        dac.outBufSizeb = tmp * g_nSdramWriteBufSize;
+        dac.paramDac.outBufSizeb = tmp * p.g_nSdramWriteBufSize;
 
-        tmp = dac.outBufSizeb / g_nDmaBufFactor;
-        if (0 != (dac.outBufSizeb % g_nDmaBufFactor))
+        tmp = dac.paramDac.outBufSizeb / p.g_nDmaBufFactor;
+        if (0 != (dac.paramDac.outBufSizeb % p.g_nDmaBufFactor))
             tmp++;
-        dac.outBufSizeb = tmp * g_nDmaBufFactor;
+        dac.paramDac.outBufSizeb = tmp * p.g_nDmaBufFactor;
 
-        dac.samplesPerChannel = dac.outBufSizeb
-            / dac.sampleSizeb
-            / dac.chanNum;
+        dac.paramDac.samplesPerChannel = dac.paramDac.outBufSizeb
+            / dac.paramDac.sampleSizeb
+            / dac.paramDac.chanNum;
 
-        SdramSetParam(dac);
-        // g_OutBufSize = dac.outBufSizeb;
-        // OldSetParamSDRAM(g_hCaptSrv[ii]);
+        SdramSetParam(dac.paramDac);
+        // p.g_OutBufSize = dac.paramDac.outBufSizeb;
+        // OldSetParamSDRAM(p.g_hCaptSrv[ii]);
 
-        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.outBufSizeb, (S64)dac.outBufSizeb);
-        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.samplesPerChannel, (S64)dac.samplesPerChannel);
-        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.dSignalFreq);
+        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.paramDac.outBufSizeb, (S64)dac.paramDac.outBufSizeb);
+        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.paramDac.samplesPerChannel, (S64)dac.paramDac.samplesPerChannel);
+        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.paramDac.dSignalFreq);
 
         //
         // Создать составной буфер для стрима
         //
-        dac.rBufAlloc.dir = BRDstrm_DIR_OUT;
-        dac.rBufAlloc.isCont = g_nIsSystemMemory;
-        dac.rBufAlloc.blkNum = 1;
-        dac.rBufAlloc.blkSize = g_nSdramWriteBufSize;
-        dac.rBufAlloc.ppBlk = new PVOID[dac.rBufAlloc.blkNum];
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.rBufAlloc));
+        dac.paramDac.rBufAlloc.dir = BRDstrm_DIR_OUT;
+        dac.paramDac.rBufAlloc.isCont = p.g_nIsSystemMemory;
+        dac.paramDac.rBufAlloc.blkNum = 1;
+        dac.paramDac.rBufAlloc.blkSize = p.g_nSdramWriteBufSize;
+        dac.paramDac.rBufAlloc.ppBlk = new PVOID[dac.paramDac.rBufAlloc.blkNum];
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.paramDac.rBufAlloc));
         if (0 > err) {
             BRDC_printf(_BRDC("ERROR: BRDctrl_STREAM_CBUF_ALLOC = 0x%X, dacNo = %d"), err, ii);
             return -1;
         }
 
         source = 2; //  данные из SDRAM
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_SETSOURCE, &source);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_SETSOURCE, &source);
 
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_SDRAM_GETSRCSTREAM, &tetrad);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_SDRAM_GETSRCSTREAM, &tetrad);
         if (0 > err) {
             BRDC_printf(_BRDC("ERROR: BRDctrl_SDRAM_GETSRCSTREAM = 0x%X, dacNo = %d"), err, ii);
             return -1;
         }
         // BRDC_printf(_BRDC("1. tetrad %d\n"), tetrad);
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad);
         // BRDC_printf(_BRDC("2. tetrad %d\n"), tetrad);
         if (0 > err) {
             BRDC_printf(_BRDC("ERROR: BRDctrl_STREAM_SETSRC = 0x%X, dacNo = %d"), err, ii);
@@ -331,7 +333,7 @@ S32 WorkMode2(int lid)
     if (0 < SdramWriteDMA(lid)) {
         PrepareStart(lid);
         while (!IPC_kbhit() && !DevicesLid[lid].dacCtrlThr.stop.load()) {
-            if (g_nIsAlwaysWriteSdram) {
+            if (p.g_nIsAlwaysWriteSdram) {
                 if (0 > SdramWriteDMA(lid))
                     break;
             }
@@ -339,7 +341,7 @@ S32 WorkMode2(int lid)
             nblock++;
             BRDC_printf(_BRDC("\rBlock %d"), nblock);
 
-            if ((1 != g_nCycle) && (nblock >= g_nCycle))
+            if ((1 != p.g_nCycle) && (nblock >= p.g_nCycle))
                 break;
         }
     }
@@ -347,14 +349,14 @@ S32 WorkMode2(int lid)
     //
     // Освободить все буфера
     //
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.rBufAlloc));
-        delete[] dac.rBufAlloc.ppBlk;
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.paramDac.rBufAlloc));
+        delete[] dac.paramDac.rBufAlloc.ppBlk;
     }
 
     BRDC_printf(_BRDC("\n"));
-    if (g_nQuickQuit == 0)
+    if (p.g_nQuickQuit == 0)
         IPC_getch();
 
     return 0;
@@ -368,46 +370,46 @@ S32 WorkMode3(int lid)
     int ii;
     volatile SBIG tmp;
     S32 isEnable;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     BRDC_printf(_BRDC("\nWorkMode 3: -- Restart FIFO -- \n\n"));
 
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
         //
         // Скорректировать количество отсчетов на канал
         //
-        dac.outBufSizeb = g_nSamplesPerChannel
-            * dac.sampleSizeb
-            * dac.chanNum;
+        dac.paramDac.outBufSizeb = p.g_nSamplesPerChannel
+            * dac.paramDac.sampleSizeb
+            * dac.paramDac.chanNum;
 
-        if (dac.outBufSizeb > 0x7FFFFFFF)
-            dac.outBufSizeb = 0x7FFFFFFF;
+        if (dac.paramDac.outBufSizeb > 0x7FFFFFFF)
+            dac.paramDac.outBufSizeb = 0x7FFFFFFF;
 
-        tmp = dac.outBufSizeb / FIFO_WIDTHB;
-        dac.outBufSizeb = tmp * FIFO_WIDTHB;
-        if (dac.outBufSizeb > (S32)dac.nFifoSizeb) {
-            dac.outBufSizeb = dac.nFifoSizeb;
+        tmp = dac.paramDac.outBufSizeb / FIFO_WIDTHB;
+        dac.paramDac.outBufSizeb = tmp * FIFO_WIDTHB;
+        if (dac.paramDac.outBufSizeb > (S32)dac.paramDac.nFifoSizeb) {
+            dac.paramDac.outBufSizeb = dac.paramDac.nFifoSizeb;
             BRDC_printf(_BRDC("WARNING: OutBufSizeb > DacFifoSizeb !\n"));
         }
 
-        dac.samplesPerChannel = dac.outBufSizeb
-            / dac.sampleSizeb
-            / dac.chanNum;
+        dac.paramDac.samplesPerChannel = dac.paramDac.outBufSizeb
+            / dac.paramDac.sampleSizeb
+            / dac.paramDac.chanNum;
 
-        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.outBufSizeb, (S64)dac.outBufSizeb);
-        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.samplesPerChannel, (S64)dac.samplesPerChannel);
-        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.dSignalFreq);
+        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.paramDac.outBufSizeb, (S64)dac.paramDac.outBufSizeb);
+        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.paramDac.samplesPerChannel, (S64)dac.paramDac.samplesPerChannel);
+        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.paramDac.dSignalFreq);
 
         //
         // Создать буфер для сигнала
         //
-        dac.pBuf = IPC_virtAlloc((int)dac.outBufSizeb);
-        if (NULL == dac.pBuf) {
+        dac.paramDac.pBuf = IPC_virtAlloc((int)dac.paramDac.outBufSizeb);
+        if (NULL == dac.paramDac.pBuf) {
             BRDC_printf(_BRDC("ERROR: No enougth memory, dacNo = %d"), ii);
             return -1;
         }
 
-        CalcSignal(dac.pBuf, dac.samplesPerChannel, dac, 0);
+        CalcSignal(lid, dac.paramDac.pBuf, dac.paramDac.samplesPerChannel, dac.paramDac, 0);
     }
 
     //
@@ -422,15 +424,15 @@ S32 WorkMode3(int lid)
     //
     // Остановит все ЦАПы и освободить все буфера
     //
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
         isEnable = 0;
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
-        IPC_virtFree(dac.pBuf);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
+        IPC_virtFree(dac.paramDac.pBuf);
     }
 
     BRDC_printf(_BRDC("\n"));
-    if (g_nQuickQuit == 0)
+    if (p.g_nQuickQuit == 0)
         IPC_getch();
 
     return 0;
@@ -446,55 +448,55 @@ S32 WorkMode4(int lid)
     S32 isEnable;
     U32 tetrad;
     U32 source;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     BRDC_printf(_BRDC("\nWorkMode 4: -- Restart SDRAM -- \n\n"));
 
     for (auto& dac : DevicesLid[lid].dac) {
         //
         // Скорректировать количество отсчетов на канал
         //
-        dac.outBufSizeb = g_nSamplesPerChannel
-            * dac.sampleSizeb
-            * dac.chanNum;
+        dac.paramDac.outBufSizeb = p.g_nSamplesPerChannel
+            * dac.paramDac.sampleSizeb
+            * dac.paramDac.chanNum;
 
-        tmp = dac.outBufSizeb / g_nSdramWriteBufSize;
+        tmp = dac.paramDac.outBufSizeb / p.g_nSdramWriteBufSize;
         if (tmp == 0)
             tmp = 1;
-        dac.outBufSizeb = tmp * g_nSdramWriteBufSize;
+        dac.paramDac.outBufSizeb = tmp * p.g_nSdramWriteBufSize;
 
-        tmp = dac.outBufSizeb / g_nDmaBufFactor;
-        if (0 != (dac.outBufSizeb % g_nDmaBufFactor))
+        tmp = dac.paramDac.outBufSizeb / p.g_nDmaBufFactor;
+        if (0 != (dac.paramDac.outBufSizeb % p.g_nDmaBufFactor))
             tmp++;
-        dac.outBufSizeb = tmp * g_nDmaBufFactor;
+        dac.paramDac.outBufSizeb = tmp * p.g_nDmaBufFactor;
 
-        dac.samplesPerChannel = dac.outBufSizeb
-            / dac.sampleSizeb
-            / dac.chanNum;
+        dac.paramDac.samplesPerChannel = dac.paramDac.outBufSizeb
+            / dac.paramDac.sampleSizeb
+            / dac.paramDac.chanNum;
 
-        SdramSetParam(dac); // У Склярова вызывается 2 раза зачем-то
+        SdramSetParam(dac.paramDac); // У Склярова вызывается 2 раза зачем-то
 
-        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.outBufSizeb, (S64)dac.outBufSizeb);
-        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.samplesPerChannel, (S64)dac.samplesPerChannel);
-        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.dSignalFreq);
+        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.paramDac.outBufSizeb, (S64)dac.paramDac.outBufSizeb);
+        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.paramDac.samplesPerChannel, (S64)dac.paramDac.samplesPerChannel);
+        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.paramDac.dSignalFreq);
 
         //
         // Создать составной буфер для стрима
         //
-        dac.rBufAlloc.dir = BRDstrm_DIR_OUT;
-        dac.rBufAlloc.isCont = g_nIsSystemMemory;
-        dac.rBufAlloc.blkNum = 1;
-        dac.rBufAlloc.blkSize = g_nSdramWriteBufSize;
-        dac.rBufAlloc.ppBlk = new PVOID[dac.rBufAlloc.blkNum];
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.rBufAlloc));
+        dac.paramDac.rBufAlloc.dir = BRDstrm_DIR_OUT;
+        dac.paramDac.rBufAlloc.isCont = p.g_nIsSystemMemory;
+        dac.paramDac.rBufAlloc.blkNum = 1;
+        dac.paramDac.rBufAlloc.blkSize = p.g_nSdramWriteBufSize;
+        dac.paramDac.rBufAlloc.ppBlk = new PVOID[dac.paramDac.rBufAlloc.blkNum];
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.paramDac.rBufAlloc));
         if (0 > err) {
             BRDC_printf(_BRDC("ERROR: BRDctrl_STREAM_CBUF_ALLOC = 0x%X, dacNo = %d"), err, ii);
             return -1;
         }
 
         source = 2; //  данные из SDRAM
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_SETSOURCE, &source);
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_SDRAM_GETSRCSTREAM, &tetrad);
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_SETSOURCE, &source);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_SDRAM_GETSRCSTREAM, &tetrad);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad);
     }
 
     //
@@ -515,14 +517,14 @@ S32 WorkMode4(int lid)
     //
     for (auto& dac : DevicesLid[lid].dac) {
         isEnable = 0;
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // Запретить чтение из SDRAM
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.rBufAlloc));
-        delete[] dac.rBufAlloc.ppBlk;
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // Запретить чтение из SDRAM
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.paramDac.rBufAlloc));
+        delete[] dac.paramDac.rBufAlloc.ppBlk;
     }
 
     BRDC_printf(_BRDC("\n"));
-    if (g_nQuickQuit == 0)
+    if (p.g_nQuickQuit == 0)
         IPC_getch();
 
     return 0;
@@ -537,47 +539,47 @@ S32 WorkMode5(int lid)
     volatile SBIG tmp;
     S32 isEnable;
     int loop;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     BRDC_printf(_BRDC("\nWorkMode 5: -- Cycle FIFO -- \n\n"));
 
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
         //
         // Скорректировать количество отсчетов на канал
         //
-        dac.outBufSizeb = g_nSamplesPerChannel
-            * dac.sampleSizeb
-            * dac.chanNum;
+        dac.paramDac.outBufSizeb = p.g_nSamplesPerChannel
+            * dac.paramDac.sampleSizeb
+            * dac.paramDac.chanNum;
 
-        if (dac.outBufSizeb > 0x7FFFFFFF)
-            dac.outBufSizeb = 0x7FFFFFFF;
+        if (dac.paramDac.outBufSizeb > 0x7FFFFFFF)
+            dac.paramDac.outBufSizeb = 0x7FFFFFFF;
 
-        tmp = dac.outBufSizeb / FIFO_WIDTHB;
-        dac.outBufSizeb = tmp * FIFO_WIDTHB;
-        if (dac.outBufSizeb > (S32)dac.nFifoSizeb - FIFO_WIDTHB) {
-            dac.outBufSizeb = dac.nFifoSizeb - FIFO_WIDTHB;
+        tmp = dac.paramDac.outBufSizeb / FIFO_WIDTHB;
+        dac.paramDac.outBufSizeb = tmp * FIFO_WIDTHB;
+        if (dac.paramDac.outBufSizeb > (S32)dac.paramDac.nFifoSizeb - FIFO_WIDTHB) {
+            dac.paramDac.outBufSizeb = dac.paramDac.nFifoSizeb - FIFO_WIDTHB;
             BRDC_printf(_BRDC("WARNING: OutBufSizeb > DacFifoSizeb !\n"));
         }
 
-        dac.samplesPerChannel = dac.outBufSizeb
-            / dac.sampleSizeb
-            / dac.chanNum;
-        CorrectOutFreq(dac);
+        dac.paramDac.samplesPerChannel = dac.paramDac.outBufSizeb
+            / dac.paramDac.sampleSizeb
+            / dac.paramDac.chanNum;
+        CorrectOutFreq(dac.paramDac);
 
-        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.outBufSizeb, (S64)dac.outBufSizeb);
-        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.samplesPerChannel, (S64)dac.samplesPerChannel);
-        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.dSignalFreq);
+        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.paramDac.outBufSizeb, (S64)dac.paramDac.outBufSizeb);
+        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.paramDac.samplesPerChannel, (S64)dac.paramDac.samplesPerChannel);
+        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.paramDac.dSignalFreq);
 
         //
         // Создать буфер для сигнала
         //
-        dac.pBuf = IPC_virtAlloc((int)dac.outBufSizeb);
-        if (NULL == dac.pBuf) {
+        dac.paramDac.pBuf = IPC_virtAlloc((int)dac.paramDac.outBufSizeb);
+        if (NULL == dac.paramDac.pBuf) {
             BRDC_printf(_BRDC("ERROR: No enough memory, dacNo = %d"), ii);
             return -1;
         }
 
-        CalcSignal(dac.pBuf, dac.samplesPerChannel, dac, 0);
+        CalcSignal(lid, dac.paramDac.pBuf, dac.paramDac.samplesPerChannel, dac.paramDac, 0);
     }
 
     //
@@ -597,16 +599,16 @@ S32 WorkMode5(int lid)
     //
     isEnable = 0;
     for (auto dac : DevicesLid[lid].dac)
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
 
     //
     // Освободить все буфера
     //
     for (auto dac : DevicesLid[lid].dac)
-        IPC_virtFree(dac.pBuf);
+        IPC_virtFree(dac.paramDac.pBuf);
 
     BRDC_printf(_BRDC("\n"));
-    if (g_nQuickQuit == 0)
+    if (p.g_nQuickQuit == 0)
         IPC_getch();
 
     return 0;
@@ -623,54 +625,54 @@ S32 WorkMode6(int lid)
     S32 isEnable;
     // U32				tetrad;
     // U32				source;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     BRDC_printf(_BRDC("\nWorkMode 6: -- Cycle DMA through FIFO -- \n\n"));
 
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
-        dac.outBufSizeb = g_nSamplesPerChannel
-            * dac.sampleSizeb
-            * dac.chanNum;
+        dac.paramDac.outBufSizeb = p.g_nSamplesPerChannel
+            * dac.paramDac.sampleSizeb
+            * dac.paramDac.chanNum;
 
-        if (dac.outBufSizeb > 0xFFFFFFFF)
-            dac.outBufSizeb = 0xFFFFFFFF;
+        if (dac.paramDac.outBufSizeb > 0xFFFFFFFF)
+            dac.paramDac.outBufSizeb = 0xFFFFFFFF;
 
-        tmp = dac.outBufSizeb / g_nDmaBufFactor;
-        if (0 != (dac.outBufSizeb % g_nDmaBufFactor))
+        tmp = dac.paramDac.outBufSizeb / p.g_nDmaBufFactor;
+        if (0 != (dac.paramDac.outBufSizeb % p.g_nDmaBufFactor))
             tmp++;
-        dac.outBufSizeb = tmp * g_nDmaBufFactor;
+        dac.paramDac.outBufSizeb = tmp * p.g_nDmaBufFactor;
 
-        dac.samplesPerChannel = g_nSamplesPerChannel;
+        dac.paramDac.samplesPerChannel = p.g_nSamplesPerChannel;
 
         //
         // Скорректировать частоту выходного сигнала
         //
-        CorrectOutFreq(dac);
+        CorrectOutFreq(dac.paramDac);
 
-        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.outBufSizeb, (S64)dac.outBufSizeb);
-        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.samplesPerChannel, (S64)dac.samplesPerChannel);
-        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.dSignalFreq);
+        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.paramDac.outBufSizeb, (S64)dac.paramDac.outBufSizeb);
+        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.paramDac.samplesPerChannel, (S64)dac.paramDac.samplesPerChannel);
+        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.paramDac.dSignalFreq);
 
         //
         // Создать составной буфер для стрима
         //
-        dac.rBufAlloc.dir = BRDstrm_DIR_OUT;
-        dac.rBufAlloc.isCont = g_nIsSystemMemory;
-        dac.rBufAlloc.blkNum = 1;
-        dac.rBufAlloc.blkSize = (U32)dac.outBufSizeb;
-        dac.rBufAlloc.ppBlk = new PVOID[dac.rBufAlloc.blkNum];
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.rBufAlloc));
+        dac.paramDac.rBufAlloc.dir = BRDstrm_DIR_OUT;
+        dac.paramDac.rBufAlloc.isCont = p.g_nIsSystemMemory;
+        dac.paramDac.rBufAlloc.blkNum = 1;
+        dac.paramDac.rBufAlloc.blkSize = (U32)dac.paramDac.outBufSizeb;
+        dac.paramDac.rBufAlloc.ppBlk = new PVOID[dac.paramDac.rBufAlloc.blkNum];
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.paramDac.rBufAlloc));
         if (0 > err) {
             BRDC_printf(_BRDC("ERROR: BRDctrl_STREAM_CBUF_ALLOC = 0x%X, dacNo = %d"), err, ii);
             return -1;
         }
 
         // source = 0;		//  данные из   FIFO
-        // err = BRD_ctrl( dac.handle, 0, BRDctrl_DAC_SETSOURCE, &source );
-        // err = BRD_ctrl( dac.handle, 0, BRDctrl_DAC_GETSRCSTREAM, &tetrad );
-        // err = BRD_ctrl( dac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad );
+        // err = BRD_ctrl( dac.paramDac.handle, 0, BRDctrl_DAC_SETSOURCE, &source );
+        // err = BRD_ctrl( dac.paramDac.handle, 0, BRDctrl_DAC_GETSRCSTREAM, &tetrad );
+        // err = BRD_ctrl( dac.paramDac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad );
 
-        CalcSignal(dac.rBufAlloc.ppBlk[0], dac.samplesPerChannel, dac, 0);
+        CalcSignal(lid, dac.paramDac.rBufAlloc.ppBlk[0], dac.paramDac.samplesPerChannel, dac.paramDac, 0);
     }
 
     //
@@ -683,12 +685,12 @@ S32 WorkMode6(int lid)
     //
     // Остановить все ЦАПы и освободить все буфера
     //
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
         isEnable = 0;
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.rBufAlloc));
-        delete[] dac.rBufAlloc.ppBlk;
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.paramDac.rBufAlloc));
+        delete[] dac.paramDac.rBufAlloc.ppBlk;
     }
 
     BRDC_printf(_BRDC("\n"));
@@ -708,58 +710,58 @@ S32 WorkMode7(int lid)
     U32 tetrad;
     U32 source;
     int loop;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     BRDC_printf(_BRDC("\nWorkMode 7: -- Cycle SDRAM -- \n\n"));
 
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
         //
         // Скорректировать количество отсчетов на канал
         //
-        dac.outBufSizeb = g_nSamplesPerChannel
-            * dac.sampleSizeb
-            * dac.chanNum;
+        dac.paramDac.outBufSizeb = p.g_nSamplesPerChannel
+            * dac.paramDac.sampleSizeb
+            * dac.paramDac.chanNum;
 
-        tmp = dac.outBufSizeb / g_nSdramWriteBufSize;
+        tmp = dac.paramDac.outBufSizeb / p.g_nSdramWriteBufSize;
         if (tmp == 0)
             tmp = 1;
-        dac.outBufSizeb = tmp * g_nSdramWriteBufSize;
+        dac.paramDac.outBufSizeb = tmp * p.g_nSdramWriteBufSize;
 
-        tmp = dac.outBufSizeb / g_nDmaBufFactor;
-        if (0 != (dac.outBufSizeb % g_nDmaBufFactor))
+        tmp = dac.paramDac.outBufSizeb / p.g_nDmaBufFactor;
+        if (0 != (dac.paramDac.outBufSizeb % p.g_nDmaBufFactor))
             tmp++;
-        dac.outBufSizeb = tmp * g_nDmaBufFactor;
+        dac.paramDac.outBufSizeb = tmp * p.g_nDmaBufFactor;
 
-        dac.samplesPerChannel = dac.outBufSizeb
-            / dac.sampleSizeb
-            / dac.chanNum;
+        dac.paramDac.samplesPerChannel = dac.paramDac.outBufSizeb
+            / dac.paramDac.sampleSizeb
+            / dac.paramDac.chanNum;
 
-        SdramSetParam(dac);
+        SdramSetParam(dac.paramDac);
 
-        CorrectOutFreq(dac);
+        CorrectOutFreq(dac.paramDac);
 
-        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.outBufSizeb, (S64)dac.outBufSizeb);
-        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.samplesPerChannel, (S64)dac.samplesPerChannel);
-        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.dSignalFreq);
+        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.paramDac.outBufSizeb, (S64)dac.paramDac.outBufSizeb);
+        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.paramDac.samplesPerChannel, (S64)dac.paramDac.samplesPerChannel);
+        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.paramDac.dSignalFreq);
 
         //
         // Создать составной буфер для стрима
         //
-        dac.rBufAlloc.dir = BRDstrm_DIR_OUT;
-        dac.rBufAlloc.isCont = g_nIsSystemMemory;
-        dac.rBufAlloc.blkNum = 1;
-        dac.rBufAlloc.blkSize = g_nSdramWriteBufSize;
-        dac.rBufAlloc.ppBlk = new PVOID[dac.rBufAlloc.blkNum];
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.rBufAlloc));
+        dac.paramDac.rBufAlloc.dir = BRDstrm_DIR_OUT;
+        dac.paramDac.rBufAlloc.isCont = p.g_nIsSystemMemory;
+        dac.paramDac.rBufAlloc.blkNum = 1;
+        dac.paramDac.rBufAlloc.blkSize = p.g_nSdramWriteBufSize;
+        dac.paramDac.rBufAlloc.ppBlk = new PVOID[dac.paramDac.rBufAlloc.blkNum];
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.paramDac.rBufAlloc));
         if (0 > err) {
             BRDC_printf(_BRDC("ERROR: BRDctrl_STREAM_CBUF_ALLOC = 0x%X, dacNo = %d"), err, ii);
             return -1;
         }
 
         source = 2; //  данные из SDRAM
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_SETSOURCE, &source);
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_SDRAM_GETSRCSTREAM, &tetrad);
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_SETSOURCE, &source);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_SDRAM_GETSRCSTREAM, &tetrad);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad);
     }
 
     //
@@ -782,17 +784,17 @@ S32 WorkMode7(int lid)
     //
     // Остановить все ЦАПы и освободить все буфера
     //
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
         isEnable = 0;
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // Запретить чтение из SDRAM
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.rBufAlloc));
-        delete[] dac.rBufAlloc.ppBlk;
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // Запретить чтение из SDRAM
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.paramDac.rBufAlloc));
+        delete[] dac.paramDac.rBufAlloc.ppBlk;
     }
 
     BRDC_printf(_BRDC("\n"));
-    if (g_nQuickQuit == 0)
+    if (p.g_nQuickQuit == 0)
         IPC_getch();
 
     return 0;
@@ -809,65 +811,65 @@ S32 WorkMode8(int lid)
     S32 isEnable;
     U32 tetrad;
     U32 source;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     BRDC_printf(_BRDC("\nWorkMode 8: -- Cycle DMA through 'SDRAM like FIFO' -- \n\n"));
 
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
-        dac.outBufSizeb = g_nSamplesPerChannel
-            * dac.sampleSizeb
-            * dac.chanNum;
+        dac.paramDac.outBufSizeb = p.g_nSamplesPerChannel
+            * dac.paramDac.sampleSizeb
+            * dac.paramDac.chanNum;
 
-        if (dac.outBufSizeb > 0xFFFFFFFF)
-            dac.outBufSizeb = 0xFFFFFFFF;
+        if (dac.paramDac.outBufSizeb > 0xFFFFFFFF)
+            dac.paramDac.outBufSizeb = 0xFFFFFFFF;
 
-        //? tmp = dac.outBufSizeb / g_nSdramWriteBufSize;
+        //? tmp = dac.paramDac.outBufSizeb / p.g_nSdramWriteBufSize;
         //? if( tmp == 0 )
         //? 	tmp =  1;
-        //? dac.outBufSizeb = tmp * g_nSdramWriteBufSize;
+        //? dac.paramDac.outBufSizeb = tmp * p.g_nSdramWriteBufSize;
 
-        tmp = dac.outBufSizeb / g_nDmaBufFactor;
-        if (0 != (dac.outBufSizeb % g_nDmaBufFactor))
+        tmp = dac.paramDac.outBufSizeb / p.g_nDmaBufFactor;
+        if (0 != (dac.paramDac.outBufSizeb % p.g_nDmaBufFactor))
             tmp++;
-        dac.outBufSizeb = tmp * g_nDmaBufFactor;
+        dac.paramDac.outBufSizeb = tmp * p.g_nDmaBufFactor;
 
-        dac.samplesPerChannel = g_nSamplesPerChannel;
+        dac.paramDac.samplesPerChannel = p.g_nSamplesPerChannel;
 
         //
         // Подготовить SDRAM к ркжиму "SDRAM как FIFO"
         //
         U32 sdramMode = 1; // память используется как FIFO
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_SDRAM_SETFIFOMODE, &sdramMode);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_SDRAM_SETFIFOMODE, &sdramMode);
 
         //
         // Скорректировать частоту выходного сигнала
         //
-        CorrectOutFreq(dac);
+        CorrectOutFreq(dac.paramDac);
 
-        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.outBufSizeb, (S64)dac.outBufSizeb);
-        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.samplesPerChannel, (S64)dac.samplesPerChannel);
-        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.dSignalFreq);
+        BRDC_printf(_BRDC("OutBufSizeb       = %lld (0x%llX)\n"), (S64)dac.paramDac.outBufSizeb, (S64)dac.paramDac.outBufSizeb);
+        BRDC_printf(_BRDC("SamplesPerChannel = %lld (0x%llX)\n"), (S64)dac.paramDac.samplesPerChannel, (S64)dac.paramDac.samplesPerChannel);
+        BRDC_printf(_BRDC("SignalFreq        = %.2f Hz\n"), dac.paramDac.dSignalFreq);
 
         //
         // Создать составной буфер для стрима
         //
-        dac.rBufAlloc.dir = BRDstrm_DIR_OUT;
-        dac.rBufAlloc.isCont = g_nIsSystemMemory;
-        dac.rBufAlloc.blkNum = 1;
-        dac.rBufAlloc.blkSize = (U32)dac.outBufSizeb;
-        dac.rBufAlloc.ppBlk = new PVOID[dac.rBufAlloc.blkNum];
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.rBufAlloc));
+        dac.paramDac.rBufAlloc.dir = BRDstrm_DIR_OUT;
+        dac.paramDac.rBufAlloc.isCont = p.g_nIsSystemMemory;
+        dac.paramDac.rBufAlloc.blkNum = 1;
+        dac.paramDac.rBufAlloc.blkSize = (U32)dac.paramDac.outBufSizeb;
+        dac.paramDac.rBufAlloc.ppBlk = new PVOID[dac.paramDac.rBufAlloc.blkNum];
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_ALLOC, &(dac.paramDac.rBufAlloc));
         if (0 > err) {
             BRDC_printf(_BRDC("ERROR: BRDctrl_STREAM_CBUF_ALLOC = 0x%X, dacNo = %d"), err, ii);
             return -1;
         }
 
         source = 2; //  данные из SDRAM
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_SETSOURCE, &source);
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_SDRAM_GETSRCSTREAM, &tetrad);
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_SETSOURCE, &source);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_SDRAM_GETSRCSTREAM, &tetrad);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_SETSRC, &tetrad);
 
-        CalcSignal(dac.rBufAlloc.ppBlk[0], dac.samplesPerChannel, dac, 0);
+        CalcSignal(lid, dac.paramDac.rBufAlloc.ppBlk[0], dac.paramDac.samplesPerChannel, dac.paramDac, 0);
     }
 
     //
@@ -880,13 +882,13 @@ S32 WorkMode8(int lid)
     //
     // Остановить все ЦАПы и освободить все буфера
     //
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
         isEnable = 0;
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // Запретить чтение из SDRAM
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.rBufAlloc));
-        delete[] dac.rBufAlloc.ppBlk;
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // Запретить чтение из SDRAM
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_STREAM_CBUF_FREE, &(dac.paramDac.rBufAlloc));
+        delete[] dac.paramDac.rBufAlloc.ppBlk;
     }
 
     BRDC_printf(_BRDC("\n"));
@@ -903,26 +905,26 @@ S32 FifoOutputCPU(int lid)
     int ii;
     ULONG isEnable;
     U32 statusFIFO = 0x4;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     FifoOutputCPUStart(lid, 0);
 
     //
     // Ожидать завершения работы всех ЦАПов
     //
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto dac : DevicesLid[lid].dac) {
         statusFIFO = 0x4;
         while ((statusFIFO & 0x4) == 0x4) // ждать окончания выдачи блока из FIFO
-            err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
+            err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
     }
 
     //
     // Остановить работу всех ЦАПов
     //
     isEnable = 0;
-    // for (ii = 0; ii < g_nDacNum; ii++)
+    // for (ii = 0; ii < p.g_nDacNum; ii++)
     for (auto dac : DevicesLid[lid].dac)
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
 
     return 0;
 }
@@ -936,28 +938,28 @@ S32 FifoOutputCPUStart(int lid, S32 isCycle)
     S32 isEnable = 0;
     BRD_DataBuf rDataBuf;
     S32 cycling = isCycle; // 0-restart,1-retransmit
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     //
     // Стартовать вывод в FIFO, начиная с последнего ЦАПа так, чтобы закончить МАСТЕРОМ
     //
-    // for (ii = g_nDacNum - 1; ii >= 0; ii--) {
+    // for (ii = p.g_nDacNum - 1; ii >= 0; ii--) {
     for (auto it = DevicesLid[lid].dac.rbegin(); it != DevicesLid[lid].dac.rend(); ++it) {
-        // idx = g_idx[ii];
+        // idx = p.g_idx[ii];
 
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_SETCYCLMODE, &cycling);
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_SETCYCLMODE, &cycling);
 
         isEnable = 0;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_FIFORESET, NULL); // сброс FIFO ЦАП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_FIFORESET, NULL); // сброс FIFO ЦАП
 
-        rDataBuf.pData = (*it).pBuf;
-        rDataBuf.size = (U32)(*it).outBufSizeb;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_PUTDATA, &rDataBuf);
+        rDataBuf.pData = (*it).paramDac.pBuf;
+        rDataBuf.size = (U32)(*it).paramDac.outBufSizeb;
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_PUTDATA, &rDataBuf);
 
         //		if(i==0) status = BRD_ctrl( (*it).handle, 0, BRDctrl_DAC_OUTSYNC,  NULL); //выдать импульс синхронизации (Master!)
 
         isEnable = 1;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // разрешение работы ЦАП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // разрешение работы ЦАП
     }
     return 0;
 }
@@ -971,49 +973,49 @@ S32 FifoOutputDMA(int lid)
     S32 isEnable;
     U32 statusFIFO;
     U32 msTimeout;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     BRDctrl_StreamCBufStart rCBufStart;
 
     //
     // Стартовать вывод в FIFO, начиная с последнего ЦАПа так, чтобы закончить МАСТЕРОМ
     //
-    // for (ii = g_nDacNum - 1; ii >= 0; ii--) {
+    // for (ii = p.g_nDacNum - 1; ii >= 0; ii--) {
 
     for (auto it = DevicesLid[lid].dac.rbegin(); it != DevicesLid[lid].dac.rend(); ++it) {
 
         isEnable = 0;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_FIFORESET, NULL); // сброс FIFO
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_FIFORESET, NULL); // сброс FIFO
 
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_STREAM_RESETFIFO, NULL); // сброс FIFO Stream
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_STREAM_RESETFIFO, NULL); // сброс FIFO Stream
 
         rCBufStart.isCycle = 0; // без зацикливания
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_STREAM_CBUF_START, &rCBufStart); // старт ПДП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_STREAM_CBUF_START, &rCBufStart); // старт ПДП
 
         msTimeout = 1000; // ждать окончания передачи блока данных до 1 сек.
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout);
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout);
         if (BRD_errcmp(err, BRDerr_WAIT_TIMEOUT)) { // вышли по тайм-ауту
             BRDC_printf(_BRDC("\nTIME-OUT DMA! \n"));
-            err = BRD_ctrl((*it).handle, 0, BRDctrl_STREAM_CBUF_STOP, NULL); // стоп ПДП
+            err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_STREAM_CBUF_STOP, NULL); // стоп ПДП
             return -1;
         }
 
         //		if(i==0) status = BRD_ctrl( (*it).handle, 0, BRDctrl_DAC_OUTSYNC,  NULL); //выдать импульс синхронизации (Master!)
 
         isEnable = 1;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // разрешение вывода
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // разрешение вывода
     }
 
     //
     // Ожидать завершения работы всех ЦАПов
     //
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
         statusFIFO = 0x4;
 
         // while( (statusFIFO & 0x4) == 0x4 )	// ждать окончания выдачи блока из FIFO
-        for (int jj = 0; jj < (1 + g_nMsTimeout / 50); jj++) {
-            err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
+        for (int jj = 0; jj < (1 + p.g_nMsTimeout / 50); jj++) {
+            err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
             if ((statusFIFO & 0x4) != 0x4)
                 break;
             IPC_delay(50);
@@ -1027,7 +1029,7 @@ S32 FifoOutputDMA(int lid)
     //
     isEnable = 0;
     for (auto dac : DevicesLid[lid].dac)
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
 
     return 0;
 }
@@ -1047,45 +1049,45 @@ S32 FifoOutputCycleDMA(int lid)
     U32 msTimeout;
     U32 drqFlag;
     S32 nblock;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     BRDctrl_StreamCBufStart rCBufStart;
 
     //
     // Стартовать вывод в FIFO, начиная с последнего ЦАПа так, чтобы закончить МАСТЕРОМ
     //
-    // for (ii = g_nDacNum - 1; ii >= 0; ii--) {
+    // for (ii = p.g_nDacNum - 1; ii >= 0; ii--) {
     for (auto it = DevicesLid[lid].dac.rbegin(); it != DevicesLid[lid].dac.rend(); ++it) {
 
         drqFlag = BRDstrm_DRQ_HALF;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_STREAM_SETDRQ, &drqFlag);
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_STREAM_SETDRQ, &drqFlag);
 
         isEnable = 0;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_FIFORESET, NULL); // сброс FIFO
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_FIFORESET, NULL); // сброс FIFO
 
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_STREAM_RESETFIFO, NULL); // сброс FIFO Stream
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_STREAM_RESETFIFO, NULL); // сброс FIFO Stream
 
         rCBufStart.isCycle = 1; // с зацикливанием
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_STREAM_CBUF_START, &rCBufStart); // старт ПДП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_STREAM_CBUF_START, &rCBufStart); // старт ПДП
 
         //		if(i==0) status = BRD_ctrl( (*it).handle, 0, BRDctrl_DAC_OUTSYNC,  NULL); //выдать импульс синхронизации (Master!)
 
         isEnable = 1;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // разрешение вывода
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // разрешение вывода
     }
 
     nblock = 0;
     while (!IPC_kbhit() && !DevicesLid[lid].dacCtrlThr.stop.load()) {
         msTimeout = 5000; // ждать окончания передачи блока данных до 2 сек.
-        err = BRD_ctrl(DevicesLid[lid].dac[0].handle, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout);
+        err = BRD_ctrl(DevicesLid[lid].dac[0].getService(), 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout);
         if (BRD_errcmp(err, BRDerr_WAIT_TIMEOUT)) { // вышли по тайм-ауту
             BRDC_printf(_BRDC("\nTIME-OUT! \n"));
-            err = BRD_ctrl(DevicesLid[lid].dac[0].handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
+            err = BRD_ctrl(DevicesLid[lid].dac[0].getService(), 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
             BRDC_printf(_BRDC("DAC   state = 0x%X \n"), statusFIFO);
             return -1;
         }
 
-        err = BRD_ctrl(DevicesLid[lid].dac[0].handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
+        err = BRD_ctrl(DevicesLid[lid].dac[0].getService(), 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
         if (statusFIFO & 0x100) {
             BRDC_printf(_BRDC("\nUnderflow! \n"));
             BRDC_printf(_BRDC("Press any key to stop!\n"));
@@ -1119,54 +1121,54 @@ S32 SdramLikeFifoOutputCycleDMA(int lid)
     U32 msTimeout;
     U32 drqFlag;
     S32 nblock;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     BRDctrl_StreamCBufStart rCBufStart;
 
     //
     // Стартовать вывод в FIFO, начиная с последнего ЦАПа так, чтобы закончить МАСТЕРОМ
     //
-    // for (ii = g_nDacNum - 1; ii >= 0; ii--) {
+    // for (ii = p.g_nDacNum - 1; ii >= 0; ii--) {
     for (auto it = DevicesLid[lid].dac.rbegin(); it != DevicesLid[lid].dac.rend(); ++it) {
-        //    idx = g_idx[ii];
+        //    idx = p.g_idx[ii];
 
         drqFlag = BRDstrm_DRQ_HALF;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_STREAM_SETDRQ, &drqFlag);
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_STREAM_SETDRQ, &drqFlag);
 
         isEnable = 0;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_FIFORESET, NULL); // сброс FIFO
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрещение вывода
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_FIFORESET, NULL); // сброс FIFO
 
         isEnable = 0;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // запрещение SDRAM
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_SDRAM_FIFORESET, NULL); // сброс FIFO SDRAM
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // запрещение SDRAM
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_SDRAM_FIFORESET, NULL); // сброс FIFO SDRAM
 
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_STREAM_RESETFIFO, NULL); // сброс FIFO Stream
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_STREAM_RESETFIFO, NULL); // сброс FIFO Stream
 
         rCBufStart.isCycle = 1; // с зацикливанием
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_STREAM_CBUF_START, &rCBufStart); // старт ПДП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_STREAM_CBUF_START, &rCBufStart); // старт ПДП
 
         isEnable = 1;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // разрешение SDRAM
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // разрешение SDRAM
         IPC_delay(100);
 
         isEnable = 1;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // разрешение вывода
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // разрешение вывода
     }
 
     nblock = 0;
     while (!IPC_kbhit() && !DevicesLid[lid].dacCtrlThr.stop.load()) {
         msTimeout = 5000; // ждать окончания передачи блока данных до 5 сек.
-        err = BRD_ctrl(DevicesLid[lid].dac[0].handle, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout);
+        err = BRD_ctrl(DevicesLid[lid].dac[0].paramDac.handle, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout);
         if (BRD_errcmp(err, BRDerr_WAIT_TIMEOUT)) { // вышли по тайм-ауту
             BRDC_printf(_BRDC("\nTIME-OUT! \n"));
-            err = BRD_ctrl(DevicesLid[lid].dac[0].handle, 0, BRDctrl_SDRAM_FIFOSTATUS, &statusFIFO);
+            err = BRD_ctrl(DevicesLid[lid].dac[0].paramDac.handle, 0, BRDctrl_SDRAM_FIFOSTATUS, &statusFIFO);
             BRDC_printf(_BRDC("SDRAM state = 0x%X \n"), statusFIFO);
-            err = BRD_ctrl(DevicesLid[lid].dac[0].handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
+            err = BRD_ctrl(DevicesLid[lid].dac[0].paramDac.handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
             BRDC_printf(_BRDC("DAC   state = 0x%X \n"), statusFIFO);
             return -1;
         }
 
-        err = BRD_ctrl(DevicesLid[lid].dac[0].handle, 0, BRDctrl_SDRAM_FIFOSTATUS, &statusFIFO);
+        err = BRD_ctrl(DevicesLid[lid].dac[0].paramDac.handle, 0, BRDctrl_SDRAM_FIFOSTATUS, &statusFIFO);
         if (statusFIFO & 0x100) {
             BRDC_printf(_BRDC("\nUnderflow! \n"));
             BRDC_printf(_BRDC("Press any key to stop!\n"));
@@ -1248,10 +1250,11 @@ S32 SdramWriteDMA(int lid)
     //
     int ii;
     S32 err;
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
 
-    // for (ii = 0; ii < g_nDacNum; ii++) {
+    // for (ii = 0; ii < p.g_nDacNum; ii++) {
     for (auto& dac : DevicesLid[lid].dac) {
-        err = SdramModulWriteDMA(dac);
+        err = SdramModulWriteDMA(dac.paramDac, lid);
         if (0 > err)
             return err;
     }
@@ -1261,7 +1264,7 @@ S32 SdramWriteDMA(int lid)
 
 ////=***************** SdramModulWriteDMA *******************
 ////=********************************************************
-S32 SdramModulWriteDMA(TDacParam& dac)
+S32 SdramModulWriteDMA(TDacParam& dac, int lid)
 {
     //
     // Выполнить однократную запись данных в  SDRAM одного модуля ПДП-методом
@@ -1272,6 +1275,7 @@ S32 SdramModulWriteDMA(TDacParam& dac)
     U32 msTimeout;
     int nwrite;
     BRDctrl_StreamCBufStart rCBufStart;
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
 
     // set flag request DMA
     drqFlag = BRDstrm_DRQ_HALF;
@@ -1280,16 +1284,16 @@ S32 SdramModulWriteDMA(TDacParam& dac)
 
     err = BRD_ctrl(dac.handle, 0, BRDctrl_STREAM_RESETFIFO, NULL); // сброс FIFO Stream
 
-    nwrite = (int)(dac.outBufSizeb / g_nSdramWriteBufSize);
+    nwrite = (int)(dac.outBufSizeb / p.g_nSdramWriteBufSize);
     BRDC_printf(_BRDC("To Stop press ESC...\n"));
     BRDC_printf(_BRDC("nwrite= %d\n"), nwrite);
 
     for (ii = 0; ii < nwrite; ii++) {
         S32 samplesPerBuf;
 
-        samplesPerBuf = g_nSdramWriteBufSize / dac.sampleSizeb / dac.chanNum;
+        samplesPerBuf = p.g_nSdramWriteBufSize / dac.sampleSizeb / dac.chanNum;
 
-        CalcSignal(dac.rBufAlloc.ppBlk[0], samplesPerBuf, dac, ii);
+        CalcSignal(lid, dac.rBufAlloc.ppBlk[0], samplesPerBuf, dac, ii);
 
         //
         // Вывести 1 буфер в SDRAM с помощью ПДП
@@ -1332,25 +1336,25 @@ S32 SdramOutToDAC(int lid)
     U32 isEnable;
     U32 cycling;
     U32 statusFIFO;
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     //
     // Стартовать все ЦАПы, начиная с последнего так, чтобы закончить МАСТЕРОМ
     //
-    // for (ii = g_nDacNum - 1; ii >= 0; ii--) {
+    // for (ii = p.g_nDacNum - 1; ii >= 0; ii--) {
     for (auto it = DevicesLid[lid].dac.rbegin(); it != DevicesLid[lid].dac.rend(); ++it) {
-        // idx = g_idx[ii];
+        // idx = p.g_idx[ii];
 
         isEnable = 0;
         cycling = 0;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_SETCYCLMODE, &cycling);
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // Стоп ЦАП
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_FIFORESET, NULL); // Сброс FIFO ЦАП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_SETCYCLMODE, &cycling);
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // Стоп ЦАП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_FIFORESET, NULL); // Сброс FIFO ЦАП
 
         //		if(i==0) status = BRD_ctrl( (*it).handle, 0, BRDctrl_DAC_OUTSYNC,  NULL); //выдать импульс синхронизации (Master!)
 
         isEnable = 1;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // Разрешить чтение из  SDRAM
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // Старт ЦАП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // Разрешить чтение из  SDRAM
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // Старт ЦАП
     }
 
     //
@@ -1358,8 +1362,8 @@ S32 SdramOutToDAC(int lid)
     //
     for (auto& dac : DevicesLid[lid].dac) {
         nStatus = 0;
-        for (int jj = 0; jj < (1 + g_nMsTimeout / 50); jj++) {
-            err = BRD_ctrl(dac.handle, 0, BRDctrl_SDRAM_ISACQCOMPLETE, &nStatus);
+        for (int jj = 0; jj < (1 + p.g_nMsTimeout / 50); jj++) {
+            err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_SDRAM_ISACQCOMPLETE, &nStatus);
             if (nStatus)
                 break;
             IPC_delay(50);
@@ -1367,13 +1371,13 @@ S32 SdramOutToDAC(int lid)
         if (!nStatus)
             BRDC_printf(_BRDC("\nTIME-OUT! status SDRAM = 0\n"));
 
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_SDRAM_FLAGCLR, NULL);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_SDRAM_FLAGCLR, NULL);
 
         //
         // Запретить чтение из SDRAM
         //
         isEnable = 0;
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable);
     }
 
     //
@@ -1383,8 +1387,8 @@ S32 SdramOutToDAC(int lid)
         statusFIFO = 0x4;
 
         // while((statusFIFO & (1<<2))==(1<<2))
-        for (int jj = 0; jj < (1 + g_nMsTimeout / 50); jj++) {
-            err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
+        for (int jj = 0; jj < (1 + p.g_nMsTimeout / 50); jj++) {
+            err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO);
             if ((statusFIFO & 0x4) != 0x4)
                 break;
             IPC_delay(50);
@@ -1396,7 +1400,7 @@ S32 SdramOutToDAC(int lid)
         // Стоп  ЦАП
         //
         isEnable = 0;
-        err = BRD_ctrl(dac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable);
+        err = BRD_ctrl(dac.paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable);
     }
     return 1;
 }
@@ -1412,32 +1416,32 @@ S32 SdramCycleOutput(int lid, S32 cycle)
     // int ii, idx;
     U32 isEnable;
     U32 cycling; // 0-restart,1-retransmit
-
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
     //
     // Стартовать все ЦАПы, начиная с последнего так, чтобы закончить МАСТЕРОМ
     //
     for (auto it = DevicesLid[lid].dac.rbegin(); it != DevicesLid[lid].dac.rend(); ++it) {
-        // idx = g_idx[ii];
+        // idx = p.g_idx[ii];
 
         isEnable = 0;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // Стоп ЦАП
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_FIFORESET, NULL); // Сброс FIFO ЦАП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // Стоп ЦАП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_FIFORESET, NULL); // Сброс FIFO ЦАП
 
         cycling = cycle;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_SETCYCLMODE, &cycling);
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_SETCYCLMODE, &cycling);
 
         // set flag request DMA
         // U32				drqFlag = BRDstrm_DRQ_HALF;
 
         isEnable = 0;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // Стоп ЦАП
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_FIFORESET, NULL); // Сброс FIFO ЦАП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // Стоп ЦАП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_FIFORESET, NULL); // Сброс FIFO ЦАП
 
         //		if(i==0) status = BRD_ctrl( (*it).handle, 0, BRDctrl_DAC_OUTSYNC,  NULL ); //выдать импульс синхронизации (Master!)
 
         isEnable = 1;
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // Разрешить чтение из  SDRAM
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // Старт ЦАП
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable); // Разрешить чтение из  SDRAM
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // Старт ЦАП
     }
 
     return 1;
@@ -1455,22 +1459,23 @@ S32 PrepareStart(int lid)
     //
     S32 err;
     // int ii, idx;
+    ParamsDACs& p = DevicesLid[lid].paramsDac;
 
-    // for (ii = g_nDacNum - 1; ii >= 0; ii--) {
+    // for (ii = p.g_nDacNum - 1; ii >= 0; ii--) {
     for (auto it = DevicesLid[lid].dac.rbegin(); it != DevicesLid[lid].dac.rend(); ++it) {
-        // idx = g_idx[ii];
-        err = BRD_ctrl((*it).handle, 0, BRDctrl_DAC_PREPARESTART, NULL);
+        // idx = p.g_idx[ii];
+        err = BRD_ctrl((*it).paramDac.handle, 0, BRDctrl_DAC_PREPARESTART, NULL);
         if (err < 0)
             if (!(BRD_errcmp(err, BRDerr_CMD_UNSUPPORTED)
                     || BRD_errcmp(err, BRDerr_INSUFFICIENT_SERVICES))) {
-                BRDC_printf(_BRDC("ERROR: Prepare Start has returned = 0x%X!!!\n"), err);
+                BRDC_printf(_BRDC("<ERR> Prepare Start has returned = 0x%X!!!\n"), err);
             }
 
         //
         // Если указан файл, то подгрузить регистры из файла
         //
-        if ((*it).sRegRwSpdFilename[0])
-            err = RegRwSpd((*it).handle & 0xFFFF, (*it).sRegRwSpdFilename);
+        if ((*it).paramDac.sRegRwSpdFilename[0])
+            err = RegRwSpd((*it).paramDac.handle & 0xFFFF, (*it).paramDac.sRegRwSpdFilename);
     }
 
     return 1;

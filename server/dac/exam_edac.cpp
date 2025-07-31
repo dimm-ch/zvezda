@@ -23,22 +23,25 @@
 // Globals
 //
 
-BRDCHAR		g_iniFileName[MAX_PATH] = _BRDC("exam_edac.ini");
-BRDCHAR		g_sFullName[MAX_PATH];
+//BRDCHAR		g_iniFileName[MAX_PATH] = _BRDC("exam_edac.ini");
+//BRDCHAR		g_sFullName[MAX_PATH];
 
 //int			g_lid = -1;
 //S32			g_nDevNum = 0;
-BRD_Handle	g_hDev[MAX_DEVICE];
+//BRD_Handle	g_hDev[MAX_DEVICE];
 //S32			g_nDacNum = 0;
 //TDacParam	g_aDac[MAX_DAC];
-BRD_Handle	g_idx[MAX_DAC];			// Рассортированные номера ЦАПов для MASTER/SLAVE
+//BRD_Handle	g_idx[MAX_DAC];			// Рассортированные номера ЦАПов для MASTER/SLAVE
+/*
 double		g_dSamplingRate;
 double		g_dSignalFreq;
+U32			g_dSignalType;
 FILE		*g_pFileDataBin;
-
+*/
 //
 // Params from ini-file
 //
+/*
 BRDCHAR		g_sServiceName[256];	// без номера службы
 BRDCHAR		g_sPldFileName[MAX_PATH];
 int			g_nWorkMode;
@@ -55,7 +58,7 @@ int			g_nQuickQuit;
 
 int			g_nIsNew;
 S32			g_nMsTimeout = 5000;
-
+*/
 //------------------------------------------------------------------------
 
 
@@ -97,20 +100,26 @@ S32 DisplayErrorDac( S32 status, const char* func_name, const BRDCHAR* cmd_str )
 
 //=******************** CaptureAllDac *********************
 //=********************************************************
-S32 CaptureAllDac(int lid, int modeCapture )
+S32 CaptureAllDac(int lid, U32 modeCapture )
 {
 	S32			err;
 	S32			ii;
 	U32			iDev = 0;
 	BRD_Info	rInfo;
 
+	ReleaseAllDac(lid);
 	// Открыть устройство, если не открыто
-	BRD_Handle hDev = DevicesLid[lid].device.handle();
+	BRD_Handle hDev = DevicesLid[lid].device.handle();		
 	if( hDev<=0)
 	{
-		printf( "<ERR> CaptureAllDac: device d'nt opened\n");		
-		return -1;
+		hDev = DevicesLid[lid].device.reopen(lid);
+		if(! DevicesLid[lid].device.isOpen()) {
+			printf( "<ERR> CaptureAllDac: device d'nt opened\n");		
+			return -1;
+		}
 	}
+	ParamsDACs& p = DevicesLid[lid].paramsDac;
+
 	// Вывести на экран информацию об устройстве
 	rInfo.size = sizeof(rInfo);
 	BRD_getInfo(lid, &rInfo );
@@ -141,12 +150,9 @@ S32 CaptureAllDac(int lid, int modeCapture )
 		//
 		U32	mode = modeCapture; //BRDcapt_EXCLUSIVE;
 		U32	nItemReal, iSrv;
-		BRD_ServList srvList[MAX_SERVICE_ON_DEVICE];
-		S32	len = (S32)BRDC_strlen( g_sServiceName );
-/////////////////////////////////////////////////////////////////////////		
-		// нужна ф-ция для освобождения захваченных сервисов
-		ReleaseAllDac(lid);
-		
+		//BRD_ServList srvList[MAX_SERVICE_ON_DEVICE];
+		//S32	len = (S32)BRDC_strlen( p.g_sServiceName );
+/*		
 		err = BRD_serviceList( hDev, 0, srvList, MAX_SERVICE_ON_DEVICE, &nItemReal);
 		for( ii = 0; ii < (S32)nItemReal; ii++)
 			BRDC_printf( _BRDC("        Srv %d:  %15s, Attr = %X.\n"),ii, srvList[ii].name, srvList[ii].attr);
@@ -154,29 +160,32 @@ S32 CaptureAllDac(int lid, int modeCapture )
 		
 		for( iSrv = 0; iSrv < nItemReal; iSrv++ )
 		{
-			if( BRDC_strnicmp(  srvList[iSrv].name, g_sServiceName, len) )
+			if( BRDC_strnicmp(  srvList[iSrv].name, p.g_sServiceName, len) )
 				continue;
 			if( (srvList[iSrv].name[len] < '0') ||
 				(srvList[iSrv].name[len] > '9') ||
 				(srvList[iSrv].name[len+1] != '\0') )
 				continue;
 
-            BRDC_printf( _BRDC( "   Try capture %s in mode %s ..."), g_sServiceName, getStrCaptureModeService(mode).c_str() );
-			BRD_Handle hSrv = BRD_capture( hDev, 0, &mode,srvList[iSrv].name, 10000);
-			if(hSrv > 0)
-			{
-                printf(" - Service captured in mode %s\n", getStrCaptureModeService(mode).c_str());
-				TDacParam dacPrm;
-				dacPrm.handle = hSrv;
-				BRDC_sprintf( dacPrm.sSection, _BRDC("device%d_%s"), iDev++, srvList[iSrv].name );
-				DevicesLid[lid].dac.push_back(dacPrm);				
-			}
-			else
-                BRDC_printf( _BRDC("Error!\n"));
-		}
+            BRDC_printf( _BRDC( "%s ..."),getStrCaptureModeService(mode).c_str() );
+			
 
-	//	g_nDevNum++;
-	// }
+		}
+*/
+	DacDevice dac;
+	dac.servDac.setMode(mode);
+	dac.servDac.capture(hDev,  p.g_sServiceName, 10000);
+	if(dac.servDac.isCaptured())
+	{
+		printf(" - %s\n", dac.servDac.strMode().c_str());
+		dac.paramDac.handle = dac.servDac.handle();
+		dac.paramDac.dSignalFreq = p.g_dSignalFreq;
+		dac.paramDac.signalType  = p.g_dSignalType;
+		BRDC_sprintf( dac.paramDac.sSection, _BRDC("device%d_%s"), iDev++, p.g_sServiceName);
+		DevicesLid[lid].dac.push_back(dac);				
+	}
+	else
+		BRDC_printf( _BRDC("Error!\n"));
 
     BRDC_printf( _BRDC( "\n" ));
 
@@ -191,10 +200,14 @@ S32 ReleaseAllDac(int lid)
 	if(lid < 0 || lid >= MAX_LID_DEVICES)
 		return err;
 		
-	for( auto& dac : DevicesLid[lid].dac )
-		err = BRD_release( dac.handle, 0 );
-
+	for( auto& dac : DevicesLid[lid].dac ) {
+		if(DevicesLid[lid].device.isOpen()) {
+			dac.servDac.release();
+			dac.paramDac.handle = 0;
+		}
+	}
 	DevicesLid[lid].dac.clear();
+
 	return 0;
 }
 
@@ -204,37 +217,43 @@ S32 SetAllDac( int lid )
 {
 	S32			err;	
 	BRD_DacCfg	rDacCfg;
+	ParamsDACs& p = DevicesLid[lid].paramsDac;
 
 	for(auto& dev : DevicesLid[lid].dac )
 	{
+		if(!dev.servDac.isCaptured()) {
+			printf("<ERR> SetAllDac: service not captured!");
+			return -1;
+		}
+		BRD_Handle hdlSrv = dev.getService();
 		//
 		// Определить размер FIFO в байтах, количество каналов
 		//
-		err = BRD_ctrl( dev.handle, 0, BRDctrl_DAC_GETCFG, &rDacCfg );
+		err = BRD_ctrl( hdlSrv, 0, BRDctrl_DAC_GETCFG, &rDacCfg );
 		if(err < 0) {
 			printf("<ERR> SetAllDac::BRD_ctrl(BRDctrl_DAC_GETCFG)");
 			return err;
 		}
 		BRDC_printf(_BRDC("<SRV> DAC Config: FIFO size = %d kBytes\n"), rDacCfg.FifoSize / 1024);
 		BRDC_printf(_BRDC("<SRV> DAC Config: chanMaxNum = %d \n"), rDacCfg.MaxChan);
-		dev.nFifoSizeb = rDacCfg.FifoSize;
-		dev.chanMaxNum = rDacCfg.MaxChan;
-		if( dev.chanMaxNum > MAX_CHAN )
-			dev.chanMaxNum = MAX_CHAN;
+		dev.paramDac.nFifoSizeb = rDacCfg.FifoSize;
+		dev.paramDac.chanMaxNum = rDacCfg.MaxChan;
+		if( dev.paramDac.chanMaxNum > MAX_CHAN )
+			dev.paramDac.chanMaxNum = MAX_CHAN;
 
 		//
 		// Задать параметры работы ЦАП с помощью ini-файла
 		//
 		BRD_IniFile rIniFile;
 
-		lstrcpy( rIniFile.fileName, g_sFullName );
-		lstrcpy( rIniFile.sectionName, dev.sSection );
-		err = BRD_ctrl( dev.handle, 0, BRDctrl_DAC_READINIFILE, &rIniFile );
+		lstrcpy( rIniFile.fileName, p.g_sFullName );
+		lstrcpy( rIniFile.sectionName, dev.paramDac.sSection );
+		err = BRD_ctrl( hdlSrv, 0, BRDctrl_DAC_READINIFILE, &rIniFile );
 		
 		if (BRD_errext(err) != BRDerr_OK) {
-			printf("Error BRDctrl_DAC_READINIFILE: err=%X, handle=%d, rIniFile.fileName=%s, rIniFile.sectionName=%s \n", 
-				err, dev.handle, rIniFile.fileName, rIniFile.sectionName);
-			//throw std::invalid_argument("Side-Driver parameters bad");
+			printf("Error BRDctrl_DAC_READINIFILE: err=0x%X, handle=0%X, rIniFile.fileName=%s, rIniFile.sectionName=%s \n", 
+				err, hdlSrv, rIniFile.fileName, rIniFile.sectionName);
+			throw std::invalid_argument("Side-Driver rejection");
 		}
 
 		//
@@ -242,8 +261,8 @@ S32 SetAllDac( int lid )
 		//
 		U32	format = 0;
 
-		err = BRD_ctrl( dev.handle, 0, BRDctrl_DAC_GETFORMAT, &format);
-		dev.sampleSizeb = format ? format : sizeof(short);
+		err = BRD_ctrl( hdlSrv, 0, BRDctrl_DAC_GETFORMAT, &format);
+		dev.paramDac.sampleSizeb = format ? format : sizeof(short);
 
 		//
 		// Получить источник и значение тактовой частоты можно отдельной функцией
@@ -251,7 +270,7 @@ S32 SetAllDac( int lid )
 		BRD_SyncMode	rSyncMode;
 		U32				nInterpFactor;
 
-		err = BRD_ctrl( dev.handle, 0, BRDctrl_DAC_GETINTERP, &nInterpFactor );
+		err = BRD_ctrl( hdlSrv, 0, BRDctrl_DAC_GETINTERP, &nInterpFactor );
 		if( !BRD_errcmp(err, BRDerr_OK) )
 		{
 			nInterpFactor = 1;
@@ -259,7 +278,7 @@ S32 SetAllDac( int lid )
 		}
 		BRDC_printf(_BRDC("BRDctrl_DAC_GETINTERP: Kint = %d\n"), nInterpFactor );
 
-		err = BRD_ctrl( dev.handle, 0, BRDctrl_DAC_GETSYNCMODE, &rSyncMode );
+		err = BRD_ctrl( hdlSrv, 0, BRDctrl_DAC_GETSYNCMODE, &rSyncMode );
 		if( BRD_errcmp(err, BRDerr_OK) )
 		{
 			BRDC_printf(_BRDC("BRDctrl_DAC_GETSYNCMODE: source = %d, value = %.2f MHz, "), rSyncMode.clkSrc, rSyncMode.clkValue/1000000);
@@ -267,7 +286,7 @@ S32 SetAllDac( int lid )
 				BRDC_printf(_BRDC("sample rate = %.2f kHz\n"), rSyncMode.rate/1000);
 			else
 				BRDC_printf(_BRDC("sample rate = %.2f MHz\n"), rSyncMode.rate/1000000);
-			dev.dSamplingRate = rSyncMode.rate;
+			dev.paramDac.dSamplingRate = rSyncMode.rate;
 		}
 		else
 			DisplayErrorDac( err, __FUNCTION__, _BRDC("BRDctrl_DAC_GETSYNCMODE") );
@@ -284,7 +303,7 @@ S32 SetAllDac( int lid )
 		U08 aStartStruct[sizeof(BRD_DacStartMode)]; // наибольшая из структур имеет размер 44 байт
 		memset( aStartStruct, 0x5A, sizeof(BRD_DacStartMode) );
 
-		err = BRD_ctrl( dev.handle, 0, BRDctrl_DAC_GETSTARTMODE, &aStartStruct );
+		err = BRD_ctrl( hdlSrv, 0, BRDctrl_DAC_GETSTARTMODE, &aStartStruct );
 		if( BRD_errcmp(err, BRDerr_OK) )
 		{
 			if( aStartStruct[1+sizeof(BRD_StartMode)] == 0x5A )
@@ -304,42 +323,40 @@ S32 SetAllDac( int lid )
 		//
 		// Скорректировать режим РЕСТАРТ для WorkMode=3 и 4
 		//
-		if( (g_nWorkMode==3) || (g_nWorkMode==4) )
+		if( (p.g_nWorkMode==3) || (p.g_nWorkMode==4) )
 		{
 			memset( aStartStruct, 0x5A, sizeof(BRD_DacStartMode) );
-			err = BRD_ctrl( dev.handle, 0, BRDctrl_DAC_GETSTARTMODE, &aStartStruct );
+			err = BRD_ctrl( hdlSrv, 0, BRDctrl_DAC_GETSTARTMODE, &aStartStruct );
 			if( BRD_errcmp(err, BRDerr_OK) )
 			{
-				if( aStartStruct[1+sizeof(BRD_StartMode)] == 0x5A )
-				{
+				if( aStartStruct[1+sizeof(BRD_StartMode)] == 0x5A ) {
+					
 					BRD_StartMode *pStart = (BRD_StartMode*)aStartStruct;
 					pStart->reStartMode = 1;
-
 				}
-				else
-		
-		//
-			{
+				else {
+					
 					BRD_DacStartMode *pStart = (BRD_DacStartMode*)aStartStruct;;
 					pStart->stndStart.reStartMode = 1;
 				}
-				err = BRD_ctrl( dev.handle, 0, BRDctrl_DAC_SETSTARTMODE, &aStartStruct );
+				err = BRD_ctrl( hdlSrv, 0, BRDctrl_DAC_SETSTARTMODE, &aStartStruct );
 			}
-		}	// Установить значения компараторов
+		}	
+		// Установить значения компараторов
 		//
 		BRD_CmpSC rCmpSc;
 		rCmpSc.src= 0;
-		rCmpSc.thr[0] = dev.aThdac[0];
-		rCmpSc.thr[1] = dev.aThdac[1];
+		rCmpSc.thr[0] = dev.paramDac.aThdac[0];
+		rCmpSc.thr[1] = dev.paramDac.aThdac[1];
 
-		err = BRD_ctrl( dev.handle, 0, BRDctrl_CMPSC_SET, &rCmpSc );
+		err = BRD_ctrl( hdlSrv, 0, BRDctrl_CMPSC_SET, &rCmpSc );
 
 		//
 		// Получить маску выбраных каналов. Определить количество выбраных каналов.
 		//
 		U32 chanMask = 0;
 
-		err = BRD_ctrl( dev.handle, 0, BRDctrl_DAC_GETCHANMASK, &chanMask );
+		err = BRD_ctrl( hdlSrv, 0, BRDctrl_DAC_GETCHANMASK, &chanMask );
 		if(BRD_errcmp(err, BRDerr_OK))
 			BRDC_printf(_BRDC("BRDctrl_DAC_GETCHANMASK: chan_mask = %0X\n"), chanMask);
 		else
@@ -349,16 +366,16 @@ S32 SetAllDac( int lid )
 		S32			jj;
 		S32			chanNum  = 0;
 
-		for( jj = 0; jj < dev.chanMaxNum; jj++ )
+		for( jj = 0; jj < dev.paramDac.chanMaxNum; jj++ )
 			chanNum += (chanMask >> jj) & 0x1;
 
-		dev.chanMask = chanMask;
-		dev.chanNum  = chanNum;
+		dev.paramDac.chanMask = chanMask;
+		dev.paramDac.chanNum  = chanNum;
 
 		//
 		// Управление коммутатором
 		//
-		SetSwitch(DevicesLid[lid].device.handle(), dev);
+		SetSwitch(DevicesLid[lid].device.handle(), dev.paramDac);
 	}
 
 	return 0;
@@ -366,7 +383,7 @@ S32 SetAllDac( int lid )
 
 //=******************** SetSwitch *****************************
 //=************************************************************
-S32 SetSwitch(BRD_Handle handle, TDacParam param)
+S32 SetSwitch(BRD_Handle handle, TDacParam& param)
 {
 	//BRD_Handle	handle   = DevicesLid[lid].device.handle; //g_hDev[idxDac];
 	S32			switchIn = param.switchIn; //g_aDac[idxDac].switchIn;
@@ -417,31 +434,36 @@ S32	SetMasterSlave(int lid)
 	int				ii, jj;
 	U32				master[MAX_DAC];
 
+	ParamsDACs& p = DevicesLid[lid].paramsDac;
+	if(DevicesLid[lid].dac.size() == 0) {
+		printf("<ERR> SetMasterSlave: service d'nt captured ");
+		return -1;
+	}
 	//
 	// Проверить номер ЦАП, выбранного в качестве МАСТЕРА
 	//
 	int g_nDacNum = DevicesLid[lid].dac.size();
-	if( g_nMasterSlave >= g_nDacNum )
+	if( p.g_nMasterSlave >= g_nDacNum )
 	if( g_nDacNum > 1 )
 	{
-		BRDC_printf(_BRDC("WARNING: Wrong Master Dac No (%d). Must be less than %d.\n"), g_nMasterSlave, g_nDacNum );
-		g_nMasterSlave = -1;
+		BRDC_printf(_BRDC("WARNING: Wrong Master Dac No (%d). Must be less than %d.\n"), p.g_nMasterSlave, g_nDacNum );
+		p.g_nMasterSlave = -1;
 	}
 
 	//
 	// Рассортировать дескрипторы ЦАПов так, чтобы первым шел МАСТЕР
 	//
-	if( (g_nMasterSlave>=0) && (g_nDacNum>1) )
+	if( (p.g_nMasterSlave>=0) && (g_nDacNum>1) )
 	{
 		//
 		// Режим MASTER/SLAVE
 		//
-		g_idx[0] = g_nMasterSlave;
+		p.g_idx[0] = p.g_nMasterSlave;
 		jj = 1;
 
 		for( ii=0; ii<g_nDacNum; ii++ )
-			if( ii != g_nMasterSlave )
-				g_idx[jj++] = ii;
+			if( ii != p.g_nMasterSlave )
+				p.g_idx[jj++] = ii;
 
 		for( ii=0; ii<g_nDacNum; ii++ )
 			master[ii] = 0;
@@ -453,7 +475,7 @@ S32	SetMasterSlave(int lid)
 		// Режим SINGLE
 		//
 		for( ii=0; ii<g_nDacNum; ii++ )
-			g_idx[ii] = ii;
+			p.g_idx[ii] = ii;
 		for( ii=0; ii<g_nDacNum; ii++ )
 			master[ii] = 1;
 	}
@@ -462,9 +484,10 @@ S32	SetMasterSlave(int lid)
 	// Установить режим МАСТЕР/СЛЕЙВ или СИНГЛ для всех ЦАПов
 	//
 	ii =0;
-	for(TDacParam param : DevicesLid[lid].dac) // ii=0; ii<g_nDacNum; ii++ )
+	
+	for(auto& param : DevicesLid[lid].dac) // ii=0; ii<g_nDacNum; ii++ )
 	{
-		err = BRD_ctrl( param.handle, 0, BRDctrl_DAC_SETMASTER, &master[ii]);
+		err = BRD_ctrl( param.paramDac.handle, 0, BRDctrl_DAC_SETMASTER, &master[ii]);
 		if( 0 <= err )
             BRDC_printf( _BRDC("BRDctrl_DAC_SETMASTER:  DAC%d  master = %d\n"), ii, master[ii] );
 		else
@@ -479,17 +502,18 @@ S32	SetMasterSlave(int lid)
 
 //********************** CalcSignal ***********************
 //*********************************************************
-S32 CalcSignal( void *pvBuf, SBIG nSamples, TDacParam& dac, int cnt )
+S32 CalcSignal(int lid, void *pvBuf, SBIG nSamples, TDacParam& dac, int cnt )
 {
 	S32				err;
 	int				ii;
 	double			twiddle;
 
+	ParamsDACs& p = DevicesLid[lid].paramsDac;
 	//
 	// Заполнить сигнал из файла
 	//
-	if( g_pFileDataBin )
-		return FillSignalFromFile( pvBuf, nSamples, dac, cnt );
+	if( p.g_pFileDataBin )
+		return FillSignalFromFile(lid, pvBuf, nSamples, dac, cnt );
 
 	//
 	// Если первый буфер, запомнить начальную фазу
@@ -501,7 +525,7 @@ S32 CalcSignal( void *pvBuf, SBIG nSamples, TDacParam& dac, int cnt )
 
 	twiddle = PI2 * dac.dSignalFreq / dac.dSamplingRate;
 
-	err = CalcSignalToBuf( pvBuf, nSamples,
+	err = CalcSignalToBuf(lid, pvBuf, nSamples,
 							dac.signalType,
 							dac.sampleSizeb,
 							dac.chanMask,
@@ -516,7 +540,7 @@ S32 CalcSignal( void *pvBuf, SBIG nSamples, TDacParam& dac, int cnt )
 
 //******************** CalcSignalToBuf ********************
 //*********************************************************
-S32 CalcSignalToBuf( void *pvBuf, SBIG nSamples, S32 signalType,
+S32 CalcSignalToBuf(int lid, void *pvBuf, SBIG nSamples, S32 signalType,
 					 S32 sampleWidth, S32 chanMask, S32 chanMaxNum,
 					 double twiddle, double *aAmpl, double *aPhase )
 {
@@ -536,7 +560,7 @@ S32 CalcSignalToBuf( void *pvBuf, SBIG nSamples, S32 signalType,
 	// Сформировать сигнал в каждом выбранном канале
 	//
 	for( ii=0; ii<chanNum; ii++ )
-		CalcSignalToChan( pvBuf, nSamples, signalType, sampleWidth, ii, chanNum,
+		CalcSignalToChan(lid, pvBuf, nSamples, signalType, sampleWidth, ii, chanNum,
 		twiddle, aAmpl[aChanNo[ii]], &(aPhase[aChanNo[ii]]) );
 
 	return 0;
@@ -544,10 +568,11 @@ S32 CalcSignalToBuf( void *pvBuf, SBIG nSamples, S32 signalType,
 
 
 template<typename T>
-void fillBufferForDac(void *pvBuf, SBIG nSamples, S32 signalType, S32 chanIdx, S32 chanNum, 
+void fillBufferForDac(int lid, void *pvBuf, SBIG nSamples, S32 signalType, S32 chanIdx, S32 chanNum, 
 		double& phase, double twiddle, double ampl, const T valc)
 {
 	T *pBuf = (T*)pvBuf;
+	ParamsDACs& p = DevicesLid[lid].paramsDac;
 
 	pBuf += chanIdx;
 	for(SBIG ii=0; ii<nSamples; ii++ )
@@ -561,7 +586,7 @@ void fillBufferForDac(void *pvBuf, SBIG nSamples, S32 signalType, S32 chanIdx, S
 		pBuf  += chanNum;
 		phase += twiddle;
 	}
-	if( g_nIsDebugMarker )
+	if( p.g_nIsDebugMarker )
 	{
 		pBuf = (T*)pvBuf;
 		pBuf[ chanIdx + (nSamples-1)*chanNum ] = valc;
@@ -571,7 +596,8 @@ void fillBufferForDac(void *pvBuf, SBIG nSamples, S32 signalType, S32 chanIdx, S
 
 //******************** CalcSignalToChan *******************
 //*********************************************************
-S32 CalcSignalToChan( void *pvBuf, SBIG nSamples, S32 signalType,
+/*
+S32 CalcSignalToChan(int lid, void *pvBuf, SBIG nSamples, S32 signalType,
 					  S32 sampleWidth, S32 chanIdx, S32 chanNum,
 					  double twiddle, double ampl, double *pPhase )
 {
@@ -591,17 +617,120 @@ S32 CalcSignalToChan( void *pvBuf, SBIG nSamples, S32 signalType,
 	// Отсчеты сигнала имеют размер 1 байт
 	//
 	if( sampleWidth == 1 )
-		fillBufferForDac<S08>(pvBuf, nSamples, signalType, chanIdx, chanNum, phase, twiddle, ampl, 0x7f);		
+		fillBufferForDac<S08>(lid,  pvBuf, nSamples, signalType, chanIdx, chanNum, phase, twiddle, ampl, 0x7f);		
 	//
 	// Отсчеты сигнала имеют размер 2 байта
 	//
 	if( sampleWidth == 2 )
-		fillBufferForDac<S16>(pvBuf, nSamples, signalType, chanIdx, chanNum, phase, twiddle, ampl, 0x7fff);		
+		fillBufferForDac<S16>(lid, pvBuf, nSamples, signalType, chanIdx, chanNum, phase, twiddle, ampl, 0x7fff);		
 	//
 	// Отсчеты сигнала имеют размер 4 байта
 	//
 	if( sampleWidth == 4 )
-		fillBufferForDac<S32>(pvBuf, nSamples, signalType, chanIdx, chanNum, phase, twiddle, ampl, 0x7fffffff);		
+		fillBufferForDac<S32>(lid, pvBuf, nSamples, signalType, chanIdx, chanNum, phase, twiddle, ampl, 0x7fffffff);		
+
+	*pPhase = fmod( phase, PI2 );
+
+	return 0;
+}*/
+
+//******************** CalcSignalToChan *******************
+//*********************************************************
+S32 CalcSignalToChan(int lid, void *pvBuf, SBIG nSamples, S32 signalType,
+					  S32 sampleWidth, S32 chanIdx, S32 chanNum,
+					  double twiddle, double ampl, double *pPhase )
+{
+	SBIG		ii;
+	double		phase = *pPhase;
+	ParamsDACs& p = DevicesLid[lid].paramsDac;
+	//
+	// Проверить аргументы
+	//
+	if( ampl < 0.0 )
+		switch( sampleWidth )
+		{
+			case 1: ampl = 128/2; break;
+			case 2: ampl = 32767/2; break;
+			case 4: ampl = 2147483647/2; break;
+		}
+
+	//
+	// Отсчеты сигнала имеют размер 1 байт
+	//
+	if( sampleWidth == 1 )
+	{
+		S08		*pBuf = (S08*)pvBuf;
+
+		if( ampl < 0.0 )
+			ampl = 64.0;
+
+		pBuf += chanIdx;
+		for( ii=0; ii<nSamples; ii++ )
+		{
+			*pBuf  = (S08)floor(ampl * sin( phase ) + 0.5);
+			if( signalType == 2 )
+				*pBuf = (S08)(( *pBuf < 0.0 ) ? -ampl : +ampl);
+			pBuf  += chanNum;
+			phase += twiddle;
+		}
+		if( p.g_nIsDebugMarker )
+		{
+			pBuf = (S08*)pvBuf;
+			pBuf[ chanIdx + (nSamples-1)*chanNum ] = 0x7f;
+		}
+	}
+
+	//
+	// Отсчеты сигнала имеют размер 2 байта
+	//
+	if( sampleWidth == 2 )
+	{
+		S16		*pBuf = (S16*)pvBuf;
+
+		if( ampl < 0.0 )
+			ampl = 16384.0;
+
+		pBuf += chanIdx;
+		for( ii=0; ii<nSamples; ii++ )
+		{
+			*pBuf  = (S16)floor(ampl * sin( phase ) + 0.5);
+			if( signalType == 2 )
+				*pBuf = (S16)(( *pBuf < 0.0 ) ? -ampl : +ampl);
+			pBuf  += chanNum;
+			phase += twiddle;
+		}
+		if( p.g_nIsDebugMarker )
+		{
+			pBuf = (S16*)pvBuf;
+			pBuf[ chanIdx + (nSamples-1)*chanNum ] = 0x7fff;
+		}
+	}
+
+	//
+	// Отсчеты сигнала имеют размер 4 байта
+	//
+	if( sampleWidth == 4 )
+	{
+		S32		*pBuf = (S32*)pvBuf;
+
+		if( ampl < 0.0 )
+			ampl = 1024.0 * 1024.0 * 1024.0;
+
+		pBuf += chanIdx;
+		for( ii=0; ii<nSamples; ii++ )
+		{
+			*pBuf  = (S32)floor(ampl * sin( phase ) + 0.5);
+			if( signalType == 2 )
+				*pBuf = (S32)(( *pBuf < 0.0 ) ? -ampl : +ampl);
+			pBuf  += chanNum;
+			phase += twiddle;
+		}
+		if( p.g_nIsDebugMarker )
+		{
+			pBuf = (S32*)pvBuf;
+			pBuf[ chanIdx + (nSamples-1)*chanNum ] = 0x7fffffff;
+		}
+	}
 
 	*pPhase = fmod( phase, PI2 );
 
@@ -611,9 +740,10 @@ S32 CalcSignalToChan( void *pvBuf, SBIG nSamples, S32 signalType,
 
 //=****************** FillSignalFromFile ******************
 //=********************************************************
-S32 FillSignalFromFile( void *pvBuf, SBIG nSamples, TDacParam& dac, int cnt )
+S32 FillSignalFromFile(int lid, void *pvBuf, SBIG nSamples, TDacParam& dac, int cnt )
 {
 	SBIG		bufSizeb;
+	ParamsDACs& p = DevicesLid[lid].paramsDac;
 
 	bufSizeb = nSamples
 				* dac.chanNum
@@ -622,10 +752,10 @@ S32 FillSignalFromFile( void *pvBuf, SBIG nSamples, TDacParam& dac, int cnt )
 	// Если первый буфер, позиционировать файл в начало
 	//
 	if( cnt==0 )
-		fseek( g_pFileDataBin, 0, SEEK_SET );
+		fseek( p.g_pFileDataBin, 0, SEEK_SET );
 
 	memset( pvBuf, 0, bufSizeb );
-	fread( pvBuf, 1, bufSizeb, g_pFileDataBin );
+	fread( pvBuf, 1, bufSizeb, p.g_pFileDataBin );
 
 	return 0;
 }
@@ -692,79 +822,81 @@ S32  ReadIniFileOption( const std::string fileIni, int lid )
 {
 	S32		err;
 	S32		ii;
-	S32		signalFreq, signalType;
 	BRDCHAR sBuffer[1024];
 
-	err = IPC_getFullPath( fileIni.c_str(), g_sFullName );
+	ParamsDACs& p = DevicesLid[lid].paramsDac;
+
+	err = IPC_getFullPath( fileIni.c_str(), p.g_sFullName );
 	if( 0 > err )
 	{
 		BRDC_printf( _BRDC("ERROR: Can't find ini-file '%s'\n\n"), fileIni );
 		return -1;
 	}
 
-	GetInifileString( _BRDC("Option"), _BRDC("ServiceName"), _BRDC("DACNAME"), g_sServiceName, sizeof(g_sServiceName), g_sFullName );
-	GetInifileString( _BRDC("Option"), _BRDC("PldFileName"), _BRDC("PLDNAME"), g_sPldFileName, sizeof(g_sPldFileName), g_sFullName );
+	GetInifileString( _BRDC("Option"), _BRDC("ServiceName"), _BRDC("DACNAME"), p.g_sServiceName, sizeof(p.g_sServiceName), p.g_sFullName );
+	GetInifileString( _BRDC("Option"), _BRDC("PldFileName"), _BRDC("PLDNAME"), p.g_sPldFileName, sizeof(p.g_sPldFileName), p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsNew"), _BRDC("1"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nIsNew = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsNew"), _BRDC("1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nIsNew = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("DebugMarker"), _BRDC("0"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nIsDebugMarker = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("DebugMarker"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nIsDebugMarker = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("Cycle"), _BRDC("1"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nCycle = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("Cycle"), _BRDC("1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nCycle = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("QuickQuit"), _BRDC("0"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nQuickQuit = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("QuickQuit"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nQuickQuit = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("WorkMode"), _BRDC("0"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nWorkMode = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("WorkMode"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nWorkMode = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsAlwaysWriteSdram"), _BRDC("0"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nIsAlwaysWriteSdram = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsAlwaysWriteSdram"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nIsAlwaysWriteSdram = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SamplesPerChannel"), _BRDC("1024"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nSamplesPerChannel = BRDC_atoi64( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SamplesPerChannel"), _BRDC("1024"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nSamplesPerChannel = BRDC_atoi64( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsSystemMemory"), _BRDC("0"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nIsSystemMemory = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsSystemMemory"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nIsSystemMemory = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SdramWriteBufSize"), _BRDC("4"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nSdramWriteBufSize = BRDC_atoi( sBuffer );
-	g_nSdramWriteBufSize *= 1024;
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SdramWriteBufSize"), _BRDC("4"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nSdramWriteBufSize = BRDC_atoi( sBuffer );
+	p.g_nSdramWriteBufSize *= 1024;
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsAlwaysLoadPld"), _BRDC("0"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nIsAlwaysLoadPld = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsAlwaysLoadPld"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nIsAlwaysLoadPld = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("MasterSlave"), _BRDC("0"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nMasterSlave = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("MasterSlave"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nMasterSlave = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("DmaBufFactor"), _BRDC("4096"), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_nDmaBufFactor = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("DmaBufFactor"), _BRDC("4096"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_nDmaBufFactor = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalFreq"), _BRDC("0"), sBuffer, sizeof(sBuffer), g_sFullName );
-	signalFreq = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalFreq"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_dSignalFreq = (double)BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalType"), _BRDC("0"), sBuffer, sizeof(sBuffer), g_sFullName );
-	signalType = BRDC_atoi( sBuffer );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalType"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_dSignalType  = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalFile"), _BRDC(""), sBuffer, sizeof(sBuffer), g_sFullName );
-	g_pFileDataBin = BRDC_fopen( sBuffer, _BRDC("rb") );
+	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalFile"), _BRDC(""), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	p.g_pFileDataBin = BRDC_fopen( sBuffer, _BRDC("rb") );
 	if( '\0' != sBuffer[0] )
-		if( NULL == g_pFileDataBin )
+		if( NULL == p.g_pFileDataBin )
 		{
             BRDC_printf( _BRDC( "\n\tERROR: Can't open file '%s'\n\n"), sBuffer );
 			return -1;
 		}
 
-	for( auto& dev : DevicesLid[lid].dac)
+/*	for( auto& dev : DevicesLid[lid].dac)
 	{
-		dev.dSignalFreq = (double)signalFreq;
-		dev.signalType  = signalType;
+		dev.dSignalFreq = p.g_dSignalFreq;
+		dev.signalType  = p.g_dSignalType;
+		printf("signalFreq = %.2f ", p.g_dSignalFreq);
 	}
-
-	IPC_getPrivateProfileString( _BRDC( "Option" ), _BRDC( "TimeoutSec" ), _BRDC( "5" ), sBuffer, sizeof( sBuffer ), g_sFullName );
-	g_nMsTimeout = BRDC_atoi( sBuffer ) * 1000;
+*/
+	IPC_getPrivateProfileString( _BRDC( "Option" ), _BRDC( "TimeoutSec" ), _BRDC( "5" ), sBuffer, sizeof( sBuffer ), p.g_sFullName );
+	p.g_nMsTimeout = BRDC_atoi( sBuffer ) * 1000;
 
 	return 0;
 }
@@ -778,37 +910,39 @@ S32  ReadIniFileDevice( int lid )
 	BRDCHAR sParamName[128];
 	double	dAmpl;
 
-	for( TDacParam& dev : DevicesLid[lid].dac )
+	ParamsDACs& p = DevicesLid[lid].paramsDac;
+
+	for( auto& dev : DevicesLid[lid].dac )
 	{
-		BRDC_printf("<SRV> Read ini-file >%s< from section >%s<\n", g_sFullName, dev.sSection );		
-		IPC_getPrivateProfileString( dev.sSection, _BRDC("Ampl"), _BRDC("-1"), sBuffer, sizeof(sBuffer), g_sFullName );
+		BRDC_printf("<SRV> Read ini-file >%s< from section >%s<\n", p.g_sFullName, dev.paramDac.sSection );		
+		IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("Ampl"), _BRDC("-1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
 		dAmpl = BRDC_atof( sBuffer );
 
 		for( jj=0; jj<MAX_CHAN; jj++ )
 		{
 			BRDC_sprintf( sParamName, _BRDC("Ampl%d"), jj );
-			IPC_getPrivateProfileString( dev.sSection, sParamName, _BRDC(""), sBuffer, sizeof(sBuffer), g_sFullName );
-			dev.aAmpl[jj] = (*sBuffer) ? BRDC_atof(sBuffer) : dAmpl;
+			IPC_getPrivateProfileString( dev.paramDac.sSection, sParamName, _BRDC(""), sBuffer, sizeof(sBuffer), p.g_sFullName );
+			dev.paramDac.aAmpl[jj] = (*sBuffer) ? BRDC_atof(sBuffer) : dAmpl;
 
 			BRDC_sprintf( sParamName, _BRDC("Phase%d"), jj );
-			IPC_getPrivateProfileString( dev.sSection, sParamName, _BRDC(""), sBuffer, sizeof(sBuffer), g_sFullName );
-			dev.aPhase[jj] = (*sBuffer) ? BRDC_atof(sBuffer) : 0.0;
-			dev.aPhase[jj] /= 360;
-			dev.aPhase[jj] *= PI2;
+			IPC_getPrivateProfileString( dev.paramDac.sSection, sParamName, _BRDC(""), sBuffer, sizeof(sBuffer), p.g_sFullName );
+			dev.paramDac.aPhase[jj] = (*sBuffer) ? BRDC_atof(sBuffer) : 0.0;
+			dev.paramDac.aPhase[jj] /= 360;
+			dev.paramDac.aPhase[jj] *= PI2;
 		}
 
-		IPC_getPrivateProfileString( dev.sSection, _BRDC("ThresholdComp0"), _BRDC("0.0"), sBuffer, sizeof(sBuffer), g_sFullName );
-		dev.aThdac[0] = BRDC_atof(sBuffer);
-		IPC_getPrivateProfileString( dev.sSection, _BRDC("ThresholdComp1"), _BRDC("0.0"), sBuffer, sizeof(sBuffer), g_sFullName );
-		dev.aThdac[1] = BRDC_atof(sBuffer);
+		IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("ThresholdComp0"), _BRDC("0.0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+		dev.paramDac.aThdac[0] = BRDC_atof(sBuffer);
+		IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("ThresholdComp1"), _BRDC("0.0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+		dev.paramDac.aThdac[1] = BRDC_atof(sBuffer);
 
-		IPC_getPrivateProfileString( dev.sSection, _BRDC("SwitchIn"), _BRDC("-1"), sBuffer, sizeof(sBuffer), g_sFullName );
-		dev.switchIn = BRDC_atoi(sBuffer);
-		IPC_getPrivateProfileString( dev.sSection, _BRDC("SwitchOut"), _BRDC("-1"), sBuffer, sizeof(sBuffer), g_sFullName );
-		dev.switchOut = BRDC_atoi(sBuffer);
+		IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("SwitchIn"), _BRDC("-1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+		dev.paramDac.switchIn = BRDC_atoi(sBuffer);
+		IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("SwitchOut"), _BRDC("-1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+		dev.paramDac.switchOut = BRDC_atoi(sBuffer);
 
-		GetInifileString( dev.sSection, _BRDC("RegFileName"), _BRDC(""),
-				dev.sRegRwSpdFilename, sizeof(dev.sRegRwSpdFilename), g_sFullName );
+		GetInifileString( dev.paramDac.sSection, _BRDC("RegFileName"), _BRDC(""),
+				dev.paramDac.sRegRwSpdFilename, sizeof(dev.paramDac.sRegRwSpdFilename), p.g_sFullName );
 	}
 
 	return 0;
@@ -826,7 +960,13 @@ S32 DisplayDacTraceText( int loop, int lid )
 	rTraceText.sizeb = sizeof(lin);
 	rTraceText.pText = lin;
 
-	err = BRD_ctrl( DevicesLid[lid].dac[0].handle, 0, BRDctrl_GETTRACETEXT, &rTraceText );
+	if( DevicesLid[lid].dac.size() <= 0)
+		return -1;
+
+	if(!DevicesLid[lid].dac[0].outText)
+		return 0;
+
+	err = BRD_ctrl( DevicesLid[lid].dac[0].getService(), 0, BRDctrl_GETTRACETEXT, &rTraceText );
 	if( err<0 )
 		BRDC_printf( _BRDC("LID:%d [%d]\r"), lid, loop );
 	else
@@ -839,57 +979,58 @@ S32 DisplayDacTraceText( int loop, int lid )
 // End of file
 //
 
-void ListParameters(void)
+void ListParameters(int lid)
 {
+	ParamsDACs& p = DevicesLid[lid].paramsDac;
 	printf("/n List DAC parameters : \n");
-	printf("g_iniFileName = %s\n", g_iniFileName);
-	printf("g_sFullName = %s\n", g_sFullName);
-	//printf("g_lid = %d\n", g_lid);
-	//printf("g_nDevNum = %d\n", g_nDevNum);
-	//printf("g_nDacNum = %d\n", g_nDacNum);
-	printf("g_dSamplingRate = %fd\n", g_dSamplingRate);
-	printf("g_dSignalFreq = %f\n", g_dSignalFreq);
+	//printf("g_iniFileName = %s\n",p.g_iniFileName);
+	printf("g_sFullName = %s\n",p.g_sFullName);
+	//printf("g_lid = %d\n",p.g_lid);
+	//printf("g_nDevNum = %d\n",p.g_nDevNum);
+	//printf("g_nDacNum = %d\n",p.g_nDacNum);
+	printf("g_dSamplingRate = %f\n",p.g_dSamplingRate);
+	printf("g_dSignalFreq = %f\n",p.g_dSignalFreq);
 	printf("from ini-file : \n");
-	printf("g_sServiceName = %s\n", g_sServiceName);
-	printf("g_nWorkMode = %d\n", g_nWorkMode);
-	printf("g_nIsAlwaysWriteSdram = %d\n", g_nIsAlwaysWriteSdram);
-	printf("g_nSamplesPerChannel = %llu\n", g_nSamplesPerChannel);
-	printf("g_nIsSystemMemory = %d\n", g_nIsSystemMemory);
-	printf("g_nSdramWriteBufSize = %d\n", g_nSdramWriteBufSize);
-	printf("g_nIsAlwaysLoadPld = %d\n", g_nIsAlwaysLoadPld);
-	printf("g_nMasterSlave = %d\n", g_nMasterSlave);
-	printf("g_nDmaBufFactor = %d\n", g_nDmaBufFactor);
-	printf("g_nIsDebugMarker = %d\n", g_nIsDebugMarker );
-	printf("g_nCycle = %d\n", g_nCycle );
-	printf("g_nQuickQuit = %d\n", g_nQuickQuit );
-	printf("g_nIsNew = %d\n", g_nMsTimeout );
-	printf("g_sPldFileName = %d\n", g_sPldFileName);
+	printf("g_sServiceName = %s\n",p.g_sServiceName);
+	printf("g_nWorkMode = %d\n",p.g_nWorkMode);
+	printf("g_nIsAlwaysWriteSdram = %d\n",p.g_nIsAlwaysWriteSdram);
+	printf("g_nSamplesPerChannel = %llu\n",p.g_nSamplesPerChannel);
+	printf("g_nIsSystemMemory = %d\n",p.g_nIsSystemMemory);
+	printf("g_nSdramWriteBufSize = %d\n",p.g_nSdramWriteBufSize);
+	printf("g_nIsAlwaysLoadPld = %d\n",p.g_nIsAlwaysLoadPld);
+	printf("g_nMasterSlave = %d\n",p.g_nMasterSlave);
+	printf("g_nDmaBufFactor = %d\n",p.g_nDmaBufFactor);
+	printf("g_nIsDebugMarker = %d\n",p.g_nIsDebugMarker );
+	printf("g_nCycle = %d\n",p.g_nCycle );
+	printf("g_nQuickQuit = %d\n",p.g_nQuickQuit );
+	printf("g_nIsNew = %d\n",p.g_nMsTimeout );
+	printf("g_sPldFileName = %s\n",p.g_sPldFileName);
 	int i=0;
 	for(auto dac : DevicesLid[x_lid].dac) {
 	//for(size_t i=0; i<g_nDacNum; i++) {
 		printf("DAC #%d : \n", i++);
-		printf("  sSection = %s\n", dac.sSection);
-		printf("  sampleSizeb = %d\n", dac.sampleSizeb);
-		printf("  samplesPerChannel = %llX (0x%llX)\n", dac.samplesPerChannel, dac.samplesPerChannel);
-		printf("  chanMask = %X\n", dac.chanMask);
-		printf("  chanNum = %d\n", dac.chanNum);
-		printf("  chanMaxNum = %d\n", dac.chanMaxNum);
-		printf("  aThdac[0] = %f\n", dac.aThdac[0]);
-		printf("  aThdac[1] = %f\n", dac.aThdac[1]);
+		printf("  sSection = %s\n", dac.paramDac.sSection);
+		printf("  sampleSizeb = %d\n", dac.paramDac.sampleSizeb);
+		printf("  samplesPerChannel = %llX (0x%llX)\n", dac.paramDac.samplesPerChannel, dac.paramDac.samplesPerChannel);
+		printf("  chanMask = %X\n", dac.paramDac.chanMask);
+		printf("  chanNum = %d\n", dac.paramDac.chanNum);
+		printf("  chanMaxNum = %d\n", dac.paramDac.chanMaxNum);
+		printf("  aThdac[0] = %f\n", dac.paramDac.aThdac[0]);
+		printf("  aThdac[1] = %f\n", dac.paramDac.aThdac[1]);
 		for(size_t c=0; c<MAX_CHAN; c++) {
-			printf("  aAmpl[%d] = %f", c, dac.aAmpl[c]);
-			printf("  aPhase[%d] = %f", c, dac.aPhase[c]);
-			printf("  aPhaseKee[%d] = %f\n", c, dac.aPhaseKee[c]);
+			printf("  aAmpl[%d] = %f", c, dac.paramDac.aAmpl[c]);
+			printf("  aPhase[%d] = %f", c, dac.paramDac.aPhase[c]);
+			printf("  aPhaseKee[%d] = %f\n", c, dac.paramDac.aPhaseKee[c]);
 		}	
-		printf("  signalType = %d\n", dac.signalType);
-		printf("  outBufSizeb = %llX\n", dac.outBufSizeb);
-		printf("  switchIn = %X\n", dac.switchIn);
-		printf("  switchOut = %X\n", dac.switchOut);
-		printf("  nFifoSizeb = %X\n", dac.nFifoSizeb);
-		printf("  dSamplingRate = %f\n", dac.dSamplingRate);
-		printf("  dSignalFreq = %f\n", dac.dSignalFreq);
-		printf("  sRegRwSpdFilename = %s\n", dac.sRegRwSpdFilename);
-		printf("  rBufAlloc = %d\n", dac.rBufAlloc);
+		printf("  signalType = %s\n", dac.paramDac.signalType==0?"sine":"meander");
+		printf("  outBufSizeb = %llX\n", dac.paramDac.outBufSizeb);
+		printf("  switchIn = %X\n", dac.paramDac.switchIn);
+		printf("  switchOut = %X\n", dac.paramDac.switchOut);
+		printf("  nFifoSizeb = %X\n", dac.paramDac.nFifoSizeb);
+		printf("  dSamplingRate = %f\n", dac.paramDac.dSamplingRate);
+		printf("  dSignalFreq = %f\n", dac.paramDac.dSignalFreq);
+		printf("  sRegRwSpdFilename = %s\n", dac.paramDac.sRegRwSpdFilename);
+		printf("  rBufAlloc = %d\n", dac.paramDac.rBufAlloc);
 	//	printf("   = %d", dac.);
 	}
 	//printf(" = %d\n",  );

@@ -110,7 +110,7 @@ extern int g_exitRightAway;
 extern S32 g_nDevNum;
 extern BRD_Handle g_hDev[MAX_DEVICE];
 extern S32 g_nDacNum;
-// /extern TDacParam	g_aDac[MAX_DAC];
+extern TDacParam g_aDac[MAX_DAC];
 extern S32 g_idx[MAX_DAC];
 
 // extern BRD_Handle		g_hCaptSrv[10];

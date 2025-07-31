@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #endif
 
+/*
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
 #include "gipcy.h"
 #include <string.h>
@@ -24,45 +25,9 @@ HANDLE* g_hBufFileMap = NULL;
 HANDLE g_hFlgFileMap = NULL;
 HANDLE g_hPostfixFileMap = NULL;
 #endif
+*/
 
-// extern FuDevs DevicesLid[10];
-
-extern int g_subNo; // номер службы АЦП из командной строки
-extern int g_fileMap;
-ULONG* g_pFlags;
-char* g_pPostfix;
-
-extern ULONG g_MsTimeout;
-
-BRDctrl_StreamCBufAlloc g_buf_dscr;
-// extern BRD_Handle x_hADC;
-extern ULONG g_MemAsFifo;
-extern ULONG g_AdcDrqFlag;
-extern ULONG g_MemDrqFlag;
-extern double g_samplRate;
-extern int g_IoDelay;
-
-extern BRDCHAR g_AdcSrvName[]; // с номером службы
-extern ULONG g_Cycle;
-extern unsigned long long g_samplesOfChannel;
-extern unsigned long long g_memorySamplesOfChannel;
-extern unsigned long long g_bBufSize;
-extern unsigned long long g_bMemBufSize;
-extern int g_DirWriteFile;
-extern ULONG g_FileBufSize;
-extern ULONG g_adjust_mode;
-
-extern int g_transRate;
-
-extern int g_PretrigMode;
-// long long  g_nPreTrigSamples = 16;
-extern long long g_nPostTrigSamples;
-
-extern void* g_pMapBuf;
-extern ULONG g_bBlkNum;
-extern ULONG g_MemOn;
-
-void MappingIsviParams(BRD_Handle hADC, unsigned long long nNumberOfBytes);
+void MappingIsviParams(int lid, unsigned long long nNumberOfBytes);
 
 // void DisplayError(S32 status, BRDCHAR* func_name, BRDCHAR* cmd_str)
 void DisplayError(S32 status, const char* funcName, const BRDCHAR* cmd_str)
@@ -166,46 +131,37 @@ int CheckClock(BRD_Handle hADC, BRDCHAR* AdcSrvName)
     return status;
 }
 
-S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* iniFileName)
+S32 AdcSettings(BRD_Handle hADC, int lid, int isx, BRDCHAR* srvName, BRDCHAR* iniFileName)
 {
     S32 status;
-
-    // ULONG master = BRDims_SINGLE; // реализован только независимый (одиночный) режим
-    // status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETMASTER, &master);
-
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
     BRD_AdcCfg adc_cfg;
-    status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCFG, &adc_cfg);
-    BRDC_printf(_BRDC("ADC Config: FIFO size = %d kBytes\n"), adc_cfg.FifoSize / 1024);
 
-    // ULONG chan_mask = 3; // включаем оба канала
-    // status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETCHANMASK, &chan_mask);
-    // int num_chan = (chan_mask & 0x1) + ((chan_mask >> 1) & 0x1);
+    status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCFG, &adc_cfg);
+    BRDC_printf(_BRDC("<SRV> AdcSettings: ADC Config: FIFO size = %d kBytes\n"), adc_cfg.FifoSize / 1024);
 
     // задать параметры из файла
     BRDCHAR iniFilePath[MAX_PATH];
     BRDCHAR iniSectionName[MAX_PATH];
-#if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-    IPC_getCurrentDir(iniFilePath, sizeof(iniFilePath) / sizeof(BRDCHAR));
-#else
-    GetCurrentDirectory(sizeof(iniFilePath) / sizeof(BRDCHAR), iniFilePath);
-#endif
-    BRDC_strcat(iniFilePath, "/");
-    BRDC_strcat(iniFilePath, iniFileName);
-    BRDC_sprintf(iniSectionName, _BRDC("device%d_%s%d"), idx, srvName, (g_subNo < 0) ? isx : 0);
+    BRDC_sprintf(iniSectionName, _BRDC("device%d_%s%d"), 0, srvName, (p.g_subNo < 0) ? isx : 0);
+    S32 err = IPC_getFullPath(iniFileName, iniFilePath);
+    if (0 > err) {
+        BRDC_printf(_BRDC("ERROR: Can't find ini-file '%s'\n\n"), iniFileName);
+        return -1;
+    }
+
+    printf("<SRV> AdcSettings: iniFileName = '%s'\n    iniFilePath = '%s'\n    iniSectionName = '%s'\n",
+        iniFileName, iniFilePath, iniSectionName);
 
     BRD_IniFile ini_file;
-    // BRDC_strcpy(ini_file.fileName, iniFilePath);
-    BRDC_strcpy(ini_file.fileName, iniFileName);
-    printf("-D--- ini_file.fileName = %s\n", ini_file.fileName);
+    BRDC_strcpy(ini_file.fileName, iniFilePath);
     BRDC_strcpy(ini_file.sectionName, iniSectionName);
-    printf("-D-- ini_file.sectionName = %s\n", ini_file.sectionName);
-    auto adc_start_time = std::chrono::high_resolution_clock::now();
+    // auto adc_start_time = std::chrono::high_resolution_clock::now();
 
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_READINIFILE, &ini_file);
-    if (!BRD_errcmp(status, BRDerr_OK)) {
-        // if (BRD_errext(status) != BRDerr_OK) {
-        printf("--- exception: BRDctrl_ADC_READINIFILE, status=0x%X \n", status);
-        throw std::invalid_argument("Side-Driver parameters bad");
+    if (status != BRDerr_OK) {
+        printf("<ERR> AdcSettings (BRDctrl_ADC_READINIFILE): status = 0x%X\n", status);
+        throw std::invalid_argument("<ERR> AdcSettings (BRDctrl_ADC_READINIFILE): Side-Driver parameters bad!");
     }
 
 #ifdef _WIN32
@@ -229,7 +185,7 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
         else
             DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_ADC_GETSYNCMODE"));
     }
-    g_samplRate = sync_mode.rate;
+    p.g_samplRate = sync_mode.rate;
     // получить параметры стартовой синхронизации
     // команда BRDctrl_ADC_GETSTARTMODE может получать 2 разные структуры
     // для определения какую из них использует данная служба применяем трюк с массивом )))
@@ -240,7 +196,7 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
         if (start_struct[39] == 0x5A) { // стартовая схема на базовом модуле (используется структура по-меньше)
             // службы: ADC414X65M, ADC216X100M, ADC1624X192, ADC818X800, ADC1612X1M
             BRD_StartMode* start = (BRD_StartMode*)start_struct;
-            BRDC_printf(_BRDC("BRDctrl_ADC_GETSTARTMODE: start source = %d\n"), start->startSrc);
+            BRDC_printf(_BRDC("<SRV> AdcSettings:(BRDctrl_ADC_GETSTARTMODE): start source = %d (small struct)\n"), start->startSrc);
             //			if(start->startSrc == BRDsts_CMP0 || start->startSrc == BRDsts_CMP1)
             //			{	// старт от компаратора 0 (сигнал канала 0) или от компаратора 1 (сигнал с разъема SDX)
             //				BRDCHAR Buffer[128];
@@ -270,7 +226,7 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
             BRD_AdcStartMode* start = (BRD_AdcStartMode*)start_struct;
             // службы: ADC212X200M, ADC10X2G, ADC214X200M, ADC28X1G, ADC214X400M, ADC210X1G,
             // FM814X125M, FM214X250M, FM412X500M, FM212X1G
-            BRDC_printf(_BRDC("BRDctrl_ADC_GETSTARTMODE: start source = %d\n"), start->src);
+            BRDC_printf(_BRDC("<SRV> AdcSettings:(BRDctrl_ADC_GETSTARTMODE): start source = %d (big struct)\n"), start->src);
         }
     } else
         DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_ADC_GETSTARTMODE"));
@@ -332,8 +288,10 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
     // получить маску включенных каналов
     ULONG chan_mask = 0;
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCHANMASK, &chan_mask);
+    printf("<DBG> AdcSettings: BRDctrl_ADC_GETCHANMASK = 0x%X\n", chan_mask);
     ULONG is_complex = 0;
     BRD_ctrl(hADC, 0, BRDctrl_ADC_ISCOMPLEX, &is_complex);
+    printf("<DBG> AdcSettings: BRDctrl_ADC_ISCOMPLEX = 0x%X\n", is_complex);
 
     // status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETCHANMASK, &chan_mask);
     if (BRD_errcmp(status, BRDerr_OK))
@@ -368,7 +326,7 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
 
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETINPRANGE, &value_chan);
         if (BRD_errcmp(status, BRDerr_OK))
-            //			printf("BRDctrl_ADC_GETINPRANGE: range of channel %d = %f\n", value_chan.chan, value_chan.value);
+            // printf("BRDctrl_ADC_GETINPRANGE: range of channel %d = %f\n", value_chan.chan, value_chan.value);
             BRDC_printf(_BRDC("Range = %f\n"), value_chan.value);
         else
             DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_ADC_GETINPRANGE"));
@@ -423,13 +381,13 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
 #else
     GetPrivateProfileString(iniSectionName, _BRDC("IsPreTriggerMode"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
 #endif
-    g_PretrigMode = BRDC_atoi(Buffer);
+    p.g_PretrigMode = BRDC_atoi(Buffer);
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
     IPC_getPrivateProfileString(iniSectionName, _BRDC("MemPostSamples"), _BRDC("16384"), Buffer, sizeof(Buffer), iniFilePath);
 #else
     GetPrivateProfileString(iniSectionName, _BRDC("MemPostSamples"), _BRDC("16384"), Buffer, sizeof(Buffer), iniFilePath);
 #endif
-    g_nPostTrigSamples = BRDC_atoi64(Buffer);
+    p.g_nPostTrigSamples = BRDC_atoi64(Buffer);
 
     BRD_PretrigMode premode;
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETPRETRIGMODE, &premode);
@@ -443,25 +401,25 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
         if (premode.assur)
             BRDC_printf(_BRDC("Pre-trigger is assurance. "));
         if (premode.external) {
-            BRDC_printf(_BRDC("Post-trigger data size = %lld \n"), g_nPostTrigSamples);
+            BRDC_printf(_BRDC("Post-trigger data size = %lld \n"), p.g_nPostTrigSamples);
         } else {
             BRDC_printf(_BRDC("Pre-trigger data size = %d \n"), premode.size);
         }
     }
     // GetPrivateProfileString("Option", "PreTriggerSamples", "16", Buffer, sizeof(Buffer), iniFilePath);
-    // g_nPreTrigSamples = _atoi64(Buffer);
+    // p.g_nPreTrigSamples = _atoi64(Buffer);
 
     // BRD_PretrigMode pretrigger;
     // pretrigger.enable = 0;
     // pretrigger.assur = 0;
     // pretrigger.external = 0;
-    // if(g_PretrigMode)
+    // if(p.g_PretrigMode)
     //{
     //	pretrigger.enable = 1;
-    //	pretrigger.assur = (g_PretrigMode == 2) ? 1 : 0;
+    //	pretrigger.assur = (p.g_PretrigMode == 2) ? 1 : 0;
     // }
     // ULONG sample_size = format ? sizeof(char) : sizeof(short);
-    // pretrigger.size = ULONG((g_nPreTrigSamples * numChan * sample_size) / sizeof(ULONG));
+    // pretrigger.size = ULONG((p.g_nPreTrigSamples * numChan * sample_size) / sizeof(ULONG));
     // status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETPRETRIGMODE, &pretrigger);
 
     //	printf("Press any key to continue...\n");
@@ -481,71 +439,73 @@ S32 AdcSettings(BRD_Handle hADC, int idx, int isx, BRDCHAR* srvName, BRDCHAR* in
         Sleep(200);
 #endif
     }
-    BRDC_printf(_BRDC("ADC DRQ flag = %0X\n"), g_AdcDrqFlag);
-    BRDC_printf(_BRDC("SDRAM DRQ flag = %0X\n"), g_MemDrqFlag);
+    BRDC_printf(_BRDC("ADC DRQ flag = %0X\n"), p.g_AdcDrqFlag);
+    BRDC_printf(_BRDC("SDRAM DRQ flag = %0X\n"), p.g_MemDrqFlag);
 
     // отладочные команды
-    if (g_IoDelay != 128) {
+    if (p.g_IoDelay != 128) {
         ULONG stabil = 2; // сброс задержки
         BRD_AdcSpec spec;
         spec.command = ADCcmd_ADJUST;
         spec.arg = &stabil;
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETSPECIFIC, &spec);
         BRDC_printf(_BRDC("IoDelay reset!\n"));
-        if (g_IoDelay) {
-            stabil = (g_IoDelay >= 0) ? 1 : 0;
+        if (p.g_IoDelay) {
+            stabil = (p.g_IoDelay >= 0) ? 1 : 0;
             spec.arg = &stabil;
-            int num = abs(g_IoDelay);
+            int num = abs(p.g_IoDelay);
             for (int i = 0; i < num; i++) {
                 BRD_ctrl(hADC, 0, BRDctrl_ADC_SETSPECIFIC, &spec);
             }
-            BRDC_printf(_BRDC("IoDelay = %d\n"), g_IoDelay);
+            BRDC_printf(_BRDC("IoDelay = %d\n"), p.g_IoDelay);
         }
     }
 
-    if (g_fileMap || g_DirWriteFile == -1) {
-        if (!g_hPostfixFileMap) {
+    if (p.g_fileMap || p.g_DirWriteFile == -1) {
+        if (!p.g_hPostfixFileMap) {
             BRDCHAR namePostfixMap[64] = _BRDC("data_postfix");
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-            g_hPostfixFileMap = IPC_createSharedMemory(namePostfixMap, 32768);
-            g_pPostfix = (char*)IPC_mapSharedMemory(g_hPostfixFileMap);
+            p.g_hPostfixFileMap = IPC_createSharedMemory(namePostfixMap, 32768);
+            p.g_pPostfix = (char*)IPC_mapSharedMemory(p.g_hPostfixFileMap);
 #else
-            g_hPostfixFileMap = CreateFileMapping(INVALID_HANDLE_VALUE,
+            p.g_hPostfixFileMap = CreateFileMapping(INVALID_HANDLE_VALUE,
                 NULL, PAGE_READWRITE,
                 0, 32768,
                 namePostfixMap);
-            g_pPostfix = (char*)MapViewOfFile(g_hPostfixFileMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+            p.g_pPostfix = (char*)MapViewOfFile(p.g_hPostfixFileMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 #endif
             ULONG sample_size = format ? format : sizeof(short);
-            g_bBufSize = (g_samplesOfChannel * numChan) * sample_size; // получить размер собираемых данных в байтах
+            p.g_bBufSize = (p.g_samplesOfChannel * numChan) * sample_size; // получить размер собираемых данных в байтах
         }
-        if (g_DirWriteFile == -1)
-            MappingIsviParams(hADC, g_FileBufSize);
-        else if (g_MemOn == 1)
-            MappingIsviParams(hADC, g_bMemBufSize);
+        if (p.g_DirWriteFile == -1)
+            MappingIsviParams(lid, p.g_FileBufSize);
+        else if (p.g_MemOn == 1)
+            MappingIsviParams(lid, p.g_bMemBufSize);
         else
-            MappingIsviParams(hADC, g_bBufSize);
+            MappingIsviParams(lid, p.g_bBufSize);
     }
 
     return numChan;
 }
 
-void MappingIsviParams(BRD_Handle hADC, unsigned long long nNumberOfBytes)
+void MappingIsviParams(int lid, unsigned long long nNumberOfBytes)
 {
     char str_buf[32768];
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
 
-    sprintf(g_pPostfix, "\r\nDEVICE_NAME_________ ");
+    sprintf(p.g_pPostfix, "\r\nDEVICE_NAME_________ ");
 #ifdef _WIN64
     char srvName[32];
-    wcstombs(srvName, g_AdcSrvName, 32);
-    lstrcatA(g_pPostfix, srvName);
+    wcstombs(srvName, p.g_AdcSrvName, 32);
+    lstrcatA(p.g_pPostfix, srvName);
 #else
-    lstrcatA(g_pPostfix, g_AdcSrvName);
+    lstrcatA(p.g_pPostfix, p.g_AdcSrvName);
 #endif
 
     BRD_AdcCfg adc_cfg;
     BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCFG, &adc_cfg);
-    // BRD_ctrl(hADC, 0, BRDctrl_ADC_GETRATE, &g_samplRate);
+    // BRD_ctrl(hADC, 0, BRDctrl_ADC_GETRATE, &p.g_samplRate);
     ULONG chanMask;
     BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCHANMASK, &chanMask);
     ULONG format = 0;
@@ -594,46 +554,46 @@ void MappingIsviParams(BRD_Handle hADC, unsigned long long nNumberOfBytes)
         mask <<= 1;
     }
     sprintf(str_buf, "\r\nNUMBER_OF_CHANNELS__ %ld", long(num_chan));
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
 
     sprintf(str_buf, "\r\nNUMBERS_OF_CHANNELS_ ");
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
     str_buf[0] = 0;
     for (int iChan = 0; iChan < num_chan; iChan++) {
         char buf[512];
         sprintf(buf, "%d,", chans[iChan]);
         lstrcatA(str_buf, buf);
     }
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
 
     ULONG sample_size = format ? format : sizeof(short);
     ULONG samples = ULONG(nNumberOfBytes / sample_size / num_chan);
 
-    if (g_MemOn)
-        samples = g_memorySamplesOfChannel;
+    if (p.g_MemOn)
+        samples = p.g_memorySamplesOfChannel;
 
-    if (g_Cycle > 1)
-        samples *= g_Cycle;
+    if (p.g_Cycle > 1)
+        samples *= p.g_Cycle;
     sprintf(str_buf, "\r\nNUMBER_OF_SAMPLES___ %ld", long(samples));
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
 
-    sprintf(str_buf, "\r\nSAMPLING_RATE_______ %f", g_samplRate);
-    lstrcatA(g_pPostfix, str_buf);
+    sprintf(str_buf, "\r\nSAMPLINp.g_RATE_______ %f", p.g_samplRate);
+    lstrcatA(p.g_pPostfix, str_buf);
 
     sprintf(str_buf, "\r\nBYTES_PER_SAMPLES___ %ld", long(sample_size));
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
 
-    lstrcatA(g_pPostfix, "\r\nSAMPLES_PER_BYTES___ 1");
+    lstrcatA(p.g_pPostfix, "\r\nSAMPLES_PER_BYTES___ 1");
 
     if (is_complex)
         sprintf(str_buf, "\r\nIS_COMPLEX_SIGNAL?__ YES");
     else
         sprintf(str_buf, "\r\nIS_COMPLEX_SIGNAL?__ NO");
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
 
     double fc[MAX_CHAN];
     sprintf(str_buf, "\r\nSHIFT_FREQUENCY_____ ");
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
     str_buf[0] = 0;
     int num_fc = num_chan;
     for (int iChan = 0; iChan < num_fc; iChan++) {
@@ -648,56 +608,58 @@ void MappingIsviParams(BRD_Handle hADC, unsigned long long nNumberOfBytes)
         sprintf(buf, "%.2f,", fc[iChan]);
         lstrcatA(str_buf, buf);
     }
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
 
     sprintf(str_buf, "\r\nGAINS_______________ ");
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
     str_buf[0] = 0;
     for (int iChan = 0; iChan < num_chan; iChan++) {
         char buf[16];
         sprintf(buf, "%f,", gains[chans[iChan]]);
         lstrcatA(str_buf, buf);
     }
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
 
     sprintf(str_buf, "\r\nVOLTAGE_OFFSETS_____ ");
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
     str_buf[0] = 0;
     for (int iChan = 0; iChan < num_chan; iChan++) {
         char buf[16];
         sprintf(buf, "%f,", volt_offset[iChan]);
         lstrcatA(str_buf, buf);
     }
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
 
     sprintf(str_buf, "\r\nVOLTAGE_RANGE_______ %f", adc_cfg.InpRange / 1000.);
-    lstrcatA(g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, str_buf);
 
     //	int BitsPerSample = !format ? adc_cfg.Bits : 8;
     //	if(is_complex)
     //		BitsPerSample = 16;
     int BitsPerSample = (format == 1) ? 8 : adc_cfg.Bits;
-    if (BRDC_strstr(g_AdcSrvName, _BRDC("ADC1624X192")) || BRDC_strstr(g_AdcSrvName, _BRDC("ADC818X800")))
+    if (BRDC_strstr(p.g_AdcSrvName, _BRDC("ADC1624X192")) || BRDC_strstr(p.g_AdcSrvName, _BRDC("ADC818X800")))
         if (format == 0 || format == 2)
             BitsPerSample = 16;
     sprintf(str_buf, "\r\nBIT_RANGE___________ %d", BitsPerSample);
-    lstrcatA(g_pPostfix, str_buf);
-    lstrcatA(g_pPostfix, "\r\n");
+    lstrcatA(p.g_pPostfix, str_buf);
+    lstrcatA(p.g_pPostfix, "\r\n");
 
-    // int len = lstrlenA(g_pPostfix);
+    // int len = lstrlenA(p.g_pPostfix);
 }
 
 // выполнить сбор данных в FIFO с программным методом передачи в ПК
-S32 DaqIntoFifo(BRD_Handle hADC, PVOID pSig, ULONG bBufSize, int DspMode)
+S32 DaqIntoFifo(int lid, PVOID pSig, ULONG bBufSize, int DspMode)
 {
     S32 status;
     ULONG Status = 0;
     ULONG Enable = 1;
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
 
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFORESET, NULL); // сборс FIFO АЦП
     //	if(DspMode)
     //		status = BRD_ctrl(hADC, 0, BRDctrl_DSPNODE_FIFORESET, NULL); // сброс FIFO ПЛИС ЦОС
-    if (g_MemAsFifo) {
+    if (p.g_MemAsFifo) {
         status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_FIFORESET, NULL); // сборс FIFO SDRAM
         status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ENABLE, &Enable); // разрешение записи в SDRAM
     }
@@ -708,7 +670,7 @@ S32 DaqIntoFifo(BRD_Handle hADC, PVOID pSig, ULONG bBufSize, int DspMode)
         //		if(DspMode)
         //			status = BRD_ctrl(hADC, 0, BRDctrl_DSPNODE_FIFOSTATUS, &Status);
         //		else
-        if (g_MemAsFifo)
+        if (p.g_MemAsFifo)
             status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_FIFOSTATUS, &Status);
         else
             status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFOSTATUS, &Status);
@@ -717,7 +679,7 @@ S32 DaqIntoFifo(BRD_Handle hADC, PVOID pSig, ULONG bBufSize, int DspMode)
     Enable = 0;
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &Enable); // запрет работы АЦП
 
-    if (g_MemAsFifo)
+    if (p.g_MemAsFifo)
         status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ENABLE, &Enable); // запрет записи в SDRAM
 
     BRD_DataBuf data_buf;
@@ -726,7 +688,7 @@ S32 DaqIntoFifo(BRD_Handle hADC, PVOID pSig, ULONG bBufSize, int DspMode)
     //	if(DspMode)
     //		status = BRD_ctrl(hADC, 0, BRDctrl_DSPNODE_GETDATA, &data_buf);
     //	else
-    if (g_MemAsFifo)
+    if (p.g_MemAsFifo)
         status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_GETDATA, &data_buf);
     else
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETDATA, &data_buf);
@@ -736,16 +698,18 @@ S32 DaqIntoFifo(BRD_Handle hADC, PVOID pSig, ULONG bBufSize, int DspMode)
 
 // выполнить сбор данных в FIFO с ПДП-методом передачи в ПК
 // S32 DaqIntoFifoDMA(BRD_Handle hADC, int idx, ULONG bBufSize, int DspMode)
-S32 DaqIntoFifoDMA(BRD_Handle hADC)
+S32 DaqIntoFifoDMA(int lid)
 {
     //	printf("DAQ into ADC FIFO\n");
     S32 status;
     ULONG adc_status = 0;
     ULONG Enable = 1;
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
 
     // установить источник для работы стрима
     ULONG tetrad;
-    if (g_MemAsFifo)
+    if (p.g_MemAsFifo)
         status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_GETSRCSTREAM, &tetrad); // стрим будет работать с SDRAM
     else
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETSRCSTREAM, &tetrad); // стрим будет работать с АЦП
@@ -755,15 +719,15 @@ S32 DaqIntoFifoDMA(BRD_Handle hADC)
     //	ULONG flag = BRDstrm_DRQ_ALMOST; // FIFO почти пустое
     //	ULONG flag = BRDstrm_DRQ_READY;
     //	ULONG flag = BRDstrm_DRQ_HALF; // рекомендуется флаг - FIFO наполовину заполнено
-    ULONG flag = g_AdcDrqFlag;
-    if (g_MemAsFifo)
-        flag = g_MemDrqFlag;
+    ULONG flag = p.g_AdcDrqFlag;
+    if (p.g_MemAsFifo)
+        flag = p.g_MemDrqFlag;
     status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_SETDRQ, &flag);
     if (!BRD_errcmp(status, BRDerr_OK))
         DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_STREAM_SETDRQ"));
 
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFORESET, NULL); // сброс FIFO АЦП
-    if (g_MemAsFifo) {
+    if (p.g_MemAsFifo) {
         status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_FIFORESET, NULL); // сброс FIFO SDRAM
         status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ENABLE, &Enable); // разрешение записи в SDRAM
     }
@@ -787,7 +751,7 @@ S32 DaqIntoFifoDMA(BRD_Handle hADC)
 #endif
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &Enable); // разрешение работы АЦП
 
-    ULONG msTimeout = g_MsTimeout; // ждать окончания сбора данных до g_MsTimeout мсек.
+    ULONG msTimeout = p.g_MsTimeout; // ждать окончания сбора данных до p.g_MsTimeout мсек.
     // ULONG msTimeout = 20000; // ждать окончания передачи данных до 20 сек.
     // while(1) // при старте с зацикливанием
     //{
@@ -802,7 +766,7 @@ S32 DaqIntoFifoDMA(BRD_Handle hADC)
     //	buf_state.timeout = 0;
     //	status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_STATE, &buf_state);
     //	printf("State Total Counter = %d\r", buf_state.blkNumTotal);
-    //	//printf("Total Counter = %d\r", g_buf_dscr.pStub->totalCounter);
+    //	//printf("Total Counter = %d\r", p.g_buf_dscr.pStub->totalCounter);
     //	if(GetAsyncKeyState(VK_ESCAPE))
     //	{
     //		status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_STOP, NULL);
@@ -824,7 +788,7 @@ S32 DaqIntoFifoDMA(BRD_Handle hADC)
         ULONG AdcStatus = 0;
         ULONG Status = 0;
         BRDCHAR msg[255];
-        if (g_MemAsFifo) {
+        if (p.g_MemAsFifo) {
             status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFOSTATUS, &AdcStatus);
             status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_FIFOSTATUS, &Status);
             BRDC_sprintf(msg, _BRDC("BRDctrl_STREAM_CBUF_WAITBUF is TIME-OUT(%d sec.)\n AdcFifoStatus = %08X SdramFifoStatus = %08X"),
@@ -862,7 +826,7 @@ S32 DaqIntoFifoDMA(BRD_Handle hADC)
     Enable = 0;
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &Enable); // запрет работы АЦП
 
-    if (g_MemAsFifo)
+    if (p.g_MemAsFifo)
         status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ENABLE, &Enable); // запрет записи в SDRAM
 
 #ifdef _WIN32
@@ -877,8 +841,8 @@ S32 DaqIntoFifoDMA(BRD_Handle hADC)
     double msTime = dt.tv_sec * 1000 + (double)dt.tv_usec / 1000;
 
 #endif
-    if (g_transRate)
-        printf("DAQ & Transfer by bus rate is %.2f Mbytes/sec\r", ((double)g_bBufSize / msTime) / 1000.);
+    if (p.g_transRate)
+        printf("DAQ & Transfer by bus rate is %.2f Mbytes/sec\r", ((double)p.g_bBufSize / msTime) / 1000.);
 
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ISBITSOVERFLOW, &adc_status);
     // status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFOSTATUS, &adc_status);
@@ -897,9 +861,11 @@ S32 DaqIntoFifoDMA(BRD_Handle hADC)
 //		1 - системная память выделяется драйвере 0-го кольца
 //		2 - пользовательская память выделяется в приложении
 //	pBlkNum - число блоков составного буфера (OUT)
-S32 AllocDaqBuf(BRD_Handle hADC, PVOID*& pSig, unsigned long long* pbytesBufSize, ULONG bufType, ULONG* pBlkNum)
+S32 AllocDaqBuf(int lid, PVOID*& pSig, unsigned long long* pbytesBufSize, ULONG bufType, ULONG* pBlkNum)
 {
     S32 status;
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
 
     unsigned long long bBufSize = *pbytesBufSize;
     ULONG bBlkSize;
@@ -929,7 +895,7 @@ S32 AllocDaqBuf(BRD_Handle hADC, PVOID*& pSig, unsigned long long* pbytesBufSize
     void** pBuffer = NULL;
     if (2 == bufType) {
 #ifdef __linux__
-        ULONG nBlkSize = (g_MemOn == 1) ? g_bMemBufSize : bBlkSize * blkNum;
+        ULONG nBlkSize = (p.g_MemOn == 1) ? p.g_bMemBufSize : bBlkSize * blkNum;
         ULONG nBlkNum = 1;
 #else
         ULONG nBlkSize = bBlkSize;
@@ -938,23 +904,23 @@ S32 AllocDaqBuf(BRD_Handle hADC, PVOID*& pSig, unsigned long long* pbytesBufSize
         // pBuffer = malloc(*pbytesBufSize);
         pBuffer = new PVOID[nBlkNum];
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-        g_hBufFileMap = new IPC_handle[nBlkNum];
+        p.g_hBufFileMap = new IPC_handle[nBlkNum];
 #else
-        g_hBufFileMap = new HANDLE[nBlkNum];
+        p.g_hBufFileMap = new HANDLE[nBlkNum];
 #endif
         for (ULONG i = 0; i < nBlkNum; i++) {
-            if (g_fileMap) {
+            if (p.g_fileMap) {
                 BRDCHAR nameBufMap[64];
                 BRDC_sprintf(nameBufMap, _BRDC("data_blk%d"), i);
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-                g_hBufFileMap[i] = IPC_createSharedMemory(nameBufMap, nBlkSize);
-                pBuffer[i] = IPC_mapSharedMemory(g_hBufFileMap[i]);
+                p.g_hBufFileMap[i] = IPC_createSharedMemory(nameBufMap, nBlkSize);
+                pBuffer[i] = IPC_mapSharedMemory(p.g_hBufFileMap[i]);
 #else
-                g_hBufFileMap[i] = CreateFileMapping(INVALID_HANDLE_VALUE,
+                p.g_hBufFileMap[i] = CreateFileMapping(INVALID_HANDLE_VALUE,
                     NULL, PAGE_READWRITE,
                     0, nBlkSize,
                     nameBufMap);
-                pBuffer[i] = MapViewOfFile(g_hBufFileMap[i], FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+                pBuffer[i] = MapViewOfFile(p.g_hBufFileMap[i], FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 #endif
             }
 #ifdef _WIN32
@@ -967,26 +933,26 @@ S32 AllocDaqBuf(BRD_Handle hADC, PVOID*& pSig, unsigned long long* pbytesBufSize
             }
 #endif
         }
-        if (g_fileMap) {
+        if (p.g_fileMap) {
             BRDCHAR nameFlagMap[64] = _BRDC("data_flg");
             // BRDC_sprintf(nameFlagMap, _BRDC("data_flg"), i);
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-            g_hFlgFileMap = IPC_createSharedMemory(nameFlagMap, 3 * sizeof(ULONG));
-            g_pFlags = (ULONG*)IPC_mapSharedMemory(g_hFlgFileMap);
+            p.g_hFlgFileMap = IPC_createSharedMemory(nameFlagMap, 3 * sizeof(ULONG));
+            p.g_pFlags = (ULONG*)IPC_mapSharedMemory(p.g_hFlgFileMap);
 
-            g_pMapBuf = pBuffer[0];
+            p.g_pMapBuf = pBuffer[0];
 
             char str_buf[64];
             sprintf(str_buf, "BLKNUM %d", nBlkNum);
-            lstrcatA(g_pPostfix, str_buf);
+            lstrcatA(p.g_pPostfix, str_buf);
             sprintf(str_buf, "\r\nBLKSIZE %d\r\n", nBlkSize);
-            lstrcatA(g_pPostfix, str_buf);
+            lstrcatA(p.g_pPostfix, str_buf);
 #else
-            g_hFlgFileMap = CreateFileMapping(INVALID_HANDLE_VALUE,
+            p.g_hFlgFileMap = CreateFileMapping(INVALID_HANDLE_VALUE,
                 NULL, PAGE_READWRITE,
                 0, 3 * sizeof(ULONG),
                 nameFlagMap);
-            g_pFlags = (ULONG*)MapViewOfFile(g_hFlgFileMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+            p.g_pFlags = (ULONG*)MapViewOfFile(p.g_hFlgFileMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 #endif
         }
     }
@@ -996,78 +962,81 @@ S32 AllocDaqBuf(BRD_Handle hADC, PVOID*& pSig, unsigned long long* pbytesBufSize
         bufType = 1;
 #endif
 
-    g_buf_dscr.dir = BRDstrm_DIR_IN;
-    g_buf_dscr.isCont = bufType; // 0 - буфер размещается в пользовательской памяти ПК, 1 - в системной
-    g_buf_dscr.blkNum = blkNum;
-    g_buf_dscr.blkSize = bBlkSize; //*pbytesBufSize;
-    g_buf_dscr.ppBlk = new PVOID[g_buf_dscr.blkNum];
-    if (g_buf_dscr.isCont == 2) {
+    p.g_buf_dscr.dir = BRDstrm_DIR_IN;
+    p.g_buf_dscr.isCont = bufType; // 0 - буфер размещается в пользовательской памяти ПК, 1 - в системной
+    p.g_buf_dscr.blkNum = blkNum;
+    p.g_buf_dscr.blkSize = bBlkSize; //*pbytesBufSize;
+    p.g_buf_dscr.ppBlk = new PVOID[p.g_buf_dscr.blkNum];
+    if (p.g_buf_dscr.isCont == 2) {
         for (ULONG i = 0; i < blkNum; i++)
-            g_buf_dscr.ppBlk[i] = pBuffer[i];
+            p.g_buf_dscr.ppBlk[i] = pBuffer[i];
         delete[] pBuffer;
     }
-    status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_ALLOC, &g_buf_dscr);
+    status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_ALLOC, &p.g_buf_dscr);
     if (!BRD_errcmp(status, BRDerr_OK) && !BRD_errcmp(status, BRDerr_PARAMETER_CHANGED))
         DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_STREAM_CBUF_ALLOC"));
     if (BRD_errcmp(status, BRDerr_PARAMETER_CHANGED)) { // может быть выделено меньшее количество памяти
         BRDC_printf(_BRDC("Warning!!! BRDctrl_STREAM_CBUF_ALLOC: BRDerr_PARAMETER_CHANGED\n"));
         status = BRDerr_OK;
     }
-    //*pSig = g_buf_dscr.ppBlk[0];
+    //*pSig = p.g_buf_dscr.ppBlk[0];
     pSig = new PVOID[blkNum];
     for (ULONG i = 0; i < blkNum; i++) {
-        pSig[i] = g_buf_dscr.ppBlk[i];
+        pSig[i] = p.g_buf_dscr.ppBlk[i];
     }
-    *pbytesBufSize = (unsigned long long)g_buf_dscr.blkSize * blkNum;
+    *pbytesBufSize = (unsigned long long)p.g_buf_dscr.blkSize * blkNum;
     *pBlkNum = blkNum;
     BRDC_printf(_BRDC("Allocated memory for Stream:: Number of blocks = %d, Block size = %d kBytes\n"),
-        blkNum, g_buf_dscr.blkSize / 1024);
+        blkNum, p.g_buf_dscr.blkSize / 1024);
     return status;
 }
 
 // освобождение буфера для получения данных с АЦП через Стрим
-S32 FreeDaqBuf(BRD_Handle hADC, ULONG blkNum)
+S32 FreeDaqBuf(int lid, ULONG blkNum)
 {
     S32 status;
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+
     status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_FREE, NULL);
     if (!BRD_errcmp(status, BRDerr_OK))
         DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_STREAM_CBUF_FREE"));
-    if (g_buf_dscr.isCont == 2) {
+    if (p.g_buf_dscr.isCont == 2) {
         for (ULONG i = 0; i < blkNum; i++) {
-            if (g_fileMap) {
+            if (p.g_fileMap) {
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
 #ifdef __linux__
                 blkNum = 1;
 #endif
-                IPC_unmapSharedMemory(g_hBufFileMap[i]);
-                IPC_deleteSharedMemory(g_hBufFileMap[i]);
+                IPC_unmapSharedMemory(p.g_hBufFileMap[i]);
+                IPC_deleteSharedMemory(p.g_hBufFileMap[i]);
 #else
-                UnmapViewOfFile(g_buf_dscr.ppBlk[i]);
-                CloseHandle(g_hBufFileMap[i]);
+                UnmapViewOfFile(p.g_buf_dscr.ppBlk[i]);
+                CloseHandle(p.g_hBufFileMap[i]);
 #endif
             }
 #ifdef _WIN32
             else
-                VirtualFree(g_buf_dscr.ppBlk[i], 0, MEM_RELEASE);
+                VirtualFree(p.g_buf_dscr.ppBlk[i], 0, MEM_RELEASE);
 #endif
         }
-        if (g_fileMap) {
+        if (p.g_fileMap) {
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-            IPC_unmapSharedMemory(g_hFlgFileMap);
-            IPC_deleteSharedMemory(g_hFlgFileMap);
+            IPC_unmapSharedMemory(p.g_hFlgFileMap);
+            IPC_deleteSharedMemory(p.g_hFlgFileMap);
 #else
-            UnmapViewOfFile(g_pFlags);
-            CloseHandle(g_hFlgFileMap);
+            UnmapViewOfFile(p.g_pFlags);
+            CloseHandle(p.g_hFlgFileMap);
 #endif
         }
     }
-    delete[] g_buf_dscr.ppBlk;
+    delete[] p.g_buf_dscr.ppBlk;
     // delete pSig;
     return status;
 }
 
 // размещение 1-блокового буфера для получения данных с АЦП через Стрим
-// S32 AllocDaqBuf(BRD_Handle hADC, PVOID* pSig, unsigned long long* pbytesBufSize, ULONG bufType)
+// S32 AllocDaqBuf(int lid, PVOID* pSig, unsigned long long* pbytesBufSize, ULONG bufType)
 //{
 //	S32		status;
 //
@@ -1082,14 +1051,14 @@ S32 FreeDaqBuf(BRD_Handle hADC, ULONG blkNum)
 //			return -1; // error
 //		}
 //	}
-//	g_buf_dscr.dir = BRDstrm_DIR_IN;
-//	g_buf_dscr.isCont = bufType; // 0 - буфер размещается в пользовательской памяти ПК, 1 - в системной
-//	g_buf_dscr.blkNum = 1;
-//	g_buf_dscr.blkSize = *pbytesBufSize;
-//	g_buf_dscr.ppBlk = new PVOID[g_buf_dscr.blkNum];
-//	if(g_buf_dscr.isCont == 2)
-//		g_buf_dscr.ppBlk[0] = pBuffer;
-//	status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_ALLOC, &g_buf_dscr);
+//	p.g_buf_dscr.dir = BRDstrm_DIR_IN;
+//	p.g_buf_dscr.isCont = bufType; // 0 - буфер размещается в пользовательской памяти ПК, 1 - в системной
+//	p.g_buf_dscr.blkNum = 1;
+//	p.g_buf_dscr.blkSize = *pbytesBufSize;
+//	p.g_buf_dscr.ppBlk = new PVOID[p.g_buf_dscr.blkNum];
+//	if(p.g_buf_dscr.isCont == 2)
+//		p.g_buf_dscr.ppBlk[0] = pBuffer;
+//	status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_ALLOC, &p.g_buf_dscr);
 //	if(!BRD_errcmp(status, BRDerr_OK) && !BRD_errcmp(status, BRDerr_PARAMETER_CHANGED))
 //		DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_STREAM_CBUF_ALLOC"));
 //	if(BRD_errcmp(status, BRDerr_PARAMETER_CHANGED))
@@ -1097,8 +1066,8 @@ S32 FreeDaqBuf(BRD_Handle hADC, ULONG blkNum)
 //		BRDC_printf(_BRDC("Warning!!! BRDctrl_STREAM_CBUF_ALLOC: BRDerr_PARAMETER_CHANGED\n"));
 //		status = BRDerr_OK;
 //	}
-//	*pSig = g_buf_dscr.ppBlk[0];
-//	*pbytesBufSize = g_buf_dscr.blkSize;
+//	*pSig = p.g_buf_dscr.ppBlk[0];
+//	*pbytesBufSize = p.g_buf_dscr.blkSize;
 ////	printf("BRDctrl_STREAM_CBUF_ALLOC:: %d kBytes, memory type = %d\n", (*pbytesBufSize)/1024, bufType);
 //	return status;
 //}
@@ -1110,42 +1079,44 @@ S32 FreeDaqBuf(BRD_Handle hADC, ULONG blkNum)
 //	status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_FREE, NULL);
 //	if(!BRD_errcmp(status, BRDerr_OK))
 //		DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_STREAM_CBUF_FREE"));
-//	if(g_buf_dscr.isCont == 2)
-//		free(g_buf_dscr.ppBlk[0]);
-////		VirtualFree(g_buf_dscr.ppBlk[0], 0, MEM_RELEASE);
-//	delete[] g_buf_dscr.ppBlk;
+//	if(p.g_buf_dscr.isCont == 2)
+//		free(p.g_buf_dscr.ppBlk[0]);
+////		VirtualFree(p.g_buf_dscr.ppBlk[0], 0, MEM_RELEASE);
+//	delete[] p.g_buf_dscr.ppBlk;
 //	return status;
 //}
 
 void MapWriteData(PVOID* pBuf, unsigned long long nNumberOfBytes)
 {
-    DWORD blockSize = DWORD(nNumberOfBytes / g_bBlkNum);
-    for (ULONG i = 0; i < g_bBlkNum; i++) {
-        char* pDst = (char*)g_pMapBuf;
+    DWORD blockSize = DWORD(nNumberOfBytes / p.g_bBlkNum);
+    for (ULONG i = 0; i < p.g_bBlkNum; i++) {
+        char* pDst = (char*)p.g_pMapBuf;
         memcpy((void*)(pDst + i * blockSize), pBuf[i], blockSize);
     }
 }
 
-void MapWrFlagSinc(int flg, int isNewParam)
+void MapWrFlagSinc(int lid, int flg, int isNewParam)
 {
-    g_pFlags[0] = flg;
-    g_pFlags[1] = isNewParam;
-    g_pFlags[2] = g_buf_dscr.blkSize;
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    p.g_pFlags[0] = flg;
+    p.g_pFlags[1] = isNewParam;
+    p.g_pFlags[2] = p.g_buf_dscr.blkSize;
 }
 
-int MapRdFlagSinc()
+int MapRdFlagSinc(int lid)
 {
-    int flg = g_pFlags[0];
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    int flg = p.g_pFlags[0];
     return flg;
 }
 
 S32 MapDataFromMemWriteData(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBufSize, unsigned long long bMemBufSize, ULONG DmaOn)
 {
-    char* pDst = (char*)g_pMapBuf;
+    char* pDst = (char*)p.g_pMapBuf;
 
     S32 status = BRDerr_OK;
 
-    //    if(g_PretrigMode == 3)
+    //    if(p.g_PretrigMode == 3)
     //    {
     //        // получить параметры, актуальные в режиме претриггера
     //        status = GetPostrigData(hADC);
@@ -1185,16 +1156,20 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, HANDLE hfile, int idx, BRDctrl_StreamCBuf
 
 void DspFunc(void* buf, ULONG size);
 
-int g_flbreak = 0;
+/*
+int p.g_flbreak = 0;
 
-ULONG g_bufType;
-ULONG g_fileBufSize;
-ULONG g_fileBufNum;
-ULONG g_fileBlkNum;
+ULONG p.g_bufType;
+ULONG p.g_fileBufSize;
+ULONG p.g_fileBufNum;
+ULONG p.g_fileBlkNum;
+*/
 
 void DirectFile(int lid, ULONG bufType, ULONG FileBufSize, ULONG FileBufNum, ULONG FileBlkNum)
 {
     THREAD_PARAM thread_par;
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    printf("<DBG> DirectFile: ADC-%d, bufType=%lu, FileBufSize=%lu, FileBufNum=%lu? FileBlkNum=%ul \n", lid, bufType, FileBufSize, FileBufNum, FileBlkNum);
 
 #ifdef _WIN32
     SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
@@ -1202,14 +1177,14 @@ void DirectFile(int lid, ULONG bufType, ULONG FileBufSize, ULONG FileBufNum, ULO
     BRDC_printf(_BRDC("Process Priority = %d\n"), prior_class);
 #endif
 
-    g_bufType = bufType;
-    g_fileBufSize = FileBufSize;
-    g_fileBufNum = FileBufNum;
-    g_fileBlkNum = FileBlkNum;
+    p.g_bufType = bufType;
+    p.g_fileBufSize = FileBufSize;
+    p.g_fileBufNum = FileBufNum;
+    p.g_fileBlkNum = FileBlkNum;
 
-    g_flbreak = 0;
+    p.g_flbreak = 0;
     thread_par.handle = DevicesLid[lid].adc.handle(); // x_hADC;
-    thread_par.idx = 0;
+    thread_par.idx = lid; // 0;
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
     IPC_handle hThread = IPC_createThread(_BRDC("DirWriteIntoFile"), &DirWriteIntoFile, &thread_par);
     IPC_waitThread(hThread, INFINITE); // Wait until threads terminates
@@ -1222,8 +1197,8 @@ void DirectFile(int lid, ULONG bufType, ULONG FileBufSize, ULONG FileBufNum, ULO
 #endif
 }
 
-extern BRDCHAR g_dirFileName[];
-// extern ULONG g_flDirFileName;
+// extern BRDCHAR g_dirFileName[];
+//  extern ULONG p.g_flDirFileName;
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
 thread_value __IPC_API DirWriteIntoFile(void* pParams)
@@ -1241,12 +1216,13 @@ unsigned __stdcall DirWriteIntoFile(void* pParams)
     PTHREAD_PARAM pThreadParam = (PTHREAD_PARAM)pParams;
     BRD_Handle hSrv = pThreadParam->handle;
     int idx = pThreadParam->idx;
+    ParamsAdc& p = DevicesLid[idx].paramsAdc;
 
     BRDCHAR fileName[MAX_PATH];
-    if (idx)
-        BRDC_sprintf(fileName, _BRDC("%s_%d.bin"), g_dirFileName, idx);
+    if (idx != 0)
+        BRDC_sprintf(fileName, _BRDC("%s_%d.bin"), p.g_dirFileName, idx);
     else
-        BRDC_strcpy(fileName, g_dirFileName);
+        BRDC_strcpy(fileName, p.g_dirFileName);
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
     IPC_handle hfile = IPC_openFileEx(fileName,
@@ -1274,9 +1250,9 @@ unsigned __stdcall DirWriteIntoFile(void* pParams)
 
     BRDctrl_StreamCBufAlloc buf_dscr;
     buf_dscr.dir = BRDstrm_DIR_IN;
-    buf_dscr.isCont = g_bufType; // 0/1 - буфер размещается в пользовательской/системной памяти ПК
-    buf_dscr.blkNum = g_fileBlkNum;
-    buf_dscr.blkSize = g_fileBufSize;
+    buf_dscr.isCont = p.g_bufType; // 0/1 - буфер размещается в пользовательской/системной памяти ПК
+    buf_dscr.blkNum = p.g_fileBlkNum;
+    buf_dscr.blkSize = p.g_fileBufSize;
     buf_dscr.ppBlk = new PVOID[buf_dscr.blkNum];
     status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_ALLOC, &buf_dscr);
     if (!BRD_errcmp(status, BRDerr_OK) && !BRD_errcmp(status, BRDerr_PARAMETER_CHANGED)) {
@@ -1291,32 +1267,32 @@ unsigned __stdcall DirWriteIntoFile(void* pParams)
         BRDC_printf(_BRDC("Warning!!! BRDctrl_STREAM_CBUF_ALLOC: BRDerr_PARAMETER_CHANGED\n"));
         status = BRDerr_OK;
     }
-    BRDC_printf(_BRDC("Block size = %d Mbytes, Block num = %d, Total blocks = %d\n"), buf_dscr.blkSize / 1024 / 1024, buf_dscr.blkNum, g_fileBufNum);
+    BRDC_printf(_BRDC("Block size = %d Mbytes, Block num = %d, Total blocks = %d\n"), buf_dscr.blkSize / 1024 / 1024, buf_dscr.blkNum, p.g_fileBufNum);
 
     // установить источник для работы стрима
     ULONG tetrad;
-    if (g_MemAsFifo)
+    if (p.g_MemAsFifo)
         status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_GETSRCSTREAM, &tetrad); // стрим будет работать с SDRAM
     else
         status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_GETSRCSTREAM, &tetrad); // стрим будет работать с АЦП
     status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_SETSRC, &tetrad);
 
-    if (g_adjust_mode)
-        status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_ADJUST, &g_adjust_mode);
+    if (p.g_adjust_mode)
+        status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_ADJUST, &p.g_adjust_mode);
 
     // устанавливать флаг для формирования запроса ПДП надо после установки источника (тетрады) для работы стрима
     //	ULONG flag = BRDstrm_DRQ_ALMOST; // FIFO почти пустое
     //	ULONG flag = BRDstrm_DRQ_READY;
     //	ULONG flag = BRDstrm_DRQ_HALF; // рекомендуется флаг - FIFO наполовину заполнено
-    ULONG flag = g_AdcDrqFlag;
-    if (g_MemAsFifo)
-        flag = g_MemDrqFlag;
+    ULONG flag = p.g_AdcDrqFlag;
+    if (p.g_MemAsFifo)
+        flag = p.g_MemDrqFlag;
     status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_SETDRQ, &flag);
 
     ULONG Enable = 1;
     status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_FIFORESET, NULL); // сброс FIFO АЦП
     status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_RESETFIFO, NULL);
-    if (g_MemAsFifo) {
+    if (p.g_MemAsFifo) {
         status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_FIFORESET, NULL); // сборс FIFO SDRAM
         status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_ENABLE, &Enable); // разрешение записи в SDRAM
     }
@@ -1328,14 +1304,14 @@ unsigned __stdcall DirWriteIntoFile(void* pParams)
 
     int errCnt = 0;
     BRDC_printf(_BRDC("Data writing into file %s...\n"), fileName);
-    if (g_fileBlkNum == 2)
+    if (p.g_fileBlkNum == 2)
         errCnt = SimpleProcWrDir(hSrv, hfile, idx, &buf_dscr);
     else
         errCnt = MultiBlkProcWrDir(hSrv, hfile, idx, &buf_dscr);
 
     Enable = 0;
     status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_ENABLE, &Enable); // запрет работы АЦП
-    if (g_MemAsFifo)
+    if (p.g_MemAsFifo)
         status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_ENABLE, &Enable); // запрет записи в SDRAM
     //	printf("                                             \r");
     if (errCnt)
@@ -1344,7 +1320,7 @@ unsigned __stdcall DirWriteIntoFile(void* pParams)
     status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_FIFOSTATUS, &Status);
     if (Status & 0x80)
         BRDC_printf(_BRDC("ERROR (%s): ADC FIFO is overflow\n"), fileName);
-    if (g_MemAsFifo) {
+    if (p.g_MemAsFifo) {
         status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_FIFOSTATUS, &Status);
         if (Status & 0x8000)
             BRDC_printf(_BRDC("ERROR (%s): SDRAM FIFO is overflow\n"), fileName);
@@ -1370,7 +1346,9 @@ int SimpleProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_StreamCB
     int cnt = 0;
     int errcnt = 0;
     ULONG msTimeout = 40000; // ждать окончания передачи данных до 40 сек.
-    for (ULONG i = 0; i < g_fileBufNum; i++) {
+    ParamsAdc& p = DevicesLid[idx].paramsAdc;
+
+    for (ULONG i = 0; i < p.g_fileBufNum; i++) {
         status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout);
         if (BRD_errcmp(status, BRDerr_WAIT_TIMEOUT)) { // если вышли по тайм-ауту, то остановимся
             status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_FIFOSTATUS, &Status);
@@ -1383,7 +1361,7 @@ int SimpleProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_StreamCB
             int ch = IPC_getch(); // получает клавишу
             if (0x1B == ch) // если Esc
             {
-                g_flbreak = 1;
+                p.g_flbreak = 1;
                 break;
             }
         }
@@ -1414,6 +1392,8 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_Stream
     int err_cnt = 0;
     int waitblk_cnt = 0;
     ULONG msTimeout = 40000; // ждать окончания передачи данных до 20 сек.
+    ParamsAdc& p = DevicesLid[idx].paramsAdc;
+
     do {
         total_cnt = buf_dscr->pStub->totalCounter;
         delta_cnt = total_cnt - write_cnt;
@@ -1454,7 +1434,7 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_Stream
             int ch = IPC_getch(); // получает клавишу
             if (0x1B == ch) // если Esc
             {
-                g_flbreak = 1;
+                p.g_flbreak = 1;
                 break;
             }
         }
@@ -1467,7 +1447,7 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_Stream
             //	err_cnt++;
             // printf("Writing %d, daq %d, total %d\n", cur_buf, daq_buf, buf_dscr.pStub->totalCounter);
             // DspFunc(buf_dscr->ppBlk[cur_buf], buf_dscr->blkSize);
-            if (g_MemAsFifo) {
+            if (p.g_MemAsFifo) {
                 status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_FIFOSTATUS, &Status);
                 if (Status & 0x8000)
                     BRDC_printf(_BRDC("ERROR: SDRAM FIFO is overflow (SDRAM FIFO Status = 0x%04X)\n"), Status);
@@ -1477,13 +1457,13 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_Stream
                     BRDC_printf(_BRDC("ERROR: ADC FIFO is overflow (ADC FIFO Status = 0x%04X)\n"), Status);
             }
             IPC_writeFile(hfile, buf_dscr->ppBlk[cur_buf], buf_dscr->blkSize);
-            if (g_adjust_mode)
+            if (p.g_adjust_mode)
                 status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_DONE, &cur_buf);
             cur_buf++;
             if (cur_buf == (LONG)buf_dscr->blkNum)
                 cur_buf = 0;
             write_cnt++;
-            if (write_cnt == g_fileBufNum)
+            if (write_cnt == p.g_fileBufNum)
                 break;
         }
         BRDC_printf(_BRDC("Status = 0x%04X, Delta = %ld, written buffers = %d, errors = %d\r"), Status, delta_cnt, write_cnt, err_cnt);
@@ -1496,7 +1476,7 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_Stream
         // printf("%s: Total buffers = %d, written buffers = %d\r", fileName, total_cnt, write_cnt);
         //	printf("%s: written buffers = %d\r", fileName, write_cnt);
         //}
-    } while (write_cnt < g_fileBufNum);
+    } while (write_cnt < p.g_fileBufNum);
     return err_cnt;
 }
 

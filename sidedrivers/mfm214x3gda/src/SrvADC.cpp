@@ -849,9 +849,9 @@ auto SrvADC::CtrlSetSysRef(void* pDev, void* pServData, ULONG cmd, void* args) -
     decltype(auto) sub_module = ModuleCast<Cmfm214x3gda>(pDev);
     decltype(auto) val = ArgumentCast<BRD_SysRefConfig_FM214x3GDA>(args);
 
-    if( val.level < 0.0 )
+    if (val.level < 0.0)
         val.level = 0.0;
-    if( val.level > 5.0 )
+    if (val.level > 5.0)
         val.level = 5.0;
 
     LOG("BRDctrl_DAC_SETSYSREF | level: %.02f V, config: 0x%X", val.level, val.select);
@@ -1098,7 +1098,7 @@ auto SrvADC::CtrlSetPreSync(void* pDev, void* pServData, ULONG cmd, void* args) 
         return BRDerr_OK;
     }
 
-    //установка программного старта для пресинка
+    // установка программного старта для пресинка
     BRD_StartMode start_mode = { 0 };
     uint32_t start_src = 0;
     CtrlGetStartMode(pDev, pServData, BRDctrl_ADC_GETSTARTMODE, &start_mode);
@@ -1115,12 +1115,13 @@ auto SrvADC::CtrlSetPreSync(void* pDev, void* pServData, ULONG cmd, void* args) 
 
     // ждём результат
     auto presync_result = false;
+    m_timeout_msec = 10000;
     const auto timeout = std::chrono::steady_clock::now() + std::chrono::milliseconds(m_timeout_msec);
     do {
         presync_result = (sub_module.DirRegRead(m_tetr_num, ADM2IFnr_STATUS) & (1 << 13)) != 0;
     } while ((presync_result == false) && (timeout > std::chrono::steady_clock::now()));
 
-    //возвращение установленного ранее значения
+    // возвращение установленного ранее значения
     start_mode.startSrc = start_src;
     CtrlSetStartMode(pDev, pServData, BRDctrl_ADC_SETSTARTMODE, &start_mode);
 

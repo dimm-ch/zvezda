@@ -23,7 +23,7 @@
 #include <ctype.h>
 #include <signal.h>
 #include <string.h>
-void WriteIsviParams(IPC_handle hfile, BRD_Handle hADC, unsigned long long nNumberOfBytes);
+void WriteIsviParams(IPC_handle hfile, int lid, unsigned long long nNumberOfBytes);
 #else
 #include <conio.h>
 #include <io.h>
@@ -31,18 +31,19 @@ void WriteIsviParams(IPC_handle hfile, BRD_Handle hADC, unsigned long long nNumb
 #include <sys\stat.h>
 #include <windows.h>
 
-void WriteIsviParams(HANDLE hfile, BRD_Handle hADC, unsigned long long nNumberOfBytes);
+void WriteIsviParams(HANDLE hfile, int lid, unsigned long long nNumberOfBytes);
 #endif
 
-S32 SetParamSrv(int lid, BRD_ServList* srv, int idx);
+S32 SetParamSrv(int lid /*, BRD_ServList* srv, int idx*/);
 S32 GetAdcData(int lid, unsigned long long bBufSize, unsigned long long bMemBufSize);
 
-S32 DataFromMemWriteFile(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBufSize, unsigned long long bMemBufSize, ULONG DmaOn);
-void WriteDataFile(BRD_Handle hADC, int idx, PVOID* pBuf, unsigned long long nNumberOfBytes);
-void WriteFlagSinc(int flg, int isNewParam, int idx);
-int ReadFlagSinc(int idx);
+S32 DataFromMemWriteFile(int lid /*BRD_Handle hADC*/, PVOID* pBuf, unsigned long long bBufSize, unsigned long long bMemBufSize, ULONG DmaOn);
+void WriteDataFile(int lid /*BRD_Handle hADC*/, PVOID* pBuf, unsigned long long nNumberOfBytes);
+void WriteFlagSinc(int flg, int isNewParam, int lid);
+int ReadFlagSinc(int lid);
 
 // Options
+/*
 BRDCHAR g_AdcSrvName[64]; // с номером службы
 BRDCHAR g_SrvName[64]; // без номера службы
 int g_AdcSrvNum; // номер службы
@@ -78,9 +79,12 @@ uint64_t g_bMemBufSize;
 ULONG g_bBlkNum;
 ULONG g_FileBlkNum;
 ULONG g_MsTimeout;
+*/
 
 void DirectFile(int lid, ULONG bufType, ULONG FileBufSize, ULONG FileBufNum, ULONG FileBlkNum);
 void WriteIsviParamDirFile(int lid);
+
+/*
 int g_DirWriteFile;
 ULONG g_FileBufSize;
 BRDCHAR g_dirFileName[MAX_PATH] = _BRDC("adcdir.bin");
@@ -105,19 +109,24 @@ double g_samplRate;
 int g_transRate;
 
 void* g_pMapBuf;
-
-U32 modeAdcServiceCapture = BRDcapt_EXCLUSIVE;
-
-S32 RegProg(BRD_Handle hAdc, int idx, int isx);
 int g_regdbg;
 
+// U32 modeAdcServiceCapture = BRDcapt_EXCLUSIVE;
+*/
+
+S32 RegProg(BRD_Handle hAdc, int idx, int isx);
+
 #if defined(__IPC_LINUX__)
+/*
 static int g_StopFlag = 0;
+*/
+
 void stop_exam(int sig)
 {
     fprintf(stderr, "\n");
     fprintf(stderr, "SIGNAL = %d\n", sig);
-    g_StopFlag = 1;
+    for (auto& dp : DevicesLid)
+        dp.paramsAdc.g_StopFlag = 1;
 }
 #endif
 
@@ -154,108 +163,118 @@ static void GetInifileString(const BRDCHAR* FileName, const BRDCHAR* SectionName
 }
 
 // получить параметры из ini-файла
-void adcGetOptions(const std::string inifile)
+void adcGetOptions(int lid, const std::string inifile)
 {
     BRDCHAR Buffer[4096];
     BRDCHAR iniFilePath[4096];
 
-    strcpy(g_iniFileNameAdc, inifile.c_str());
+#if defined(__IPC_LINUX__)
+    signal(SIGINT, stop_exam);
+#endif
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    strcpy(p.g_iniFileNameAdc, inifile.c_str());
 
-    IPC_getCurrentDir(iniFilePath, sizeof(iniFilePath) / sizeof(BRDCHAR));
-    BRDC_strcat(iniFilePath, "/");
-    BRDC_strcat(iniFilePath, g_iniFileNameAdc);
+    //    IPC_getCurrentDir(iniFilePath, sizeof(iniFilePath) / sizeof(BRDCHAR));
+    //    BRDC_strcat(iniFilePath, "/");
+    //    BRDC_strcat(iniFilePath, g_iniFileNameAdc);
+    S32 err = IPC_getFullPath(inifile.c_str(), iniFilePath);
+    if (0 > err) {
+        BRDC_printf(_BRDC("ERROR: Can't find ini-file '%s'\n\n"), inifile.c_str());
+        return;
+    }
 
-    printf("Load filename: g_iniFileNameAdc=%s \n", g_iniFileNameAdc);
-    printf("Path to filename: iniFilePath=%s \n", iniFilePath);
+    printf("Load filename: g_iniFileNameAdc=>%s< \n", p.g_iniFileNameAdc);
+    printf("Path to filename: iniFilePath=>%s< \n", iniFilePath);
 
     BRDCHAR* endptr;
     // GetPrivateProfileString("Option", "AdcServiceName", "ADC212X200M", g_SrvName, sizeof(g_SrvName), iniFilePath);
-    GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("AdcServiceName"), _BRDC("ADC214x3GDA"), g_SrvName, sizeof(g_SrvName));
+    GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("AdcServiceName"), _BRDC("ADC214x3GDA"), p.g_SrvName, sizeof(p.g_SrvName));
     // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdcServiceName"), _BRDC("ADC214x3GDA"), Buffer, sizeof(Buffer), iniFilePath);
     // BRDC_strncpy(g_SrvName, Buffer, 64);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdcServiceNum"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_AdcSrvNum = BRDC_atoi(Buffer);
-    if (g_subNo >= 0)
-        g_AdcSrvNum = g_subNo;
-    BRDC_sprintf(g_AdcSrvName, _BRDC("%s%d"), g_SrvName, g_AdcSrvNum);
+    p.g_AdcSrvNum = BRDC_atoi(Buffer);
+    if (p.g_subNo >= 0)
+        p.g_AdcSrvNum = g_subNo;
+    BRDC_sprintf(g_AdcSrvName, _BRDC("%s%d"), p.g_SrvName, p.g_AdcSrvNum);
 
-    // GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("PldFileName"), _BRDC("ambpcd_v10_adm212x200m.mcs"), g_pldFileName, sizeof(g_pldFileName));
+    GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("PldFileName"), _BRDC("ambpcd_v10_adm212x200m.mcs"), p.g_pldFileName, sizeof(p.g_pldFileName));
     // GetPrivateProfileString("Option", "PldFileName", "ambpcd_v10_adm212x200m.mcs", g_pldFileName, sizeof(g_pldFileName), iniFilePath);
     // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("PldFileName"), _BRDC("ambpcd_v10_adm212x200m.mcs"), Buffer, sizeof(Buffer), iniFilePath);
     // BRDC_strcpy(g_pldFileName, Buffer);
     // GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("PldFileName"), _BRDC("ambpcd_v10_adm212x200m.mcs"), g_pldFileName, sizeof(g_pldFileName));
-    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("isPldLoadAlways"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_isPldLoadAlways = 0; // BRDC_atoi(Buffer);
+    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("isPldLoadAlways"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    p.g_isPldLoadAlways = BRDC_atoi(Buffer);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("BusMasterEnable"), _BRDC("1"), Buffer, sizeof(Buffer), iniFilePath);
-    g_DmaOn = BRDC_atoi(Buffer);
+    p.g_DmaOn = BRDC_atoi(Buffer);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("Cycle"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_Cycle = BRDC_atoi(Buffer);
+    p.g_Cycle = BRDC_atoi(Buffer);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("Pause"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_Pause = BRDC_atoi(Buffer);
+    p.g_Pause = BRDC_atoi(Buffer);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DaqIntoMemory"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_MemOn = BRDC_atoi(Buffer);
+    p.g_MemOn = BRDC_atoi(Buffer);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("IsWriteFile"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_IsWriteFile = BRDC_atoi(Buffer);
+    p.g_IsWriteFile = BRDC_atoi(Buffer);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("SamplesPerChannel"), _BRDC("16384"), Buffer, sizeof(Buffer), iniFilePath);
-    g_samplesOfChannel = BRDC_atoi64(Buffer);
+    p.g_samplesOfChannel = BRDC_atoi64(Buffer);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("MemSamplesPerChan"), _BRDC("16384"), Buffer, sizeof(Buffer), iniFilePath);
-    g_memorySamplesOfChannel = BRDC_atoi64(Buffer);
+    p.g_memorySamplesOfChannel = BRDC_atoi64(Buffer);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("IsSystemMemory"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_IsSysMem = BRDC_atoi(Buffer);
-    if (g_IsSysMem == 1 && g_info.busType == BRDbus_ETHERNET) {
+    p.g_IsSysMem = BRDC_atoi(Buffer);
+    if (p.g_IsSysMem == 1 && p.g_info.busType == BRDbus_ETHERNET) {
         BRDC_printf(_BRDC("Ethernet: IsSystemMemory=0 or IsSystemMemory=2 (NOT EQUAL 1)!!!\n"));
-        g_IsSysMem = 0;
+        p.g_IsSysMem = 0;
     }
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DirFileBufSize"), _BRDC("64"), Buffer, sizeof(Buffer), iniFilePath); // KBytes
-    g_FileBufSize = BRDC_atoi(Buffer) * 1024;
+    p.g_FileBufSize = BRDC_atoi(Buffer) * 1024;
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DirNumBufWrite"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath); // KBytes
-    g_DirWriteFile = BRDC_atoi(Buffer);
+    p.g_DirWriteFile = BRDC_atoi(Buffer);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DirNumBlock"), _BRDC("2"), Buffer, sizeof(Buffer), iniFilePath); // KBytes
-    g_FileBlkNum = BRDC_atoi(Buffer);
-    if (g_FileBlkNum < 2)
-        g_FileBlkNum = 2;
-    GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("DirFileName"), _BRDC("adcdir.bin"), g_dirFileName, sizeof(g_dirFileName));
+    p.g_FileBlkNum = BRDC_atoi(Buffer);
+    if (p.g_FileBlkNum < 2)
+        p.g_FileBlkNum = 2;
+    GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("DirFileName"), _BRDC("adcdir.bin"), p.g_dirFileName, sizeof(p.g_dirFileName));
 
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdcDrqFlag"), _BRDC("2"), Buffer, sizeof(Buffer), iniFilePath);
-    g_AdcDrqFlag = BRDC_atoi(Buffer);
+    p.g_AdcDrqFlag = BRDC_atoi(Buffer);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("MemDrqFlag"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_MemDrqFlag = BRDC_atoi(Buffer);
+    p.g_MemDrqFlag = BRDC_atoi(Buffer);
 
     IPC_getPrivateProfileString(_BRDC("Debug"), _BRDC("IoDelay"), _BRDC("128"), Buffer, sizeof(Buffer), iniFilePath);
-    g_IoDelay = BRDC_atoi(Buffer);
+    p.g_IoDelay = BRDC_atoi(Buffer);
 
-    if (g_IsWriteFile == 4) {
+    if (p.g_IsWriteFile == 4) {
         BRDC_printf(_BRDC("File mapping mode: IsWriteFile=0, IsSystemMemory=2 !!!\n"));
-        g_IsWriteFile = 0;
-        g_fileMap = 1;
-        g_IsSysMem = 2;
+        p.g_IsWriteFile = 0;
+        p.g_fileMap = 1;
+        p.g_IsSysMem = 2;
     }
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("RateRate"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_transRate = BRDC_atoi(Buffer);
+    p.g_transRate = BRDC_atoi(Buffer);
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("TimeoutSec"), _BRDC("5"), Buffer, sizeof(Buffer), iniFilePath); // sec
-    g_MsTimeout = BRDC_atoi(Buffer) * 1000;
+    p.g_MsTimeout = BRDC_atoi(Buffer) * 1000;
 
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("SwitchOutMask"), _BRDC("0x18"), Buffer, sizeof(Buffer), iniFilePath);
-    g_SwitchOutMask = BRDC_strtol(Buffer, &endptr, 0);
+    p.g_SwitchOutMask = BRDC_strtol(Buffer, &endptr, 0);
 
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("RegDbg"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_regdbg = BRDC_atoi(Buffer);
+    p.g_regdbg = BRDC_atoi(Buffer);
 
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdjustMode"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_adjust_mode = BRDC_atoi(Buffer);
+    p.g_adjust_mode = BRDC_atoi(Buffer);
 
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("QuickQuit"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    g_quick_quit = BRDC_atoi(Buffer);
+    p.g_quick_quit = BRDC_atoi(Buffer);
 }
 
 #include "ctrlbasef.h"
 //=******************* SetSwitchAdc *****************************
 //=************************************************************
-void SetSwitchAdc(BRD_Handle handle)
+void SetSwitchAdc(int lid /*BRD_Handle handle*/)
 {
     S32 status;
-    ///>>>
-    U32 mode = modeAdcServiceCapture;
+    U32 mode = BRDcapt_SHARED;
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    BRD_Handle handle = DevicesLid[lid].device.handle();
     BRD_Handle hSrv = BRD_capture(handle, 0, &mode, _BRDC("BASEFMC0"), 10000);
     if (hSrv <= 0) {
         BRDC_printf(_BRDC("BASEFMC0 NOT capture (0x%X)\n"), hSrv);
@@ -272,7 +291,7 @@ void SetSwitchAdc(BRD_Handle handle)
     BRD_Switch sw;
     for (int i = 0; i < 8; i++) {
         sw.out = i;
-        sw.val = (g_SwitchOutMask >> i) & 0x1; // 1 = on
+        sw.val = (p.g_SwitchOutMask >> i) & 0x1; // 1 = on
         // if(!sw.val)
         //  отключаем ненужные и включаем нужные выходы коммутатора
         status = BRD_ctrl(hSrv, 0, BRDctrl_BASEF_SWITCHONOFF, &sw);
@@ -285,36 +304,27 @@ void SetSwitchAdc(BRD_Handle handle)
 // устанавливаем параметры АЦП,
 // получаем размер собираемых данных в байтах,
 // проверяем наличие динамической памяти на модуле и, если надо, устанавливаем ее параметры, включая размер активной зоны
-S32 SetParamSrv(int lid, BRD_ServList* srv, int idx)
+S32 SetParamSrv(int lid /*, BRD_ServList* srv, int idx*/)
 {
     S32 status = BRDerr_OK;
-    U32 md = modeAdcServiceCapture;
-    // if (!DevicesLid[lid].device.isOpen())
-    //     DevicesLid[lid].device.open(lid);
+
+    if (!DevicesLid[lid].device.isOpen() || !DevicesLid[lid].adc.isCaptured()) {
+        printf("<ERR> SetParamSrv: service d'nt capture .. \n");
+        return -1;
+    }
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
     BRD_Handle handle = DevicesLid[lid].device.handle();
-    printf("<DEBUG> SetParamSrv: Handle device = %X \n", handle);
 
-    DevicesLid[lid].adc.setMode(md);
-    BRD_Handle hADC = DevicesLid[lid].adc.capture(handle, srv->name, 10000);
-    printf("<DEBUG> SetParamSrv: Handle service = %X \n", hADC);
-    // BRD_Handle hADC = BRD_capture(handle, 0, &md, srv->name, 10000);
-    if (md == BRDcapt_SHARED)
-        BRDC_printf(_BRDC("%s: Capture mode SHARED\n"), srv->name);
-    if (md == BRDcapt_EXCLUSIVE)
-        BRDC_printf(_BRDC("%s: Capture mode EXCLUSIVE\n"), srv->name);
-    if (md == BRDcapt_SPY)
-        BRDC_printf(_BRDC("%s: Capture mode SPY\n"), srv->name);
+    U32 md = DevicesLid[lid].adc.mode();
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+
+    BRDC_printf(_BRDC("%s"), DevicesLid[lid].adc.strMode());
+
     if (hADC > 0) {
-        if (g_SwitchOutMask <= 0xFF)
-            SetSwitchAdc(handle);
-        // x_hADC = hADC;
+        if (p.g_SwitchOutMask <= 0xFF)
+            SetSwitchAdc(lid /*handle*/);
 
-        // int numChan = AdcSettings(hADC, 0, g_SrvName, g_iniFileNameAdc); // установить параметры АЦП
-        // g_numChan = AdcSettings(hADC, (g_lid_adc != -1) ? g_lid_adc : 0, g_AdcSrvNum, g_SrvName, g_iniFileNameAdc); // установить параметры АЦП
-        g_numChan = AdcSettings(hADC, 0, g_AdcSrvNum, g_SrvName, g_iniFileNameAdc); // установить параметры АЦП
-
-        // if(g_regdbg)
-        //	RegProg(hADC, (g_lid_adc != -1) ? g_lid_adc : 0, g_AdcSrvNum);
+        p.g_numChan = AdcSettings(hADC, lid, p.g_AdcSrvNum, p.g_SrvName, p.g_iniFileNameAdc); // установить параметры АЦП
 
         ULONG format = 0;
         BRD_ctrl(hADC, 0, BRDctrl_ADC_GETFORMAT, &format);
@@ -322,14 +332,14 @@ S32 SetParamSrv(int lid, BRD_ServList* srv, int idx)
         if (format == 0x80) // упакованные 12-разрядные данные
             sample_size = 2;
 
-        g_bBufSize = (g_samplesOfChannel * g_numChan) * sample_size; // получить размер собираемых данных в байтах
+        p.g_bBufSize = (p.g_samplesOfChannel * p.g_numChan) * sample_size; // получить размер собираемых данных в байтах
 
-        if (!g_DirWriteFile)
-            BRDC_printf(_BRDC("SamplesPerChannel = %lld (%lld kBytes)\n"), g_samplesOfChannel, g_bBufSize / 1024);
+        if (!p.g_DirWriteFile)
+            BRDC_printf(_BRDC("<SRV> SetParamSrv: SamplesPerChannel = %lld (%lld kBytes)\n"), p.g_samplesOfChannel, p.g_bBufSize / 1024);
 
-        g_bMemBufSize = (g_memorySamplesOfChannel * g_numChan) * sample_size; // получить размер собираемых в память данных в байтах
+        p.g_bMemBufSize = (p.g_memorySamplesOfChannel * p.g_numChan) * sample_size; // получить размер собираемых в память данных в байтах
 
-        g_bPostTrigSize = (g_nPostTrigSamples * g_numChan) * sample_size; // получить размер пост-триггерных данных (в байтах), собираемых в память
+        p.g_bPostTrigSize = (p.g_nPostTrigSamples * p.g_numChan) * sample_size; // получить размер пост-триггерных данных (в байтах), собираемых в память
 
         // проверяем наличие динамической памяти
         BRD_SdramCfgEx SdramConfig;
@@ -337,9 +347,9 @@ S32 SetParamSrv(int lid, BRD_ServList* srv, int idx)
         uint64_t PhysMemSize;
         status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_GETCFGEX, &SdramConfig);
         if (status < 0) {
-            if (g_MemOn) {
-                BRDC_printf(_BRDC("Get SDRAM Config: Error = 0x%X!!!\n"), status);
-                g_MemOn = 0;
+            if (p.g_MemOn) {
+                BRDC_printf(_BRDC("<ERR> SetParamSrv: Get SDRAM Config: status = 0x%X!!!\n"), status);
+                p.g_MemOn = 0;
             }
             PhysMemSize = 0;
             return BRDerr_OK;
@@ -352,25 +362,25 @@ S32 SetParamSrv(int lid, BRD_ServList* srv, int idx)
             else
                 PhysMemSize = (1 << SdramConfig.RowAddrBits) * (1 << SdramConfig.ColAddrBits) * SdramConfig.ModuleBanks * SdramConfig.ChipBanks * SdramConfig.ModuleCnt * 2; // в 32-битных словах
         }
-        if (PhysMemSize && g_MemOn) { // динамическая память присутствует на модуле
-            BRDC_printf(_BRDC("SDRAM Config: Memory size = %d MBytes\n"), (PhysMemSize / (1024 * 1024)) * 4);
+        if (PhysMemSize && p.g_MemOn) { // динамическая память присутствует на модуле
+            BRDC_printf(_BRDC("<SRV> SetParamSrv: SDRAM Config: Memory size = %d MBytes\n"), (PhysMemSize / (1024 * 1024)) * 4);
 
-            status = SdramSettings(g_MemOn, hADC, g_bMemBufSize); // установить параметры SDRAM
-            g_memorySamplesOfChannel = (g_bMemBufSize / sample_size) / g_numChan;
-            if (g_MemOn == 2) {
-                BRDC_printf(_BRDC("SDRAM as a FIFO mode!!!\n"));
-                g_MemOn = 0;
-                g_MemAsFifo = 1;
+            status = SdramSettings(p.g_MemOn, lid, p.g_bMemBufSize); // установить параметры SDRAM
+            p.g_memorySamplesOfChannel = (p.g_bMemBufSize / sample_size) / p.g_numChan;
+            if (p.g_MemOn == 2) {
+                BRDC_printf(_BRDC("<SRV> SetParamSrv: SDRAM as a FIFO mode!!!\n"));
+                p.g_MemOn = 0;
+                p.g_MemAsFifo = 1;
             } else
-                BRDC_printf(_BRDC("Samples of channel = %lld\n"), g_memorySamplesOfChannel);
+                BRDC_printf(_BRDC("<SRV> SetParamSrv: Samples of channel = %lld\n"), p.g_memorySamplesOfChannel);
 
         } else {
             // освободить службу SDRAM (она могла быть захвачена командой BRDctrl_SDRAM_GETCFG, если та отработала без ошибки)
             ULONG mem_size = 0;
             status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_SETMEMSIZE, &mem_size);
-            if (g_MemOn) {
-                BRDC_printf(_BRDC("No SDRAM on board!!!\n"));
-                g_MemOn = 0;
+            if (p.g_MemOn) {
+                BRDC_printf(_BRDC("<SRV> SetParamSrv: No SDRAM on board!!!\n"));
+                p.g_MemOn = 0;
             }
 
             // установка узла ЦОС в режим получения данных от ПЛИС ЦОС
@@ -385,42 +395,46 @@ S32 SetParamSrv(int lid, BRD_ServList* srv, int idx)
 }
 
 // получить параметры, актуальные в режиме претриггера при вводе через FIFO
-S32 GetPretrigData(BRD_Handle hADC)
+S32 GetPretrigData(int lid)
 {
     S32 status;
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
     // получить момент срабатывания на событие старта в режиме претриггера
     ULONG start_event;
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETPRETRIGEVENT, &start_event);
-    g_bStartEvent = start_event << 2; // запомнить в байтах
+    p.g_bStartEvent = start_event << 2; // запомнить в байтах
     // уточнить момент срабатывания
     ULONG prec_event;
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETPREVENTPREC, &prec_event);
     ULONG bPrecEvent = prec_event << 1; // запомнить в байтах
-    g_bStartEvent += bPrecEvent * g_numChan;
+    p.g_bStartEvent += bPrecEvent * p.g_numChan;
 
     return status;
 }
 
 // получить параметры, актуальные в режиме претриггера (пост-триггера) при вводе через SDRAM
-S32 GetPostrigData(BRD_Handle hADC)
+S32 GetPostrigData(int lid)
 {
     S32 status;
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
     // получить момент срабатывания на событие старта в режиме претриггера
     ULONG start_event;
     status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_GETPRETRIGEVENT, &start_event);
-    g_bStartEvent = start_event << 2; // запомнить в байтах
+    p.g_bStartEvent = start_event << 2; // запомнить в байтах
     // уточнить момент срабатывания
     ULONG prec_event;
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETPREVENTPREC, &prec_event);
     ULONG bPrecEvent = prec_event << 1; // запомнить в байтах
-    g_bStartEvent += bPrecEvent * g_numChan;
+    p.g_bStartEvent += bPrecEvent * p.g_numChan;
 
     // выяснить был ли переход через конец активной зоны
-    status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ISPASSMEMEND, &g_isPassMemEnd);
+    status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ISPASSMEMEND, &p.g_isPassMemEnd);
     // получить реальное число собранных данных
     ULONG acq_size;
     status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_GETACQSIZE, &acq_size);
-    g_bRealSize = acq_size << 2; // запомнить в байтах
+    p.g_bRealSize = acq_size << 2; // запомнить в байтах
 
     return status;
 }
@@ -430,34 +444,41 @@ S32 GetAdcData(int lid, unsigned long long bBufSize, unsigned long long bMemBufS
     S32 status;
     int idx = lid;
 
-    printf("<DEBUG:GetAdcData> lid#%d is %s hdl= %X\n", lid, DevicesLid[lid].device.isOpen() ? "open" : "close",
+    printf("<DBG>  GetAdcData: ADC-%d is %s (hdl= %X)\n", lid, DevicesLid[lid].device.isOpen() ? "open" : "close",
         DevicesLid[lid].device.handle());
 
-    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    if (!DevicesLid[lid].adc.isCaptured()) {
+        printf("<ERR> GetAdcData: service ADC-%d d'not captured", lid);
+        return -1;
+    }
 
-    printf("<DEBUG:GetAdcData> serv(%s) is %s hdl=%X\n", DevicesLid[lid].adc.name().c_str(),
-        DevicesLid[lid].adc.isOpen() ? "capture" : "none",
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+
+    printf("<DBG>  GetAdcData: service>%s< is %s (hdl=%X)\n", DevicesLid[lid].adc.name().c_str(),
+        DevicesLid[lid].adc.isCaptured() ? "capture" : "not capture",
         hADC);
 
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_PREPARESTART, NULL);
     if (status < 0)
         if (!(BRD_errcmp(status, BRDerr_CMD_UNSUPPORTED)
                 || BRD_errcmp(status, BRDerr_INSUFFICIENT_SERVICES))) {
-            BRDC_printf(_BRDC("<ERR> GetAdcData: Prepare Start Error = 0x%X!!!\n"), status);
+            BRDC_printf(_BRDC("<ERR> GetAdcData: Prepare Start Error = 0x%X !\n"), status);
             return status;
         }
 
-    // RegProg(hADC, 0, g_AdcSrvNum);
+    // RegProg(hADC, 0, p.g_AdcSrvNum);
+    RegProg(hADC, 0, p.g_AdcSrvNum);
 
-    g_bBlkNum = 1;
+    p.g_bBlkNum = 1;
     // PVOID pSig = NULL;
     PVOID* pSig = NULL; // указатель на массив указателей на блоки памяти с сигналом
     PVOID pSigNonDMA = NULL; // указатель на память с сигналом при программном (не ПДП) вводе
-    if (g_DmaOn) {
-        if (!g_Cycle)
-            BRDC_printf(_BRDC("AllocDaqBuf (memory type = %d)\n"), g_IsSysMem);
-        // status = AllocDaqBuf(hADC, &pSig, &bBufSize, g_IsSysMem);
-        status = AllocDaqBuf(hADC, pSig, &bBufSize, g_IsSysMem, &g_bBlkNum);
+    if (p.g_DmaOn) {
+        if (!p.g_Cycle)
+            BRDC_printf(_BRDC("AllocDaqBuf (memory type = %d)\n"), p.g_IsSysMem);
+        // status = AllocDaqBuf(hADC, &pSig, &bBufSize, p.g_IsSysMem);
+        status = AllocDaqBuf(lid, pSig, &bBufSize, p.g_IsSysMem, &p.g_bBlkNum);
         if (!BRD_errcmp(status, BRDerr_OK)) {
             printf("<ERR> AllocDaqBuf: status=%X\n ", status);
             return status;
@@ -481,7 +502,7 @@ S32 GetAdcData(int lid, unsigned long long bBufSize, unsigned long long bMemBufS
             if (format == 0x80) // упакованные 12-разрядные данные
                 sample_size = 2;
             // ULONG daq_sample_num = bBufSize / g_numChan / sample_size;
-            ULONG fifo_sample_num = adc_cfg.FifoSize / g_numChan / sample_size;
+            ULONG fifo_sample_num = adc_cfg.FifoSize / p.g_numChan / sample_size;
             BRDC_printf(_BRDC("Real acquisition data = %d samples per channel (It's FIFO size)\n"), fifo_sample_num);
         }
     }
@@ -489,43 +510,43 @@ S32 GetAdcData(int lid, unsigned long long bBufSize, unsigned long long bMemBufS
     // BRDC_printf(_BRDC("Press any key for continue\n"));
     // IPC_getch();
 
-    if (g_IsWriteFile || g_fileMap)
-        WriteFlagSinc(0, 0, idx);
+    if (p.g_IsWriteFile || p.g_fileMap)
+        WriteFlagSinc(0, 0, lid);
     int newParam_fl = 0xffffffff;
-    if (!g_Cycle) { // однократный сбор данных
-        if (!g_DmaOn) { // программная передача данных
-            if (g_MemOn) { // сбор в память и программная передача данных
+    if (!p.g_Cycle) { // однократный сбор данных
+        if (!p.g_DmaOn) { // программная передача данных
+            if (p.g_MemOn) { // сбор в память и программная передача данных
                 // status = DaqIntoSdram(hADC, pSig, bBufSize, numChan); // выполнить сбор данных
                 status = DaqIntoSdram(hADC); // выполнить сбор данных в память
-                status = DataFromMemWriteFile(hADC, pSig, bBufSize, bMemBufSize, g_DmaOn); // передать данные из памяти в ОЗУ ПК, а затем в файл
+                status = DataFromMemWriteFile(lid, pSig, bBufSize, bMemBufSize, p.g_DmaOn); // передать данные из памяти в ОЗУ ПК, а затем в файл
             } else { // сбор в FIFO и программная передача данных
-                status = DaqIntoFifo(hADC, pSigNonDMA, (ULONG)bBufSize, DspMode); // выполнить сбор данных
-                WriteDataFile(hADC, idx, pSig, bBufSize);
+                status = DaqIntoFifo(lid, pSigNonDMA, (ULONG)bBufSize, DspMode); // выполнить сбор данных
+                WriteDataFile(lid, pSig, bBufSize);
             }
-            //				WriteDataFile(hADC, idx, pSig, bBufSize);
+            //				WriteDataFile(lid, pSig, bBufSize);
         } else { // ПДП-передача данных
-            if (g_MemOn) { // сбор в память и ПДП-передача данных
+            if (p.g_MemOn) { // сбор в память и ПДП-передача данных
                 BRDC_printf(_BRDC("DAQ into SDRAM\n"));
-                status = DaqIntoSdramDMA(hADC); // выполнить сбор данных
+                status = DaqIntoSdramDMA(lid); // выполнить сбор данных
                 if (status != -1)
-                    status = DataFromMemWriteFile(hADC, pSig, bBufSize, bMemBufSize, g_DmaOn); // передать данные из памяти в ОЗУ ПК, а затем в файл
+                    status = DataFromMemWriteFile(lid, pSig, bBufSize, bMemBufSize, p.g_DmaOn); // передать данные из памяти в ОЗУ ПК, а затем в файл
             } else { // сбор в FIFO и ПДП-передача данных
                 BRDC_printf(_BRDC("DAQ into FIFO\n"));
-                status = DaqIntoFifoDMA(hADC); // выполнить сбор данных
-                WriteDataFile(hADC, idx, pSig, bBufSize);
+                status = DaqIntoFifoDMA(lid); // выполнить сбор данных
+                WriteDataFile(lid, pSig, bBufSize);
             }
         }
 
-        if (g_IsWriteFile || g_fileMap) {
-            int rd_fl = ReadFlagSinc(0);
+        if (p.g_IsWriteFile || p.g_fileMap) {
+            int rd_fl = ReadFlagSinc(lid);
             if (rd_fl == 1)
-                WriteFlagSinc(1, newParam_fl, idx);
+                WriteFlagSinc(1, newParam_fl, lid);
             else
-                WriteFlagSinc(0xffffffff, newParam_fl, idx);
+                WriteFlagSinc(0xffffffff, newParam_fl, lid);
         }
 
     } else { // циклический (многократный) сбор данных
-        // if(g_IsWriteFile || g_fileMap)
+        // if(p.g_IsWriteFile || p.g_fileMap)
         //	WriteFlagSinc(0, 0, 0);
         //				WriteFlagSinc(0, 0, idx);
         BRDC_printf(_BRDC("\n\n"));
@@ -550,80 +571,71 @@ S32 GetAdcData(int lid, unsigned long long bBufSize, unsigned long long bMemBufS
             else
                 BRDC_printf(_BRDC("Send Loop: [%08d] %s\r"), loop, lin);
 
-            if (DevicesLid[lid].adcCtrlThr.stop.load())
-                loop = -1;
-
-            if (!g_DmaOn) { // программная передача данных
-                if (g_MemOn) { // сбор в память и программная передача данных
+            if (!p.g_DmaOn) { // программная передача данных
+                if (p.g_MemOn) { // сбор в память и программная передача данных
                     // status = DaqIntoSdram(hADC, pSig, bBufSize, numChan); // выполнить сбор данных
                     status = DaqIntoSdram(hADC); // выполнить сбор данных в память
-                    status = DataFromMemWriteFile(hADC, pSig, bBufSize, bMemBufSize, g_DmaOn); // передать данные из памяти в ОЗУ ПК, а затем в файл
+                    status = DataFromMemWriteFile(lid, pSig, bBufSize, bMemBufSize, p.g_DmaOn); // передать данные из памяти в ОЗУ ПК, а затем в файл
                 } else { // сбор в FIFO и программная передача данных
-                    status = DaqIntoFifo(hADC, pSigNonDMA, (ULONG)bBufSize, DspMode); // выполнить сбор данных
-                    WriteDataFile(hADC, idx, pSig, bBufSize);
+                    status = DaqIntoFifo(lid, pSigNonDMA, (ULONG)bBufSize, DspMode); // выполнить сбор данных
+                    WriteDataFile(lid, pSig, bBufSize);
                 }
-                //					WriteDataFile(hADC, idx, pSig, bBufSize);
+                //					WriteDataFile(lid, pSig, bBufSize);
             } else { // сбор в память и ПДП-передача данных
-                if (g_MemOn) { // сбор в память и ПДП-передача данных
+                if (p.g_MemOn) { // сбор в память и ПДП-передача данных
 #if defined(__IPC_LINUX__)
-                    status = DaqIntoSdramDMA(hADC); // выполнить сбор данных в память без использования прерывания по окончанию сбора
+                    status = DaqIntoSdramDMA(lid); // выполнить сбор данных в память без использования прерывания по окончанию сбора
 #else
-                    if (g_info.busType == BRDbus_USB)
-                        status = DaqIntoSdramDMA(hADC); // если устройство на шине USB, то выполнить сбор данных в память без использования прерывания по окончанию сбора
+                    if (p.g_info.busType == BRDbus_USB)
+                        status = DaqIntoSdramDMA(lid); // если устройство на шине USB, то выполнить сбор данных в память без использования прерывания по окончанию сбора
                     else {
                         status = StartDaqIntoSdramDMA(hADC, idx); // стартует сбор данных в память с использованием прерывания по окончанию сбора
-                        while (!CheckDaqIntoSdramDMA()) // проверяет завершение сбора данных
+                        while (!CheckDaqIntoSdramDMA(lid)) // проверяет завершение сбора данных
                         {
-                            if (_kbhit()) // проверяет была ли нажата клавиша
-                            {
-                                int ch = _getch(); // получает клавишу
-                                if (0x1B == ch) // если Esc
-                                    loop = -1;
-                            }
-                            if (DevicesLid[lid].adcCtrlThr.stop.load())
+                            if (DevicesLid[lid].adcCtrlThr.stop.load()) {
+                                BreakDaqIntoSdramDMA(lid); // // прерывает сбор данных
                                 loop = -1;
-                            if (loop == -1)
-                                BreakDaqIntoSdramDMA(); // // прерывает сбор данных
+                            }
                         }
-                        status = EndDaqIntoSdramDMA(); // закрывает открытые описатели (Handles)
+                        status = EndDaqIntoSdramDMA(lid); // закрывает открытые описатели (Handles)
                     }
 #endif
                     // if(!BRD_errcmp(status, BRDerr_OK))
                     //	loop = -1;
                     // if(loop != -1)
                     if (loop != -1 && BRD_errcmp(status, BRDerr_OK))
-                        status = DataFromMemWriteFile(hADC, pSig, bBufSize, bMemBufSize, g_DmaOn); // передать данные из памяти в ОЗУ ПК, а затем в файл
+                        status = DataFromMemWriteFile(lid, pSig, bBufSize, bMemBufSize, p.g_DmaOn); // передать данные из памяти в ОЗУ ПК, а затем в файл
                 } else { // сбор в FIFO и ПДП-передача данных
-                    status = DaqIntoFifoDMA(hADC); // выполнить сбор данных
+                    status = DaqIntoFifoDMA(lid); // выполнить сбор данных
                     if (loop != -1)
-                        WriteDataFile(hADC, idx, pSig, bBufSize);
+                        WriteDataFile(lid, pSig, bBufSize);
                 }
-                // WriteDataFile(hADC, idx, g_buf_dscr.ppBlk[0], bBufSize);
+                // WriteDataFile(lid, p.g_buf_dscr.ppBlk[0], bBufSize);
                 // WriteDataFile0(idx, buf_dscr.ppBlk[0], bBufSize);
             }
-            if (g_Pause) {
+            if (p.g_Pause) {
                 BRDC_printf(_BRDC("\nPress any key for next start...\n"));
                 IPC_getch();
             }
             if (loop == -1)
                 break;
-            if (g_IsWriteFile || g_fileMap) {
-                int rd_fl = ReadFlagSinc(0);
+            if (p.g_IsWriteFile || p.g_fileMap) {
+                int rd_fl = ReadFlagSinc(lid);
                 // BRDC_printf(_BRDC("rd_fl = %d\n"), rd_fl);
                 if (rd_fl == 1)
-                    WriteFlagSinc(1, newParam_fl, idx);
+                    WriteFlagSinc(1, newParam_fl, lid);
                 else {
-                    if (g_Cycle <= 1)
-                        WriteFlagSinc(0xffffffff, newParam_fl, idx);
-                    if (g_Cycle > 1 && g_times == g_Cycle)
-                        WriteFlagSinc(0xffffffff, 0xffffffff, idx);
+                    if (p.g_Cycle <= 1)
+                        WriteFlagSinc(0xffffffff, newParam_fl, lid);
+                    if (p.g_Cycle > 1 && p.g_times == p.g_Cycle)
+                        WriteFlagSinc(0xffffffff, 0xffffffff, lid);
                 }
-                // WriteFlagSinc(0xffffffff, newParam_fl, idx);
+                // WriteFlagSinc(0xffffffff, newParam_fl, lid);
                 loop++;
                 int rd_idx = 0;
                 newParam_fl = 0;
                 do {
-                    rd_fl = ReadFlagSinc(idx);
+                    rd_fl = ReadFlagSinc(lid);
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
                     if (IPC_kbhit()) {
                         int ch = IPC_getch();
@@ -634,13 +646,14 @@ S32 GetAdcData(int lid, unsigned long long bBufSize, unsigned long long bMemBufS
                         if (0x1B == ch) // Esc
                             loop = 0;
                         if (0x20 == ch) { // Space
-                            status = AdcSettings(hADC, idx, g_AdcSrvNum, g_SrvName, g_iniFileNameAdc); // установить параметры АЦП
+                            // my//status = AdcSettings(hADC, idx, p.g_AdcSrvNum, p.g_SrvName, p.g_iniFileNameAdc); // установить параметры АЦП
+                            status = AdcSettings(hADC, lid, p.g_AdcSrvNum, p.g_SrvName, p.g_iniFileNameAdc); // установить параметры АЦП
                             status = BRD_ctrl(hADC, 0, BRDctrl_ADC_PREPARESTART, NULL);
                             newParam_fl = 0xffffffff;
                         }
                     }
 #if defined(__IPC_LINUX__)
-                    if ((rd_fl == 0) || g_StopFlag)
+                    if ((rd_fl == 0) || p.g_StopFlag)
 #else
                     if (rd_fl == 0)
 #endif
@@ -668,16 +681,16 @@ S32 GetAdcData(int lid, unsigned long long bBufSize, unsigned long long bMemBufS
 #endif
                         loop = 0;
             }
-            if (g_Cycle > 1 && (ULONG)loop == g_Cycle)
+            if (p.g_Cycle > 1 && (ULONG)loop == p.g_Cycle)
                 break;
 #if defined(__IPC_LINUX__)
-            if (g_StopFlag)
+            if (p.g_StopFlag)
                 break;
 #endif
         } while (loop);
     }
-    if (g_DmaOn)
-        status = FreeDaqBuf(hADC, g_bBlkNum);
+    if (p.g_DmaOn)
+        status = FreeDaqBuf(hADC, p.g_bBlkNum);
     else
         delete (char*)pSigNonDMA;
 
@@ -685,26 +698,34 @@ S32 GetAdcData(int lid, unsigned long long bBufSize, unsigned long long bMemBufS
 }
 
 // S32	DataFromMemWriteFile(BRD_Handle hADC, PVOID pBuf, unsigned long long bBufSize, unsigned long long bMemBufSize, ULONG DmaOn)
-S32 DataFromMemWriteFile(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBufSize, unsigned long long bMemBufSize, ULONG DmaOn)
+S32 DataFromMemWriteFile(int lid /*BRD_Handle hADC*/, PVOID* pBuf, unsigned long long bBufSize, unsigned long long bMemBufSize, ULONG DmaOn)
 {
+    if (!DevicesLid[lid].adc.isCaptured()) {
+        printf("<ERR> DataFromMemWriteFile: service ADC-%d d'not captured", lid);
+        return -1;
+    }
+
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+
 #ifdef __linux__
-    if (g_fileMap)
+    if (p.g_fileMap)
         return MapDataFromMemWriteData(hADC, pBuf, bBufSize, bMemBufSize, DmaOn);
 #endif
 
     S32 status = BRDerr_OK;
-    if (!g_IsWriteFile)
+    if (!p.g_IsWriteFile)
         return 1;
-    if (!g_Cycle)
-        BRDC_printf(_BRDC("<SRV> Writing file...\n"));
+    if (!p.g_Cycle)
+        BRDC_printf(_BRDC("<SRV> Reading file...\n"));
 
-    if (g_PretrigMode == 3) {
+    if (p.g_PretrigMode == 3) {
         // получить параметры, актуальные в режиме претриггера
-        status = GetPostrigData(hADC);
+        status = GetPostrigData(lid);
     }
 
     BRDCHAR fileName[64];
-    BRDC_sprintf(fileName, _BRDC("data_%d.bin"), 0);
+    BRDC_sprintf(fileName, _BRDC("data_%d.bin"), lid);
 
     IPC_handle hfile = IPC_openFile(fileName, IPC_CREATE_FILE | IPC_FILE_WRONLY);
     if (!hfile) {
@@ -726,56 +747,63 @@ S32 DataFromMemWriteFile(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBufSi
         bResult = IPC_writeFile(hfile, *pBuf, ostSize);
     }
 
-    if (g_IsWriteFile == 1)
+    if (p.g_IsWriteFile == 1)
         WriteIsviParams(hfile, hADC, bMemBufSize);
 
     IPC_closeFile(hfile);
     if (bResult < 0)
         BRDC_printf(_BRDC("<ERR> Write file %s error.\n"), fileName);
-    else if (!g_Cycle)
+    else if (!p.g_Cycle)
         BRDC_printf(_BRDC("<SRV> Write file %s is OK.\n"), fileName);
     return status;
 }
 
-void WriteDataFile(BRD_Handle hADC, int idx, PVOID* pBuf, unsigned long long nNumberOfBytes)
+void WriteDataFile(int lid, PVOID* pBuf, unsigned long long nNumberOfBytes)
 {
     S32 status = BRDerr_OK;
+    if (!DevicesLid[lid].adc.isCaptured()) {
+        printf("<ERR> WriteDataFile: service ADC-%d d'not captured", lid);
+        return;
+    }
+
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
 
 #ifdef __linux__
-    if (g_fileMap) {
+    if (p.g_fileMap) {
         MapWriteData(pBuf, nNumberOfBytes);
         return;
     }
 #endif
 
-    if (!g_IsWriteFile)
+    if (!p.g_IsWriteFile)
         return;
-    if (!g_Cycle)
+    if (!p.g_Cycle)
         BRDC_printf(_BRDC("<SRV> Writing file...\n"));
 
-    if (g_PretrigMode) { // получить параметры, актуальные в режиме претриггера
-        status = GetPretrigData(hADC);
+    if (p.g_PretrigMode) { // получить параметры, актуальные в режиме претриггера
+        status = GetPretrigData(lid);
     }
 
     BRDCHAR fileName[64];
-    BRDC_sprintf(fileName, _BRDC("data_%d.bin"), idx);
+    BRDC_sprintf(fileName, _BRDC("data_%d.bin"), lid);
     IPC_handle hfile = 0;
-    if (g_Cycle > 1 && g_times) {
+    if (p.g_Cycle > 1 && p.g_times) {
         hfile = IPC_openFile(fileName, IPC_OPEN_FILE | IPC_FILE_WRONLY);
         IPC_setPosFile(hfile, 0, IPC_FILE_END);
     } else {
         hfile = IPC_openFile(fileName, IPC_CREATE_FILE | IPC_FILE_WRONLY);
     }
-    g_times++;
+    p.g_times++;
     if (!hfile) {
         BRDC_printf(_BRDC("Create file %s error.\n"), fileName);
         return;
     }
 
     int bResult;
-    DWORD blockSize = DWORD(nNumberOfBytes / g_bBlkNum);
-    for (ULONG i = 0; i < g_bBlkNum; i++) {
-        if (BRDC_stricmp(g_SrvName, _BRDC("FFT")) == 0) {
+    DWORD blockSize = DWORD(nNumberOfBytes / p.g_bBlkNum);
+    for (ULONG i = 0; i < p.g_bBlkNum; i++) {
+        if (BRDC_stricmp(p.g_SrvName, _BRDC("FFT")) == 0) {
             // конвертируем, если собрали FFT
             auto buf_dbl = new double[blockSize]; // double для FFT
             auto buf_src = reinterpret_cast<int*>(pBuf[i]);
@@ -790,25 +818,26 @@ void WriteDataFile(BRD_Handle hADC, int idx, PVOID* pBuf, unsigned long long nNu
     }
     //	BOOL bResult = WriteFile(hfile, pBuf, nNumberOfBytes, &nNumberOfWriteBytes, NULL);
 
-    if (g_IsWriteFile == 1)
-        if ((g_Cycle > 1 && g_times == g_Cycle) || g_Cycle <= 1)
+    if (p.g_IsWriteFile == 1)
+        if ((p.g_Cycle > 1 && p.g_times == p.g_Cycle) || p.g_Cycle <= 1)
             WriteIsviParams(hfile, hADC, nNumberOfBytes);
 
     IPC_closeFile(hfile);
     if (bResult < 0)
         BRDC_printf(_BRDC("Write file %s error.\n"), fileName);
-    else if (!g_Cycle)
+    else if (!p.g_Cycle)
         BRDC_printf(_BRDC("Write file %s is OK.\n"), fileName);
 }
 
 void WriteIsviParamDirFile(int lid)
 {
+    printf("<DBG> WriteIsviParamDirFile: ADC-%d \n", lid);
+
     BRDCHAR fileName[MAX_PATH];
 
-    BRDC_strcpy(fileName, g_dirFileName);
-    strncat(fileName, "_", 1);
-    std::string ls = std::to_string(lid);
-    strncat(fileName, ls.c_str(), 2);
+    BRDC_strcpy(fileName, p.g_dirFileName);
+
+    printf("<DBG> WriteIsviParamDirFile: fileName>%s< \n", fileName);
 
     IPC_handle hfile = IPC_openFile(fileName, IPC_OPEN_FILE | IPC_FILE_RDWR);
     if (!hfile) {
@@ -820,26 +849,28 @@ void WriteIsviParamDirFile(int lid)
     if (BytesNum == -1)
         BRDC_printf(_BRDC("File %s is too big for ISVI parameters writing.\n"), fileName);
     else
-        WriteIsviParams(hfile, DevicesLid[lid].adc.handle(), BytesNum);
+        WriteIsviParams(hfile, lid, BytesNum);
     IPC_closeFile(hfile);
 }
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-void WriteIsviParams(IPC_handle hfile, BRD_Handle hADC, unsigned long long nNumberOfBytes)
+void WriteIsviParams(IPC_handle hfile, int lid, unsigned long long nNumberOfBytes)
 #else
-void WriteIsviParams(HANDLE hfile, BRD_Handle hADC, unsigned long long nNumberOfBytes)
+void WriteIsviParams(HANDLE hfile, int lid, unsigned long long nNumberOfBytes)
 #endif
 {
     char fileInfo[200 * 1024]; // 200Кб
     char str_buf[10 * 1024]; // 10Кб
 
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
     // для служб FFT пишем специальные параметры
     // FFT_SIZE____________ 65536
     // NUMBER_OF_CHANNELS__ 2
     // NUMBERS_OF_CHANNELS_ 0,1
     // SAMPLING_RATE_______ 64000000
-    // BRDC_printf(_BRDC("NAME: %s\n"), g_SrvName);
-    if (BRDC_stricmp(g_SrvName, _BRDC("FFT")) == 0) {
+    // BRDC_printf(_BRDC("NAME: %s\n"), p.g_SrvName);
+    if (BRDC_stricmp(p.g_SrvName, _BRDC("FFT")) == 0) {
         // str_buf[0] = 0;
         // BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCHANORDER, &fft_size);
         auto fft_size = 65536;
@@ -849,7 +880,7 @@ void WriteIsviParams(HANDLE hfile, BRD_Handle hADC, unsigned long long nNumberOf
         lstrcatA(fileInfo, str_buf);
         sprintf(str_buf, "\r\nNUMBERS_OF_CHANNELS_ 0,1");
         lstrcatA(fileInfo, str_buf);
-        sprintf(str_buf, "\r\nSAMPLING_RATE_______ %f\r\n", g_samplRate);
+        sprintf(str_buf, "\r\nSAMPLING_RATE_______ %f\r\n", p.g_samplRate);
         lstrcatA(fileInfo, str_buf);
 
         int len = lstrlenA(fileInfo);
@@ -868,15 +899,15 @@ void WriteIsviParams(HANDLE hfile, BRD_Handle hADC, unsigned long long nNumberOf
     sprintf(fileInfo, "\r\nDEVICE_NAME_________ ");
 #ifdef _WIN64
     char srvName[32];
-    wcstombs(srvName, g_AdcSrvName, 32);
+    wcstombs(srvName, p.g_AdcSrvName, 32);
     lstrcatA(fileInfo, srvName);
 #else
-    lstrcatA(fileInfo, g_AdcSrvName);
+    lstrcatA(fileInfo, p.g_AdcSrvName);
 #endif
 
     BRD_AdcCfg adc_cfg;
     BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCFG, &adc_cfg);
-    // BRD_ctrl(hADC, 0, BRDctrl_ADC_GETRATE, &g_samplRate);
+    // BRD_ctrl(hADC, 0, BRDctrl_ADC_GETRATE, &p.g_samplRate);
     ULONG chanMask;
     BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCHANMASK, &chanMask);
     ULONG format = 0;
@@ -918,7 +949,7 @@ void WriteIsviParams(HANDLE hfile, BRD_Handle hADC, unsigned long long nNumberOf
         mask <<= 1;
     }
 
-    if (BRDC_strstr(g_AdcSrvName, _BRDC("ADC1624X192")) || BRDC_strstr(g_AdcSrvName, _BRDC("ADC1624X128"))) {
+    if (BRDC_strstr(p.g_AdcSrvName, _BRDC("ADC1624X192")) || BRDC_strstr(p.g_AdcSrvName, _BRDC("ADC1624X128"))) {
         int i = 0, j = 0;
         num_chan = 0;
         for (int i = 0; i < 16; i++)
@@ -960,12 +991,12 @@ void WriteIsviParams(HANDLE hfile, BRD_Handle hADC, unsigned long long nNumberOf
     if (format == 0x80) // упакованные 12-разрядные данные
         sample_size = 2;
     unsigned long long samples = nNumberOfBytes / sample_size / num_chan;
-    if (g_Cycle > 1)
-        samples *= g_Cycle;
+    if (p.g_Cycle > 1)
+        samples *= p.g_Cycle;
     sprintf(str_buf, "\r\nNUMBER_OF_SAMPLES___ %lld", samples);
     lstrcatA(fileInfo, str_buf);
 
-    sprintf(str_buf, "\r\nSAMPLING_RATE_______ %f", g_samplRate);
+    sprintf(str_buf, "\r\nSAMPLING_RATE_______ %f", p.g_samplRate);
     lstrcatA(fileInfo, str_buf);
 
     sprintf(str_buf, "\r\nBYTES_PER_SAMPLES___ %lu", sample_size);
@@ -1024,7 +1055,7 @@ void WriteIsviParams(HANDLE hfile, BRD_Handle hADC, unsigned long long nNumberOf
     lstrcatA(fileInfo, str_buf);
 
     // int BitsPerSample = (format == 1) ? 8 : adc_cfg.Bits;
-    // if(BRDC_strstr(g_AdcSrvName, _BRDC("ADC1624X192")) || BRDC_strstr(g_AdcSrvName, _BRDC("ADC818X800")))
+    // if(BRDC_strstr(p.g_AdcSrvName, _BRDC("ADC1624X192")) || BRDC_strstr(p.g_AdcSrvName, _BRDC("ADC818X800")))
     //	if(format == 0 || format == 2)
     //		BitsPerSample = 16;
     int BitsPerSample = adc_cfg.Bits;
@@ -1038,8 +1069,8 @@ void WriteIsviParams(HANDLE hfile, BRD_Handle hADC, unsigned long long nNumberOf
     lstrcatA(fileInfo, str_buf);
     lstrcatA(fileInfo, "\r\n");
 
-    if (g_PretrigMode) {
-        ULONG event_mark = ULONG(g_bStartEvent / sample_size / num_chan);
+    if (p.g_PretrigMode) {
+        ULONG event_mark = ULONG(p.g_bStartEvent / sample_size / num_chan);
         sprintf(str_buf, "\r\nPRETRIGGER_SAMPLE___ %lu", event_mark);
         lstrcatA(fileInfo, str_buf);
     }
@@ -1058,13 +1089,15 @@ void WriteIsviParams(HANDLE hfile, BRD_Handle hADC, unsigned long long nNumberOf
 }
 
 //********************************************************
-void WriteFlagSinc(int flg, int isNewParam, int idx)
+void WriteFlagSinc(int flg, int isNewParam, int lid)
 {
-    if (g_fileMap)
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+
+    if (p.g_fileMap)
         MapWrFlagSinc(flg, isNewParam);
     else {
         BRDCHAR fileName[64];
-        BRDC_sprintf(fileName, _BRDC("data_%d.flg"), idx);
+        BRDC_sprintf(fileName, _BRDC("data_%d.flg"), lid);
         int val[2];
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
         IPC_handle handle = NULL;
@@ -1088,14 +1121,15 @@ void WriteFlagSinc(int flg, int isNewParam, int idx)
 }
 
 //********************************************************
-int ReadFlagSinc(int idx)
+int ReadFlagSinc(int lid)
 {
     int flg;
-    if (g_fileMap)
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    if (p.g_fileMap)
         flg = MapRdFlagSinc();
     else {
         BRDCHAR fileName[64];
-        BRDC_sprintf(fileName, _BRDC("data_%d.flg"), idx);
+        BRDC_sprintf(fileName, _BRDC("data_%d.flg"), lid);
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
         IPC_handle handle = NULL;
         while (!handle)
@@ -1120,11 +1154,12 @@ S32 RegRwSpd(BRD_Handle hDev, BRDCHAR* fname);
 S32 RegProg(BRD_Handle hAdc, int idx, int isx)
 {
     S32 status = BRDerr_OK;
+    ParamsAdc& p = DevicesLid[idx].paramsAdc;
     BRDCHAR iniFilePath[MAX_PATH];
     BRDCHAR iniSectionName[MAX_PATH];
     IPC_getCurrentDir(iniFilePath, sizeof(iniFilePath) / sizeof(BRDCHAR));
-    BRDC_strcat(iniFilePath, g_iniFileNameAdc);
-    BRDC_sprintf(iniSectionName, _BRDC("device%d_%s%d"), idx, g_SrvName, (g_subNo < 0) ? isx : 0);
+    BRDC_strcat(iniFilePath, p.g_iniFileNameAdc);
+    BRDC_sprintf(iniSectionName, _BRDC("device%d_%s%d"), idx, p.g_SrvName, (p.g_subNo < 0) ? isx : 0);
 
     BRDCHAR regfname[128];
     // GetInifileString(iniFilePath, iniSectionName, _BRDC("RegFileName"), _BRDC("spd_dev.ini"), regfname, sizeof(regfname));
@@ -1148,28 +1183,81 @@ void printLids(void)
     lidList.pLID = new U32[MAX_DEV];
     auto status = BRD_lidList(lidList.pLID, lidList.item, &lidList.itemReal);
 
-    g_info.size = sizeof(g_info);
+    BRD_Info info_.size = sizeof(info_);
     // BRD_Handle handle[MAX_DEV];
     int iDev = 0;
     // ULONG iDev = 0;
 
     // отображаем информацию об всех устройствах, указанных в ini-файле
     for (iDev = 0; iDev < lidList.itemReal; iDev++) {
-        BRD_getInfo(lidList.pLID[iDev], &g_info); // получить информацию об устройстве
-        if (g_info.busType == BRDbus_ETHERNET)
+        BRD_getInfo(lidList.pLID[iDev], &info_); // получить информацию об устройстве
+        if (info_.busType == BRDbus_ETHERNET)
             BRDC_printf(_BRDC("%s, DevID = 0x%x, RevID = 0x%x, IP %u.%u.%u.%u, Port %u, PID = %d.\n"),
-                g_info.name, g_info.boardType >> 16, g_info.boardType & 0xff,
-                (UCHAR)g_info.bus, (UCHAR)(g_info.bus >> 8), (UCHAR)(g_info.bus >> 16), (UCHAR)(g_info.bus >> 24),
-                g_info.dev, g_info.pid);
+                info_.name, info_.boardType >> 16, info_.boardType & 0xff,
+                (UCHAR)info_.bus, (UCHAR)(info_.bus >> 8), (UCHAR)(info_.bus >> 16), (UCHAR)(info_.bus >> 24),
+                info_.dev, info_.pid);
         else {
-            ULONG dev_id = g_info.boardType >> 16;
+            ULONG dev_id = info_.boardType >> 16;
             if (dev_id == 0x53B1 || dev_id == 0x53B3) // FMC115cP or FMC117cP
                 BRDC_printf(_BRDC("%s, DevID = 0x%x, RevID = 0x%x, Bus = %d, Dev = %d, G.adr = %d, Order = %d, PID = %d.\n"),
-                    g_info.name, g_info.boardType >> 16, g_info.boardType & 0xff, g_info.bus, g_info.dev,
-                    g_info.slot & 0xffff, g_info.pid >> 28, g_info.pid & 0xfffffff);
+                    info_.name, info_.boardType >> 16, info_.boardType & 0xff, info_.bus, info_.dev,
+                    info_.slot & 0xffff, info_.pid >> 28, info_.pid & 0xfffffff);
             else
                 BRDC_printf(_BRDC("%s, DevID = 0x%x, RevID = 0x%x, Bus = %d, Dev = %d, Slot = %d, PID = %d.\n"),
-                    g_info.name, g_info.boardType >> 16, g_info.boardType & 0xff, g_info.bus, g_info.dev, g_info.slot, g_info.pid);
+                    info_.name, info_.boardType >> 16, info_.boardType & 0xff, info_.bus, info_.dev, info_.slot, info_.pid);
+        }
+    }
+}
+
+void puListLoad(int lid)
+{
+    if (!DevicesLid[lid].device.isOpen()) {
+        BRDC_printf(_BRDC("<ERR> puListLoad: lid #%d not opened!\n"), lid);
+        return;
+    }
+    BRD_PuList PuList[MAX_PU];
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    U32 ItemReal;
+    BRD_Handle hdev = DevicesLid[lid].device.handle();
+    auto status = BRD_puList(hdev, PuList, MAX_PU, &ItemReal); // получить список программируемых устройств
+    if (ItemReal <= MAX_PU) {
+        for (U32 j = 0; j < ItemReal; j++) {
+            if (PuList[j].puCode == PLD_CFG_TAG) { // Тип программируемого устройства - ПЛИС
+                U32 PldState;
+                status = BRD_puState(hdev, PuList[j].puId, &PldState); // получить состояние ПЛИС
+                BRDC_printf(_BRDC("PU%d: %s, Id = %d, Code = %x, Attr = %x, PldState = %d\n"),
+                    j, PuList[j].puDescription, PuList[j].puId, PuList[j].puCode, PuList[j].puAttr, PldState);
+                if (PuList[j].puId == 0x100) {
+                    if (p.g_isPldLoadAlways || !PldState) { // загрузить ПЛИС ADM
+                        BRDC_printf(_BRDC("BRD_puLoad: loading...\r"));
+                        status = BRD_puLoad(hdev, PuList[j].puId, p.g_pldFileName, &PldState);
+                        if (BRD_errcmp(status, BRDerr_OK))
+                            BRDC_printf(_BRDC("BRD_puLoad: load is OK\n"));
+                        else if (BRD_errcmp(status, BRDerr_PLD_TEST_DATA_ERROR))
+                            BRDC_printf(_BRDC("BRD_puLoad: data error starting test\n"));
+                        else if (BRD_errcmp(status, BRDerr_PLD_TEST_ADDRESS_ERROR))
+                            BRDC_printf(_BRDC("BRD_puLoad: address error starting test\n"));
+                        else
+                            BRDC_printf(_BRDC("BRD_puLoad: error loading\n"));
+                    }
+                    if (PldState) { // если ПЛИС ADM загружена
+                        BRDextn_PLDINFO pld_info;
+                        pld_info.pldId = 0x100;
+                        status = BRD_extension(hdev, 0, BRDextn_GET_PLDINFO, &pld_info);
+                        if (BRD_errcmp(status, BRDerr_OK))
+                            BRDC_printf(_BRDC("ADM PLD: Version %d.%d, Modification %d, Build 0x%X\n"), pld_info.version >> 8, pld_info.version & 0xff, pld_info.modification, pld_info.build);
+                    }
+                } else { // загрузить ПЛИС ЦОС
+                         // status = BRD_puLoad(hdev, PuList[j].puId, _BRDC("fmc106p_exp_filter.bit"), &PldState);
+                         // status = BRD_puLoad(hdev, PuList[j].puId, _BRDC("fmc106p_dsp_base_lx240t.bit"), &PldState);
+                         // status = BRD_puLoad(hdev, PuList[j].puId, _BRDC("fmc106p_dsp_base_sx315t_full.bit"), &PldState);
+                         // status = BRD_puLoad(hdev, PuList[j].puId, _BRDC("ambpcd_v10_dsp_test1.mcs"), &PldState);
+                         // if(BRD_errcmp(status, BRDerr_OK))
+                         //	BRDC_printf(_BRDC("BRD_puLoad: load is OK\n"));
+                         // else
+                         //	BRDC_printf(_BRDC("BRD_puLoad: error loading\n"));
+                }
+            }
         }
     }
 }
@@ -1178,140 +1266,133 @@ bool checkPower(int lid)
 {
     bool retVal = false;
 
-    // if (!DevicesLid[lid].device.isOpen())
-    //     DevicesLid[lid].device.open(lid);
-    BRD_Handle handleDevice = DevicesLid[lid].device.handle();
-    if (handleDevice > 0) {
+    BRD_Handle hdev = DevicesLid[lid].device.handle();
+    if (hdev > 0) {
         // получаем состояние FMC-питания (если не FMC-модуль, то ошибка)
         BRDextn_FMCPOWER power;
         power.slot = 0;
-        S32 status = BRD_extension(handleDevice, 0, BRDextn_GET_FMCPOWER, &power);
+        S32 status = BRD_extension(hdev, 0, BRDextn_GET_FMCPOWER, &power);
         if (BRD_errcmp(status, BRDerr_OK)) {
             if (power.onOff) {
                 BRDC_printf(_BRDC("FMC Power: ON %.2f Volt\n"), power.value / 100.);
             } else {
                 BRDC_printf(_BRDC("FMC Power is turned off, enabling now...\n"));
                 power.onOff = 1;
-                status = BRD_extension(handleDevice, 0, BRDextn_SET_FMCPOWER, &power);
-                status = BRD_extension(handleDevice, 0, BRDextn_GET_FMCPOWER, &power);
+                status = BRD_extension(hdev, 0, BRDextn_SET_FMCPOWER, &power);
+                status = BRD_extension(hdev, 0, BRDextn_GET_FMCPOWER, &power);
                 if (power.onOff)
                     BRDC_printf(_BRDC("FMC Power: ON %.2f Volt\n"), power.value / 100.);
                 else
                     BRDC_printf(_BRDC("FMC Power: OFF %.2f Volt\n"), power.value / 100.);
             }
+            return true;
+        } else {
+            BRDC_printf(_BRDC("<ERR> ADC-%d - error of check power parameters\n"), lid);
+            return false;
         }
-        return true;
     }
+    BRDC_printf(_BRDC("<ERR> ADC-%d - bad handle device\n"), lid);
     return false;
 }
 
-bool captureService(int lid, int mode)
+bool captureServiceAndSetParams(int lid, int mode)
 {
-    bool retVal = false;
-
     if (!DevicesLid[lid].device.isOpen()) {
         printf("<ERR> device lid=%d d'nt opened!\n", lid);
         return false;
     }
     BRD_Handle handleDevice = DevicesLid[lid].device.handle();
-    // modeAdcServiceCapture = DevicesLid[lid].device.mode();
     DevicesLid[lid].adc.setMode(mode);
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
 
+    U32 ItemReal = 0;
     if (handleDevice > 0) {
-        U32 ItemReal = 0;
         BRD_ServList srvList[MAX_SRV];
         S32 status = BRD_serviceList(handleDevice, 0, srvList, MAX_SRV, &ItemReal);
         if (ItemReal <= MAX_SRV) {
             for (U32 j = 0; j < ItemReal; j++) {
-                BRDC_printf(_BRDC("Service %d: %s, Attr = %X.\n"),
+                BRDC_printf(_BRDC("Service %d: %s, Attr = 0x%X\n"),
                     j, srvList[j].name, srvList[j].attr);
             }
-            U32 iSrv;
-            for (iSrv = 0; iSrv < ItemReal; iSrv++) {
-                if (!BRDC_stricmp(srvList[iSrv].name, g_AdcSrvName)) {
-                    // adc_start_time = std::chrono::high_resolution_clock::now();
-                    //...............
-                    status = SetParamSrv(lid, &srvList[iSrv], ItemReal + iSrv);
-                    // ..............
-                    if (BRD_errcmp(status, BRDerr_OK))
-                        break;
-                }
-            }
-            if (iSrv == ItemReal) // нужную службу не нашли
-            {
-                BRDC_printf(_BRDC("Service %s is not found!!!\n"), g_AdcSrvName);
-                mode = BRDcapt_SPY; // это для того, чтобы обойти код сбора данных
-                DevicesLid[lid].adc.setMode(mode);
-                return false;
-            }
-        } else {
-            BRDC_printf(_BRDC("BRD_serviceList: Real Items = %d (> %d - ERROR!!!)\n"), ItemReal, MAX_SRV);
+            DevicesLid[lid].adc.capture(handleDevice, p.g_AdcSrvName, 10000);
+        }
+        if (!DevicesLid[lid].adc.isCaptured()) {
+            BRDC_printf(_BRDC("<ERR> service %s is not found!\n"), p.g_AdcSrvName);
+            mode = BRDcapt_SPY; // это для того, чтобы обойти код сбора данных
+            DevicesLid[lid].adc.setMode(mode);
             return false;
         }
+        SetParamSrv(lid);
+
     } else {
-        printf("<ERR> captureService: bad device habdle!\n");
+        BRDC_printf(_BRDC("<ERR> captureServiceAndSetParams: RealItems = %d (> %d)!\n"), ItemReal, MAX_SRV);
         return false;
     }
-    modeAdcServiceCapture = mode;
+
     return true;
 }
 
 void workFlow(int lid)
 {
-    printf("Start work ADC (LID%d) ..\n", lid);
-    // S32 md = modeAdcServiceCapture;
-    modeAdcServiceCapture = DevicesLid[lid].adc.mode();
-    if (modeAdcServiceCapture != BRDcapt_SPY) {
-        if (g_DirWriteFile) {
-            if (g_DirWriteFile == -1)
-                ContinueDaq(lid, g_FileBufSize, g_FileBlkNum);
-            else {
-                DirectFile(lid, g_IsSysMem, g_FileBufSize, g_DirWriteFile, g_FileBlkNum);
-                if (g_IsWriteFile == 1)
-                    WriteIsviParamDirFile(lid);
-            }
-        } else {
-            GetAdcData(lid, g_bBufSize, g_bMemBufSize);
+
+    U32 mode = DevicesLid[lid].adc.mode();
+    printf("<debug> Start work ADC-%d .. with mode = %d \n", lid, mode);
+    if (mode == BRDcapt_SPY)
+        return;
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+
+    if (p.g_DirWriteFile) {
+        if (p.g_DirWriteFile == -1)
+            ContinueDaq(lid, p.g_FileBufSize, p.g_FileBlkNum);
+        else {
+            DirectFile(lid, p.g_IsSysMem, p.g_FileBufSize, p.g_DirWriteFile, p.g_FileBlkNum);
+            if (p.g_IsWriteFile == 1)
+                WriteIsviParamDirFile(lid);
         }
+    } else {
+        GetAdcData(lid, p.g_bBufSize, p.g_bMemBufSize);
     }
 }
 
-void ListParametersAdc(void)
+void ListParametersAdc(int lid)
 {
-    printf("/n List ADC parameters : \n");
-    printf("g_AdcDrqFlag = %d\n", g_AdcDrqFlag);
-    printf("g_AdcSrvName =>%s<\n", g_AdcSrvName);
-    printf("g_AdcSrvNum = %d\n", g_AdcSrvNum);
-    printf("g_adjust_mode = %d\n", g_adjust_mode);
-    printf("g_bBufSize = %d\n", g_bBufSize);
-    printf("g_bMemBufSize = %lu\n", g_bMemBufSize);
-    printf("g_bPostTrigSize = %lld\n", g_bPostTrigSize);
-    printf("g_Cycle = %d\n", g_Cycle);
-    printf("g_dirFileName = %s\n", g_dirFileName);
-    printf("g_DirWriteFile = %d\n", g_DirWriteFile);
-    printf("g_DmaOn = %d\n", g_DmaOn);
-    printf("g_FileBlkNum = %d\n", g_FileBlkNum);
-    printf("g_FileBufSize = %d\n", g_FileBufSize);
-    printf("g_fileMap = %d\n", g_fileMap);
-    printf("g_iniFileNameAdc = >%s<\n", g_iniFileNameAdc);
-    printf("g_info.busType = %d (BRDbus_ETHERNET = %d)\n", g_info.busType, BRDbus_ETHERNET);
-    printf("g_IoDelay = %d\n", g_IoDelay);
-    printf("g_isPldLoadAlways = %d\n", g_isPldLoadAlways);
-    printf("g_IsSysMem = %d\n", g_IsSysMem);
-    printf("g_IsWriteFile = %d\n", g_IsWriteFile);
-    printf("g_memorySamplesOfChannel = %d\n", g_memorySamplesOfChannel);
-    printf("g_MemDrqFlag = %lu\n", g_MemDrqFlag);
-    printf("g_MemOn = %d\n", g_MemOn);
-    printf("g_MsTimeout = %lu\n", g_MsTimeout);
-    printf("g_OnlySetParams = %d\n", g_OnlySetParams);
-    printf("g_Pause = %d\n", g_Pause);
-    printf("g_pldFileName = %s\n", g_pldFileName);
-    printf("g_PretrigMode = %d\n", g_PretrigMode);
-    printf("g_quick_quit = %d\n", g_quick_quit);
-    printf("g_regdbg = %d\n", g_regdbg);
-    printf("g_samplesOfChannel = %d\n", g_samplesOfChannel);
-    printf("g_SrvName = >%s<\n", g_SrvName);
-    printf("g_SwitchOutMask = %lu\n", g_SwitchOutMask);
-    printf("g_transRate = %d\n", g_transRate);
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+
+    printf("/n List ADC-%d parameters : \n", lid);
+    printf("g_AdcDrqFlag = %d\n", p.g_AdcDrqFlag);
+    printf("g_AdcSrvName =>%s<\n", p.g_AdcSrvName);
+    printf("g_AdcSrvNum = %d\n", p.g_AdcSrvNum);
+    printf("g_adjust_mode = %d\n", p.g_adjust_mode);
+    printf("g_bBufSize = %d\n", p.g_bBufSize);
+    printf("g_bMemBufSize = %lu\n", p.g_bMemBufSize);
+    printf("g_bPostTrigSize = %lld\n", p.g_bPostTrigSize);
+    printf("g_Cycle = %d\n", p.g_Cycle);
+    printf("g_dirFileName = %s\n", p.g_dirFileName);
+    printf("g_DirWriteFile = %d\n", p.g_DirWriteFile);
+    printf("g_DmaOn = %d\n", p.g_DmaOn);
+    printf("g_FileBlkNum = %d\n", p.g_FileBlkNum);
+    printf("g_FileBufSize = %d\n", p.g_FileBufSize);
+    printf("g_fileMap = %d\n", p.g_fileMap);
+    printf("g_iniFileNameAdc = >%s<\n", p.g_iniFileNameAdc);
+    printf("g_info.busType = %d (BRDbus_ETHERNET = %d)\n", p.g_info.busType, BRDbus_ETHERNET);
+    printf("g_IoDelay = %d\n", p.g_IoDelay);
+    printf("g_isPldLoadAlways = %d\n", p.g_isPldLoadAlways);
+    printf("g_IsSysMem = %d\n", p.g_IsSysMem);
+    printf("g_IsWriteFile = %d\n", p.g_IsWriteFile);
+    printf("g_memorySamplesOfChannel = %d\n", p.g_memorySamplesOfChannel);
+    printf("g_MemDrqFlag = %lu\n", p.g_MemDrqFlag);
+    printf("g_MemOn = %d\n", p.g_MemOn);
+    printf("g_MsTimeout = %lu\n", p.g_MsTimeout);
+    printf("g_numChan = %d\n", p.g_numChan);
+    printf("g_OnlySetParams = %d\n", p.g_OnlySetParams);
+    printf("g_Pause = %d\n", p.g_Pause);
+    printf("g_pldFileName = %s\n", p.g_pldFileName);
+    printf("g_PretrigMode = %d\n", p.g_PretrigMode);
+    printf("g_quick_quit = %d\n", p.g_quick_quit);
+    printf("g_regdbg = %d\n", p.g_regdbg);
+    printf("g_samplesOfChannel = %d\n", p.g_samplesOfChannel);
+    printf("g_SrvName = >%s<\n", p.g_SrvName);
+    printf("g_SwitchOutMask = %lu\n", p.g_SwitchOutMask);
+    printf("g_transRate = %d\n", p.g_transRate);
     printf("----------------------------------------/n");
 }

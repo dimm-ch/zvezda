@@ -55,6 +55,21 @@ int globalDeviceIndex;
 
 static bool is_cancel { false };
 
+enum CmdExcCtrl {
+    UNDEF,
+    DESC,
+    END
+};
+
+struct ExcCtrl {
+    ExcCtrl()
+        : ctrl(CmdExcCtrl::UNDEF)
+    {
+    }
+    CmdExcCtrl ctrl;
+    std::string desc;
+};
+
 // Отключить интерфейс
 void if_down(int fd, ifreq& ifr, std::string ifname)
 {
@@ -337,6 +352,9 @@ public:
                             // std::printf("<Send>: %s\n", jsonStringToClient.c_str());
                         }
                     }
+                } catch (ExcCtrl ec) {
+                    fprintf(stdout, "<SRV> Exception - %s", ec.desc.c_str());
+                    if (ec.ctrl != END) { };
                 } catch (...) {
                     threadError = std::current_exception();
                 }

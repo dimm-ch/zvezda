@@ -59,22 +59,34 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
     decltype(auto) ini = ArgumentCast<BRD_IniFile>(args);
     auto status = uint32_t {};
 
-    LOG("BRDctrl_ADC_READINIFILE { fileName: %s, sectionName: %s }",
+    LOG("MFM214x3GDA:BRDctrl_ADC_READINIFILE { fileName: %s, sectionName: %s }",
         BARDY_STR(ini.fileName), BARDY_STR(ini.sectionName));
-
+    int x = 0;
+    LOG("CHECK_LOG begining");
+    LOG("CHECK_LOG %d", x++);
     INIReader reader(BARDY_STR(ini.fileName));
     if (reader.ParseError() < 0) {
         LOG(" - ERROR: Can't load '%s'", BARDY_STR(ini.fileName));
         return BRDerr_ERROR;
     }
-
+    LOG("CHECK_LOG %d", x++);
     // получаем параметры из INI-файла
     // и производим настройку оборудования
     // без INI-файла необходимо отправлять команды сайд-драйверу
     // -------------------------------------------------------------------------
-    auto debug_info = reader.GetBoolean(BARDY_STR(ini.sectionName), "DebugInfo", false);
-    CtrlSetDebugInfo(pDev, pServData, BRDctrl_SETDEBUGINFO, &debug_info);
-
+    LOG("CHECK_LOG before debug_info");
+    try {
+        auto debug_info = reader.GetBoolean(BARDY_STR(ini.sectionName), "DebugInfo", false);
+    } catch (...) {
+        LOG("CHECK_LOG was exception");
+    }
+    LOG("CHECK_LOG %d, debug_info = %d", x++, debug_info);
+    status = CtrlSetDebugInfo(pDev, pServData, BRDctrl_SETDEBUGINFO, &debug_info);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_SETDEBUGINFO");
+        return BRDerr_ERROR;
+    }
+    LOG("CHECK_LOG %d", x++);
     m_timeout_msec = reader.GetInteger(BARDY_STR(_BRDC("Option")), "TimeoutSec", 5) * 1000;
 
     // настройка источника тактовой частоты для АЦП
@@ -88,8 +100,11 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
     clk_mode.OutB = reader.GetBoolean(BARDY_STR(ini.sectionName), "LMXOutB", true);
     clk_mode.Mult = 1;
     status = CtrlSetClkMode(pDev, pServData, BRDctrl_ADC_SETCLKMODE, &clk_mode);
-    if (status != BRDerr_OK)
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETCLKMODE");
         return BRDerr_ERROR;
+    }
+    LOG("CHECK_LOG %d", x++);
 
     // установка параметров стартовой синхронизации
     auto start_mode = BRD_StartMode {};
@@ -99,34 +114,49 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
     start_mode.trigStopSrc = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "StopSource", 0)); // Stop source for trigger start
     start_mode.stopInv = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "StopInverting", 0)); // Stop inversion
     start_mode.reStartMode = uint32_t(reader.GetBoolean(BARDY_STR(ini.sectionName), "ReStart", false)); // Restart mode
-    CtrlSetStartMode(pDev, pServData, BRDctrl_ADC_SETSTARTMODE, &start_mode);
+    status = CtrlSetStartMode(pDev, pServData, BRDctrl_ADC_SETSTARTMODE, &start_mode);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETSTARTMODE");
+    }
 
     // установка уровня и входного сопротивления внешнего старта
     auto start_level = BRD_StartLevel_FM214x3GDA {};
     start_level.level = reader.GetReal(BARDY_STR(ini.sectionName), "StartLevel", sub_module.m_start_level);
     start_level.resistance = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "StartResistance", 0));
-    CtrlSetStartLevel(pDev, pServData, BRDctrl_ADC_SETSTARTLEVEL, &start_level);
+    status = CtrlSetStartLevel(pDev, pServData, BRDctrl_ADC_SETSTARTLEVEL, &start_level);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETSTARTLEVEL");
+    }
 
     // установка уровня и выбор источника сигнала SysRef
-    auto sysref = BRD_SysRefConfig_FM214x3GDA{};
+    auto sysref = BRD_SysRefConfig_FM214x3GDA {};
     sysref.level = reader.GetReal(BARDY_STR(ini.sectionName), "SysRefLevel", 0.0);
     sysref.select = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "SysRefConfig", 0x00));
     bool ext_sysref = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "SysRefExt", 0x00));
-    if( ext_sysref )
+    if (ext_sysref)
         sysref.select = 2;
-    CtrlSetSysRef(pDev, pServData, BRDctrl_ADC_SETSYSREF, &sysref);
-
+    status = CtrlSetSysRef(pDev, pServData, BRDctrl_ADC_SETSYSREF, &sysref);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETSYSREF");
+    }
     // установка clock delay для АЦП каналов (задержка принимаемого сигнала)
     auto clock_delay_control = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "ClockDelayControl", 0));
-    CtrlSetClockDelayControl(pDev, pServData, BRDctrl_ADC_SETCLOCKDELAYCONTROL, &clock_delay_control);
+    status = CtrlSetClockDelayControl(pDev, pServData, BRDctrl_ADC_SETCLOCKDELAYCONTROL, &clock_delay_control);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETCLOCKDELAYCONTROL");
+    }
     auto clock_delay = BRD_ClockDelayChannel_FM214x3GDA {};
     for (auto i = 0U; i < 2; i++) {
         clock_delay.channel = i;
         clock_delay.divider_phase = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "ClockDividerPhase" + std::to_string(i), 0));
         clock_delay.superfine_delay = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "ClockSuperfineDelay" + std::to_string(i), 0));
         clock_delay.fine_delay = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "ClockFineDelay" + std::to_string(i), 0xC0));
-        CtrlSetClockDelayChannel(pDev, pServData, BRDctrl_DDC_SETFC, &clock_delay);
+        status = CtrlSetClockDelayChannel(pDev, pServData, BRDctrl_DDC_SETFC, &clock_delay);
+        if (status != BRDerr_OK) {
+            LOG("ERROR: BRDctrl_DDC_SETFC");
+        }
     }
+    LOG("MARK # 1 -------------------------------------");
 
     // установка режима АЦП
     auto adc_mode = BRD_AdcMode_FM214x3GDA {};
@@ -158,47 +188,77 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
         adc_mode.app_mode = 0b0000; // ADC Full Bandwidth
         adc_mode.channel_mask = reader.GetInteger(BARDY_STR(ini.sectionName), "ChannelMask", 0x03);
     }
-    CtrlSetMode(pDev, pServData, BRDctrl_ADC_SETMODE, &adc_mode);
+    status = CtrlSetMode(pDev, pServData, BRDctrl_ADC_SETMODE, &adc_mode);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETMODE");
+    }
 
     // Настройка/запуск JESD'ов
     auto ext_core_clk = reader.GetBoolean(BARDY_STR(ini.sectionName), "JESD_CoreClockExt", false); // Признак использования внешней тактовой частоты для CoreClk
     status = CtrlSetJesd(pDev, pServData, BRDctrl_ADC_SETJESD, &ext_core_clk);
-    if (status != BRDerr_OK)
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETJESD");
         return BRDerr_ERROR;
+    }
 
     // установка значений кадрового режима
     auto start_delay = BRD_EnVal {};
     start_delay.enable = reader.GetBoolean(BARDY_STR(ini.sectionName), "StartDelayEnable", false);
     start_delay.value = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "StartDelayCounter", 0));
-    CtrlSetStartDelay(pDev, pServData, BRDctrl_ADC_SETSTDELAY, &start_delay);
+    status = CtrlSetStartDelay(pDev, pServData, BRDctrl_ADC_SETSTDELAY, &start_delay);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETSTDELAY");
+    }
+
+    LOG("MARK # 2 -------------------------------------");
 
     auto acq_count = BRD_EnVal {};
     acq_count.enable = reader.GetBoolean(BARDY_STR(ini.sectionName), "AcquiredSampleEnable", false);
     acq_count.value = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "AcquiredSampleCounter", 0));
-    CtrlSetAcqCount(pDev, pServData, BRDctrl_ADC_SETACQDATA, &acq_count);
+    status = CtrlSetAcqCount(pDev, pServData, BRDctrl_ADC_SETACQDATA, &acq_count);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETACQDATA");
+    }
 
     auto skip_count = BRD_EnVal {};
     skip_count.enable = reader.GetBoolean(BARDY_STR(ini.sectionName), "SkipSampleEnable", false);
     skip_count.value = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "SkipSampleCounter", 0));
-    CtrlSetSkipCount(pDev, pServData, BRDctrl_ADC_SETSKIPDATA, &skip_count);
+    status = CtrlSetSkipCount(pDev, pServData, BRDctrl_ADC_SETSKIPDATA, &skip_count);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETSKIPDATA");
+    }
 
     // установка значений заголовков кадрового режима
     auto title_mode = BRD_EnVal {};
     title_mode.enable = reader.GetBoolean(BARDY_STR(ini.sectionName), "TitleEnable", false);
     title_mode.value = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "TitleSize", 0));
-    CtrlSetTitleMode(pDev, pServData, BRDctrl_ADC_SETTITLEMODE, &title_mode);
+    status = CtrlSetTitleMode(pDev, pServData, BRDctrl_ADC_SETTITLEMODE, &title_mode);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETSKIPDATA");
+    }
 
     auto title_data = uint32_t(reader.GetReal(BARDY_STR(ini.sectionName), "TitleData", 0));
-    CtrlSetTitleData(pDev, pServData, BRDctrl_ADC_SETTITLEDATA, &title_data);
+    status = CtrlSetTitleData(pDev, pServData, BRDctrl_ADC_SETTITLEDATA, &title_data);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETTITLEDATA");
+    }
+
+    LOG("MARK # 3 -------------------------------------");
 
     // Установка NCO и Phase для DDC 0..3
     auto freq = BRD_ValChan {};
     for (auto i = 0U; i < 4; i++) {
         freq.chan = i;
         freq.value = reader.GetReal(BARDY_STR(ini.sectionName), "DDCFc" + std::to_string(i), 725.0);
-        CtrlSetDDCFc(pDev, pServData, BRDctrl_DDC_SETFC, &freq);
+        status = CtrlSetDDCFc(pDev, pServData, BRDctrl_DDC_SETFC, &freq);
+        if (status != BRDerr_OK) {
+            LOG("ERROR: BRDctrl_DDC_SETFC");
+        }
         freq.value = reader.GetReal(BARDY_STR(ini.sectionName), "DDCFc_Phase" + std::to_string(i), 0.0);
-        CtrlSetDDCFcPhase(pDev, pServData, BRDctrl_DDC_SETFCPHASE, &freq);
+        status = CtrlSetDDCFcPhase(pDev, pServData, BRDctrl_DDC_SETFCPHASE, &freq);
+        if (status != BRDerr_OK) {
+            LOG("ERROR: BRDctrl_DDC_SETFCPHASE");
+        }
     }
 
     // Подключение каналов АЦП к входам DDC IQ
@@ -208,11 +268,17 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
         input.src_i = reader.GetReal(BARDY_STR(ini.sectionName), "DDCInputI" + std::to_string(i), 0);
         input.src_q = reader.GetReal(BARDY_STR(ini.sectionName), "DDCInputQ" + std::to_string(i), 0);
         status = CtrlSetDDCInputSource(pDev, pServData, BRDctrl_DDC_SETINPSRC, &input);
+        if (status != BRDerr_OK) {
+            LOG("ERROR: BRDctrl_DDC_SETINPSRC");
+        }
     }
 
     // Параметр Invert Channel B
     if (reader.GetBoolean(BARDY_STR(ini.sectionName), "InvertChannelA", false)) {
-        CtrlSetInvertChannelA(pDev, pServData, BRDctrl_ADC_SETINVERTCHANNELA, nullptr);
+        status = CtrlSetInvertChannelA(pDev, pServData, BRDctrl_ADC_SETINVERTCHANNELA, nullptr);
+        if (status != BRDerr_OK) {
+            LOG("ERROR: BRDctrl_ADC_SETINVERTCHANNELA");
+        }
     }
 
     // Параметр Input Full-Scale Voltage для каналов
@@ -221,15 +287,23 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
     for (auto i = 0U; i < 2; i++) {
         voltage.chan = i;
         voltage.value = reader.GetReal(BARDY_STR(ini.sectionName), "InputFSVoltageCh" + std::to_string(i), 1.7);
-        CtrlSetInputFSVoltage(pDev, pServData, BRDctrl_ADC_SETINPUTFSVOLTAGE, &voltage);
+        status = CtrlSetInputFSVoltage(pDev, pServData, BRDctrl_ADC_SETINPUTFSVOLTAGE, &voltage);
+        if (status != BRDerr_OK) {
+            LOG("ERROR: BRDctrl_ADC_SETINPUTFSVOLTAGE");
+        }
     }
+
+    LOG("MARK # 4 -------------------------------------");
 
     // Параметр Input Buffer Control для каналов
     auto buf = BRD_ValChan {};
     for (auto i = 0U; i < 2; i++) {
         buf.chan = i;
         buf.value = reader.GetInteger(BARDY_STR(ini.sectionName), "InputBufferControlCh" + std::to_string(i), 0);
-        CtrlSetInputBufferControl(pDev, pServData, BRDctrl_ADC_SETINPUTBUFFERCONTROL, &buf);
+        status = CtrlSetInputBufferControl(pDev, pServData, BRDctrl_ADC_SETINPUTBUFFERCONTROL, &buf);
+        if (status != BRDerr_OK) {
+            LOG("ERROR: BRDctrl_ADC_SETINPUTBUFFERCONTROL");
+        }
     }
 
     // Параметры Fast Detect'а для каналов АЦП
@@ -240,20 +314,29 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
         fd.threshold_upper = reader.GetReal(BARDY_STR(ini.sectionName), "FDUpper" + std::to_string(i), 0.0);
         fd.threshold_lower = reader.GetReal(BARDY_STR(ini.sectionName), "FDLower" + std::to_string(i), 0.0);
         fd.dwell_time = uint16_t(reader.GetInteger(BARDY_STR(ini.sectionName), "FDDwellTime" + std::to_string(i), 1));
-        CtrlSetFastDetectChannel(pDev, pServData, BRDctrl_ADC_SETFASTDETECTCHANNEL, &fd);
+        status = CtrlSetFastDetectChannel(pDev, pServData, BRDctrl_ADC_SETFASTDETECTCHANNEL, &fd);
+        if (status != BRDerr_OK) {
+            LOG("ERROR: BRDctrl_ADC_SETFASTDETECTCHANNEL");
+        }
     }
 
     // Калибровочные значения для JESD линков
     auto jesd_lmfc_count = BRD_JesdLmfcCount {};
     jesd_lmfc_count.count = size_t(reader.GetInteger(BARDY_STR(ini.sectionName), "LMFCCount", 0));
-    CtrlSetLMFCCount(pDev, pServData, BRDctrl_JESD_SETLMFCCOUNT, &jesd_lmfc_count);
+    status = CtrlSetLMFCCount(pDev, pServData, BRDctrl_JESD_SETLMFCCOUNT, &jesd_lmfc_count);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_JESD_SETLMFCCOUNT");
+    }
 
     // Включение/Отключение режима предварительной синхронизации JESD'ов
     auto presync = BRD_PreSync_FM214x3GDA {};
     presync.enable = reader.GetBoolean(BARDY_STR(ini.sectionName), "PreSync", false);
+    LOG("BRDctrl_ADC_SETPRESYNC : enable = %d, type = %d", presync.enable, presync.type);
     status = CtrlSetPreSync(pDev, pServData, BRDctrl_ADC_SETPRESYNC, &presync);
-    if (status != BRDerr_OK)
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETPRESYNC : status = %X", status);
         return BRDerr_ERROR;
+    }
 
     // Включение/Отключение режима PreTrigger'а
     auto pretrigger = BRD_PretrigMode {};
@@ -264,9 +347,13 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
         pretrigger.external = (pretrigger_mode == 3) ? 1 : 0;
         pretrigger.size = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "PreTriggerSamples", 16));
         status = CtrlSetPretrigMode(pDev, pServData, BRDctrl_ADC_SETPRETRIGMODE, &pretrigger);
-        if (status != BRDerr_OK)
+        if (status != BRDerr_OK) {
+            LOG("ERROR: BRDctrl_ADC_SETPRETRIGMODE");
             return BRDerr_ERROR;
+        }
     }
+
+    LOG("MARK # 5 -------------------------------------");
 
     // Калибровочные значения для JESD линков
     auto prbs_type_str = reader.Get(BARDY_STR(ini.sectionName), "PrbsType", "");
@@ -275,15 +362,22 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
         prbs_type = PRBS_TYPE::PN9;
     if (prbs_type_str == "PN23")
         prbs_type = PRBS_TYPE::PN23;
-    CtrlSetJESDPrbs(pDev, pServData, BRDctrl_JESD_SETPRBS, &prbs_type);
+    status = CtrlSetJESDPrbs(pDev, pServData, BRDctrl_JESD_SETPRBS, &prbs_type);
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_JESD_SETPRBS");
+    }
 
     // Включение/Отключение режима временных меток TimeStamp в потоке
     auto timestamp = BRD_TimeStamp_FM214x3GDA {};
     timestamp.enable = reader.GetBoolean(BARDY_STR(ini.sectionName), "TimeStamp", false);
     timestamp.polarity_negative = reader.GetBoolean(BARDY_STR(ini.sectionName), "TimeStamp_PolarityNegative", false);
     status = CtrlSetTimeStamp(pDev, pServData, BRDctrl_ADC_SETTIMESTAMP, &timestamp);
-    if (status != BRDerr_OK)
+    if (status != BRDerr_OK) {
+        LOG("ERROR: BRDctrl_ADC_SETTIMESTAMP");
         return BRDerr_ERROR;
+    }
+
+    LOG("MARK # 6 -------------------------------------");
 
     // установка стандартной задержки для IDELAYE3 (UltraScale)
     auto std_delay = BRD_StdDelay {};
@@ -291,9 +385,14 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
         if (reader.HasValue(BARDY_STR(ini.sectionName), "StdDelay" + std::to_string(i))) {
             std_delay.nodeID = i;
             std_delay.value = reader.GetInteger(BARDY_STR(ini.sectionName), "StdDelay" + std::to_string(i), 0);
-            CtrlSetDelay(pDev, pServData, BRDctrl_ADC_WRDELAY, &std_delay);
+            status = CtrlSetDelay(pDev, pServData, BRDctrl_ADC_WRDELAY, &std_delay);
+            if (status != BRDerr_OK) {
+                LOG("ERROR: BRDctrl_ADC_WRDELAY");
+                return BRDerr_ERROR;
+            }
         }
-
+    LOG("MARK # 7 -------------------------------------");
+    LOG("CHECK_LOG %d", x++);
     return BRDerr_OK;
 }
 
@@ -380,7 +479,7 @@ auto SrvADC::CtrlGetFormat(void* pDev, void* pServData, ULONG cmd, void* args) -
     format.ByBits.Pack = std::ceil(m_bits / 8.0); // в байтах
     // format.ByBits.Code = 0; // двоично дополнительный код
     // format.ByBits.Align = 0; // align to high-order bit
-    //LOG("BRDctrl_ADC_GETFORMAT | %d bits", format.ByBits.Pack * 8);
+    // LOG("BRDctrl_ADC_GETFORMAT | %d bits", format.ByBits.Pack * 8);
 
     return BRDerr_OK;
 }

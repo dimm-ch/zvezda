@@ -12,6 +12,7 @@
 
 // extern BRD_Handle g_hSRV;
 
+/*
 extern ULONG g_MemDrqFlag;
 extern unsigned long long g_bMemBufSize;
 extern ULONG g_MsTimeout;
@@ -20,11 +21,13 @@ extern int g_transRate;
 
 extern int g_PretrigMode;
 extern long long g_bPostTrigSize;
+*/
 
 // установить параметры SDRAM
-S32 SdramSettings(ULONG mem_mode, BRD_Handle hADC, uint64_t& bBuf_size)
+S32 SdramSettings(ULONG mem_mode, int lid, uint64_t& bBuf_size)
 {
     S32 status;
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
 
     BRD_SdramCfgEx rSdramConfig;
     rSdramConfig.Size = sizeof(BRD_SdramCfgEx);
@@ -60,12 +63,12 @@ S32 SdramSettings(ULONG mem_mode, BRD_Handle hADC, uint64_t& bBuf_size)
         else
             DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_SDRAM_SETMEMSIZE"));
 
-        if (g_PretrigMode == 3) {
-            ULONG post_size = ULONG(g_bPostTrigSize >> 2);
+        if (p.g_PretrigMode == 3) {
+            ULONG post_size = ULONG(p.g_bPostTrigSize >> 2);
             status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_SETPOSTTRIGER, &post_size);
-            g_bPostTrigSize = (long long)post_size << 2;
+            p.g_bPostTrigSize = (long long)post_size << 2;
             if (BRD_errcmp(status, BRDerr_OK))
-                BRDC_printf(_BRDC("BRDctrl_SDRAM_SETPOSTTRIGER: Post-trigger size = %lld bytes\n"), g_bPostTrigSize);
+                BRDC_printf(_BRDC("BRDctrl_SDRAM_SETPOSTTRIGER: Post-trigger size = %lld bytes\n"), p.g_bPostTrigSize);
             else
                 DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_SDRAM_SETPOSTTRIGER"));
         }
@@ -120,9 +123,10 @@ typedef struct _THREAD_PARAM {
     int idx;
 } THREAD_PARAM, *PTHREAD_PARAM;
 
-HANDLE g_hThread = NULL;
+// HANDLE g_hThread = NULL;
 THREAD_PARAM thread_par;
-HANDLE g_hUserEvent = NULL;
+// HANDLE g_hUserEvent = NULL;
+
 // выполнить сбор данных в SDRAM с ПДП-методом передачи в ПК
 // с использованием прерывания по окончанию сбора
 unsigned __stdcall ThreadDaqIntoSdramDMA(void* pParams)
@@ -136,6 +140,7 @@ unsigned __stdcall ThreadDaqIntoSdramDMA(void* pParams)
     PTHREAD_PARAM pThreadParam = (PTHREAD_PARAM)pParams;
     BRD_Handle hADC = pThreadParam->handle;
     int idx = pThreadParam->idx;
+    ParamsAdc& p = DevicesLid[idx].paramsAdc;
 
     // определение скорости сбора данных
     LARGE_INTEGER Frequency, StartPerformCount, StopPerformCount;
@@ -155,8 +160,8 @@ unsigned __stdcall ThreadDaqIntoSdramDMA(void* pParams)
 
     // дожидаемся окончания сбора
     BRD_WaitEvent waitEvt;
-    waitEvt.timeout = g_MsTimeout; // ждать окончания сбора данных до g_MsTimeout мсек.
-    waitEvt.hAppEvent = g_hUserEvent;
+    waitEvt.timeout = p.g_MsTimeout; // ждать окончания сбора данных до g_MsTimeout мсек.
+    waitEvt.hAppEvent = p.g_hUserEvent;
     status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_WAITACQCOMPLETEEX, &waitEvt);
     QueryPerformanceCounter(&StopPerformCount);
     if (BRD_errcmp(status, BRDerr_WAIT_TIMEOUT)) { // если вышли по тайм-ауту
@@ -183,7 +188,7 @@ unsigned __stdcall ThreadDaqIntoSdramDMA(void* pParams)
 
     status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_IRQACQCOMPLETE, &Enable); // запрет прерывания от флага завершения сбора в SDRAM
 
-    //	CloseHandle(g_hUserEvent);
+    //	CloseHandle(p.g_hUserEvent);
 
     if (!BRD_errcmp(evt_status, BRDerr_OK))
         //	if(BRD_errcmp(evt_status, BRDerr_SIGNALED_APPEVENT))
@@ -191,8 +196,8 @@ unsigned __stdcall ThreadDaqIntoSdramDMA(void* pParams)
         return evt_status;
 
     double msTime = (double)(StopPerformCount.QuadPart - StartPerformCount.QuadPart) / (double)Frequency.QuadPart * 1.E3;
-    if (g_transRate)
-        printf("DAQ into board memory rate is %.2f Mbytes/sec\r", ((double)g_bMemBufSize / msTime) / 1000.);
+    if (p.g_transRate)
+        printf("DAQ into board memory rate is %.2f Mbytes/sec\r", ((double)p.g_bMemBufSize / msTime) / 1000.);
 
     // установить, что стрим работает с памятью
     ULONG tetrad;
@@ -203,7 +208,7 @@ unsigned __stdcall ThreadDaqIntoSdramDMA(void* pParams)
     //	ULONG flag = BRDstrm_DRQ_ALMOST; // FIFO почти пустое
     //	ULONG flag = BRDstrm_DRQ_READY;
     //	ULONG flag = BRDstrm_DRQ_HALF; // рекомендуется флаг - FIFO наполовину заполнено
-    ULONG flag = g_MemDrqFlag;
+    ULONG flag = p.g_MemDrqFlag;
     status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_SETDRQ, &flag);
     if (!BRD_errcmp(status, BRDerr_OK))
         DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_STREAM_SETDRQ"));
@@ -216,7 +221,7 @@ unsigned __stdcall ThreadDaqIntoSdramDMA(void* pParams)
     ////	ULONG msTimeout = 20000; // ждать окончания передачи данных до 20 сек.
     ////	status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_WAITBUF, &msTimeout);
     //	waitEvt.timeout = 20000; // ждать окончания сбора данных до 20 сек.
-    //	waitEvt.hAppEvent = g_hUserEvent;
+    //	waitEvt.hAppEvent = p.g_hUserEvent;
     //	status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_WAITBUFEX, &waitEvt);
     //	if(BRD_errcmp(status, BRDerr_WAIT_TIMEOUT))
     //	{	// если вышли по тайм-ауту, то остановимся
@@ -251,43 +256,47 @@ S32 StartDaqIntoSdramDMA(BRD_Handle hADC, int idx)
 
     thread_par.handle = hADC;
     thread_par.idx = idx;
-    g_hUserEvent = CreateEvent(
+    ParamsAdc& p = DevicesLid[idx].paramsAdc;
+    p.g_hUserEvent = CreateEvent(
         NULL, // default security attributes
         FALSE, // auto-reset event object
         FALSE, // initial state is nonsignaled
         NULL); // unnamed object
 
     // Create thread
-    g_hThread = (HANDLE)_beginthreadex(NULL, 0, &ThreadDaqIntoSdramDMA, &thread_par, 0, &threadID);
+    p.g_hThread = (HANDLE)_beginthreadex(NULL, 0, &ThreadDaqIntoSdramDMA, &thread_par, 0, &threadID);
     return 1;
 }
 
 // проверяет завершение треда
-S32 CheckDaqIntoSdramDMA()
+S32 CheckDaqIntoSdramDMA(int lid)
 {
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
     // check for terminate thread
-    ULONG ret = WaitForSingleObject(g_hThread, 0);
+    ULONG ret = WaitForSingleObject(p.g_hThread, 0);
     if (ret == WAIT_TIMEOUT)
         return 0;
     return 1;
 }
 
 // прерывает исполнение треда, находящегося в ожидании завершения сбора данных в SDRAM или передачи их по ПДП
-void BreakDaqIntoSdramDMA()
+void BreakDaqIntoSdramDMA(int lid)
 {
-    SetEvent(g_hUserEvent); // установить в состояние Signaled
-    WaitForSingleObject(g_hThread, INFINITE); // Wait until thread terminates
-    //	CloseHandle(g_hUserEvent);
-    //	CloseHandle(g_hThread);
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    SetEvent(p.g_hUserEvent); // установить в состояние Signaled
+    WaitForSingleObject(p.g_hThread, INFINITE); // Wait until thread terminates
+    //	CloseHandle(p.g_hUserEvent);
+    //	CloseHandle(p.g_hThread);
 }
 
 // Эта функция должна вызываться ТОЛЬКО когда тред уже закончил исполняться
-S32 EndDaqIntoSdramDMA()
+S32 EndDaqIntoSdramDMA(int lid)
 {
-    CloseHandle(g_hUserEvent);
-    CloseHandle(g_hThread);
-    g_hUserEvent = NULL;
-    g_hThread = NULL;
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    CloseHandle(p.g_hUserEvent);
+    CloseHandle(p.g_hThread);
+    p.g_hUserEvent = NULL;
+    p.g_hThread = NULL;
     return evt_status;
 }
 #endif
@@ -300,13 +309,15 @@ S32 releaseAdc(int lid)
 
 // выполнить сбор данных в SDRAM с ПДП-методом передачи в ПК
 // без использования прерывания по окончанию сбора
-S32 DaqIntoSdramDMA(BRD_Handle hADC)
+S32 DaqIntoSdramDMA(int lid)
 {
     //	printf("DAQ into SDRAM\n");
     S32 status;
     ULONG Status = 0;
     //	ULONG isAcqComplete = 0;
     ULONG Enable = 1;
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
 
     // status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_FIFOSTATUS, &Status);
 
@@ -323,7 +334,7 @@ S32 DaqIntoSdramDMA(BRD_Handle hADC)
     if (!BRD_errcmp(status, BRDerr_OK))
         DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_ADC_ENABLE"));
 
-    ULONG cntTimeout = g_MsTimeout / 50;
+    ULONG cntTimeout = p.g_MsTimeout / 50;
     evt_status = BRDerr_WAIT_TIMEOUT;
     // дожидаемся окончания сбора
     for (ULONG i = 0; i < cntTimeout; i++) {
@@ -348,7 +359,7 @@ S32 DaqIntoSdramDMA(BRD_Handle hADC)
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFOSTATUS, &AdcStatus);
         status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_FIFOSTATUS, &SdramStatus);
         BRDC_printf(_BRDC("\nBRDctrl_SDRAM_ISACQCOMPLETE is TIME-OUT(%d sec.)\n    AdcFifoStatus = %08X SdramFifoStatus = %08X\n"),
-            g_MsTimeout / 1000, AdcStatus, SdramStatus);
+            p.g_MsTimeout / 1000, AdcStatus, SdramStatus);
         // return evt_status;
     }
 
@@ -359,7 +370,7 @@ S32 DaqIntoSdramDMA(BRD_Handle hADC)
     if (!BRD_errcmp(evt_status, BRDerr_OK))
         return evt_status;
 
-    // if(g_PretrigMode == 3)
+    // if(p.g_PretrigMode == 3)
     //{
     //	// получить параметры, актуальные в режиме претриггера
     //	status = GetPostrigData(hADC);
@@ -374,7 +385,7 @@ S32 DaqIntoSdramDMA(BRD_Handle hADC)
     //	ULONG flag = BRDstrm_DRQ_ALMOST; // FIFO почти пустое
     //	ULONG flag = BRDstrm_DRQ_READY;
     //	ULONG flag = BRDstrm_DRQ_HALF; // рекомендуется флаг - FIFO наполовину заполнено
-    ULONG flag = g_MemDrqFlag;
+    ULONG flag = p.g_MemDrqFlag;
     status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_SETDRQ, &flag);
     if (!BRD_errcmp(status, BRDerr_OK))
         DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_STREAM_SETDRQ"));

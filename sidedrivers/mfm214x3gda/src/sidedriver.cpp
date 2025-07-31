@@ -514,6 +514,8 @@ auto Cmfm214x3gda::IndRegRead(size_t tetr_num, size_t reg_num) -> size_t
     param.tetr = tetr_num;
     param.reg = reg_num;
     (base_entry)(base_dev, nullptr, DEVScmd_REGREADIND, &param);
+    // dch
+    // printf("<RD_IND> Tetr=%d  Reg=%X  Val=%X\n", tetr_num, reg_num, param.val);
     return param.val;
 }
 
@@ -533,6 +535,8 @@ auto Cmfm214x3gda::IndRegWrite(size_t tetr_num, size_t reg_num, size_t val) -> v
     param.reg = reg_num;
     param.val = val;
     (base_entry)(base_dev, nullptr, DEVScmd_REGWRITEIND, &param);
+    // dch
+    // printf("<WR_IND> Tetr=%d  Reg=%X  Val=%X\n", tetr_num, reg_num, val);
 }
 
 ///
@@ -549,6 +553,8 @@ auto Cmfm214x3gda::DirRegRead(size_t tetr_num, size_t reg_num) -> size_t
     param.tetr = tetr_num;
     param.reg = reg_num;
     (base_entry)(base_dev, nullptr, DEVScmd_REGREADDIR, &param);
+    // dch
+    // printf("<RD_DIR> Tetr=%d  Reg=%X  Val=%X\n", tetr_num, reg_num, param.val);
     return param.val;
 }
 
@@ -568,6 +574,8 @@ auto Cmfm214x3gda::DirRegWrite(size_t tetr_num, size_t reg_num, size_t val) -> v
     param.reg = reg_num;
     param.val = val;
     (base_entry)(base_dev, nullptr, DEVScmd_REGWRITEDIR, &param);
+    // dch
+    // printf("<WR_DIR> Tetr=%d  Reg=%X  Val=%X\n", tetr_num, reg_num, val);
 }
 
 ///
@@ -589,6 +597,8 @@ auto Cmfm214x3gda::DirRegWrites(size_t tetr_num, size_t reg_num, void* buf, size
     param.pBuf = buf;
     param.bytes = size;
     (base_entry)(base_dev, nullptr, DEVScmd_REGWRITESDIR, &param);
+    // dch
+    // printf("<WR_DIR_BLK> Tetr=%d  Reg=%X  size=%X ...\n", tetr_num, reg_num, size);
 }
 
 ///

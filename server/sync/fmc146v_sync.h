@@ -2,7 +2,7 @@
 
 #include <type_traits>
 
-// #include "adm2if.h"
+// #include "../../core/bardy/brdlib/adm2if.h"
 #include "brdsafe.h"
 #include "chappi.h"
 
@@ -361,4 +361,4 @@ enum class SyncMode {
 };
 }
 
-void startFmc(const std::string inifile, S32 DevNum);
+void startFmc(const std::string& inifile, S32 DevNum);
