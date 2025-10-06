@@ -4,6 +4,19 @@
 #include "../total.h"
 
 /*
+#if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
+ #include	<string.h>
+ #include    "gipcy.h"
+static IPC_handle g_hBufFileMap_cont;
+static IPC_handle g_hFlgFileMap_cont;
+#else
+ #include	<conio.h>
+ #include	<process.h>
+static HANDLE g_hBufFileMap_cont;
+static HANDLE g_hFlgFileMap_cont;
+#endif
+*/
+/*
 extern BRD_Handle x_hADC;
 extern ULONG g_MemAsFifo;
 extern ULONG g_AdcDrqFlag;
@@ -21,12 +34,12 @@ thread_value __IPC_API ContDaqFileMapping(void* pParams);
 unsigned __stdcall ContDaqFileMapping(void* pParams);
 #endif
 
-// static int g_flbreak = 0;
+// static int g_flbreak_cont = 0;
 /*
 ULONG g_BlkSize;
 ULONG g_BlkNum;
 static void* g_pBufFileMap;
-static ULONG* g_pFlags;
+static ULONG* g_pFlags_cont;
 */
 
 void ContinueDaq(int lid, ULONG BlkSize, ULONG BlkNum)
@@ -42,7 +55,7 @@ void ContinueDaq(int lid, ULONG BlkSize, ULONG BlkNum)
     // p.g_fileBufNum = FileBufNum;
     p.g_BlkNum = BlkNum;
 
-    p.g_flbreak = 0;
+    p.g_flbreak_cont = 0;
     thread_par.handle = DevicesLid[lid].adc.handle(); // x_hADC;
     thread_par.idx = 0;
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
@@ -98,26 +111,26 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
     BRDCHAR nameFlagMap[64] = _BRDC("data_flg");
     // BRDC_sprintf(nameFlagMap, _BRDC("data_flg"), i);
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-    p.g_hBufFileMap = IPC_createSharedMemory(nameBufMap, p.g_BlkSize);
-    p.g_pBufFileMap = IPC_mapSharedMemory(g_hBufFileMap);
-    p.g_hFlgFileMap = IPC_createSharedMemory(nameFlagMap, 3 * sizeof(ULONG));
-    p.g_pFlags = (ULONG*)IPC_mapSharedMemory(g_hFlgFileMap);
+    p.g_hBufFileMap_cont = IPC_createSharedMemory(nameBufMap, p.g_BlkSize);
+    p.g_pBufFileMap = IPC_mapSharedMemory(g_hBufFileMap_cont);
+    p.g_hFlgFileMap_cont = IPC_createSharedMemory(nameFlagMap, 3 * sizeof(ULONG));
+    p.g_pFlags_cont = (ULONG*)IPC_mapSharedMemory(g_hFlgFileMap_cont);
 #else
-    p.g_hBufFileMap = CreateFileMapping(INVALID_HANDLE_VALUE,
+    p.g_hBufFileMap_cont = CreateFileMapping(INVALID_HANDLE_VALUE,
         NULL, PAGE_READWRITE,
         0, p.g_BlkSize,
         nameBufMap);
-    p.g_pBufFileMap = (void*)MapViewOfFile(g_hBufFileMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+    p.g_pBufFileMap = (void*)MapViewOfFile(g_hBufFileMap_cont, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 
-    p.g_hFlgFileMap = CreateFileMapping(INVALID_HANDLE_VALUE,
+    p.g_hFlgFileMap_cont = CreateFileMapping(INVALID_HANDLE_VALUE,
         NULL, PAGE_READWRITE,
         0, 3 * sizeof(ULONG),
         nameFlagMap);
-    p.g_pFlags = (ULONG*)MapViewOfFile(g_hFlgFileMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+    p.g_pFlags_cont = (ULONG*)MapViewOfFile(g_hFlgFileMap_cont, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 #endif
-    p.g_pFlags[0] = 0;
-    p.g_pFlags[1] = 0;
-    p.g_pFlags[2] = buf_dscr.blkSize;
+    p.g_pFlags_cont[0] = 0;
+    p.g_pFlags_cont[1] = 0;
+    p.g_pFlags_cont[2] = buf_dscr.blkSize;
 
     // установить источник для работы стрима
     ULONG tetrad;
@@ -169,11 +182,11 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
             DisplayError(status, __FUNCTION__, _BRDC("TIME-OUT"));
             break;
         }
-        if (!buf_dscr.pStub->lastBlock && !g_pFlags[0]) {
+        if (!buf_dscr.pStub->lastBlock && !g_pFlags_cont[0]) {
             memcpy(g_pBufFileMap, buf_dscr.ppBlk[0], p.g_BlkSize);
-            p.g_pFlags[0] = 0xffffffff;
-            p.g_pFlags[1] = cnt == 0 ? 1 : 0;
-            p.g_pFlags[2] = buf_dscr.blkSize;
+            p.g_pFlags_cont[0] = 0xffffffff;
+            p.g_pFlags_cont[1] = cnt == 0 ? 1 : 0;
+            p.g_pFlags_cont[2] = buf_dscr.blkSize;
         }
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
@@ -181,13 +194,13 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
             int ch = IPC_getch(); // получает клавишу
             if (0x1B == ch) // если Esc
             {
-                p.g_flbreak = 1;
+                p.g_flbreak_cont = 1;
                 break;
             }
         }
 #else
         if (!idx && GetAsyncKeyState(VK_ESCAPE)) {
-            p.g_flbreak = 1;
+            p.g_flbreak_cont = 1;
             _getch();
         }
 #endif
@@ -206,7 +219,7 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
         if (Status & 0x80)
             BRDC_printf(_BRDC("\nERROR (%s): ADC FIFO is overflow (ADC FIFO Status = 0x%04X)\n"), nameBufMap, Status);
 
-    } while (!g_flbreak);
+    } while (!g_flbreak_cont);
 
     Enable = 0;
     status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_ENABLE, &Enable); // запрет работы АЦП
@@ -234,15 +247,15 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
     }
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-    IPC_unmapSharedMemory(g_hFlgFileMap);
-    IPC_deleteSharedMemory(g_hFlgFileMap);
+    IPC_unmapSharedMemory(g_hFlgFileMap_cont);
+    IPC_deleteSharedMemory(g_hFlgFileMap_cont);
     IPC_unmapSharedMemory(g_pBufFileMap);
     IPC_deleteSharedMemory(g_pBufFileMap);
 #else
-    UnmapViewOfFile(g_pFlags);
-    CloseHandle(g_hFlgFileMap);
+    UnmapViewOfFile(g_pFlags_cont);
+    CloseHandle(g_hFlgFileMap_cont);
     UnmapViewOfFile(g_pBufFileMap);
-    CloseHandle(g_hBufFileMap);
+    CloseHandle(g_hBufFileMap_cont);
 #endif
 
     status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_FREE, &buf_dscr);

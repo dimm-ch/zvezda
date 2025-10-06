@@ -938,7 +938,7 @@ S32 AllocDaqBuf(int lid, PVOID*& pSig, unsigned long long* pbytesBufSize, ULONG 
             // BRDC_sprintf(nameFlagMap, _BRDC("data_flg"), i);
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
             p.g_hFlgFileMap = IPC_createSharedMemory(nameFlagMap, 3 * sizeof(ULONG));
-            p.g_pFlags = (ULONG*)IPC_mapSharedMemory(p.g_hFlgFileMap);
+            p.g_pFlags_adc = (ULONG*)IPC_mapSharedMemory(p.g_hFlgFileMap);
 
             p.g_pMapBuf = pBuffer[0];
 
@@ -952,7 +952,7 @@ S32 AllocDaqBuf(int lid, PVOID*& pSig, unsigned long long* pbytesBufSize, ULONG 
                 NULL, PAGE_READWRITE,
                 0, 3 * sizeof(ULONG),
                 nameFlagMap);
-            p.g_pFlags = (ULONG*)MapViewOfFile(p.g_hFlgFileMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+            p.g_pFlags_adc = (ULONG*)MapViewOfFile(p.g_hFlgFileMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 #endif
         }
     }
@@ -1025,7 +1025,7 @@ S32 FreeDaqBuf(int lid, ULONG blkNum)
             IPC_unmapSharedMemory(p.g_hFlgFileMap);
             IPC_deleteSharedMemory(p.g_hFlgFileMap);
 #else
-            UnmapViewOfFile(p.g_pFlags);
+            UnmapViewOfFile(p.g_pFlags_adc);
             CloseHandle(p.g_hFlgFileMap);
 #endif
         }
@@ -1086,8 +1086,9 @@ S32 FreeDaqBuf(int lid, ULONG blkNum)
 //	return status;
 //}
 
-void MapWriteData(PVOID* pBuf, unsigned long long nNumberOfBytes)
+void MapWriteData(int lid, PVOID* pBuf, unsigned long long nNumberOfBytes)
 {
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
     DWORD blockSize = DWORD(nNumberOfBytes / p.g_bBlkNum);
     for (ULONG i = 0; i < p.g_bBlkNum; i++) {
         char* pDst = (char*)p.g_pMapBuf;
@@ -1098,22 +1099,23 @@ void MapWriteData(PVOID* pBuf, unsigned long long nNumberOfBytes)
 void MapWrFlagSinc(int lid, int flg, int isNewParam)
 {
     ParamsAdc& p = DevicesLid[lid].paramsAdc;
-    p.g_pFlags[0] = flg;
-    p.g_pFlags[1] = isNewParam;
-    p.g_pFlags[2] = p.g_buf_dscr.blkSize;
+    p.g_pFlags_adc[0] = flg;
+    p.g_pFlags_adc[1] = isNewParam;
+    p.g_pFlags_adc[2] = p.g_buf_dscr.blkSize;
 }
 
 int MapRdFlagSinc(int lid)
 {
     ParamsAdc& p = DevicesLid[lid].paramsAdc;
-    int flg = p.g_pFlags[0];
+    int flg = p.g_pFlags_adc[0];
     return flg;
 }
 
-S32 MapDataFromMemWriteData(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBufSize, unsigned long long bMemBufSize, ULONG DmaOn)
+S32 MapDataFromMemWriteData(int lid, PVOID* pBuf, unsigned long long bBufSize, unsigned long long bMemBufSize, ULONG DmaOn)
 {
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
     char* pDst = (char*)p.g_pMapBuf;
-
     S32 status = BRDerr_OK;
 
     //    if(p.g_PretrigMode == 3)
@@ -1157,7 +1159,7 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, HANDLE hfile, int idx, BRDctrl_StreamCBuf
 void DspFunc(void* buf, ULONG size);
 
 /*
-int p.g_flbreak = 0;
+int p.g_flbreak_adc = 0;
 
 ULONG p.g_bufType;
 ULONG p.g_fileBufSize;
@@ -1182,7 +1184,7 @@ void DirectFile(int lid, ULONG bufType, ULONG FileBufSize, ULONG FileBufNum, ULO
     p.g_fileBufNum = FileBufNum;
     p.g_fileBlkNum = FileBlkNum;
 
-    p.g_flbreak = 0;
+    p.g_flbreak_adc = 0;
     thread_par.handle = DevicesLid[lid].adc.handle(); // x_hADC;
     thread_par.idx = lid; // 0;
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
@@ -1361,7 +1363,7 @@ int SimpleProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_StreamCB
             int ch = IPC_getch(); // получает клавишу
             if (0x1B == ch) // если Esc
             {
-                p.g_flbreak = 1;
+                p.g_flbreak_adc = 1;
                 break;
             }
         }
@@ -1434,7 +1436,7 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_Stream
             int ch = IPC_getch(); // получает клавишу
             if (0x1B == ch) // если Esc
             {
-                p.g_flbreak = 1;
+                p.g_flbreak_adc = 1;
                 break;
             }
         }

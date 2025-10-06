@@ -43,10 +43,10 @@ void BreakDaqIntoSdramDMA(int lid);
 S32 CheckDaqIntoSdramDMA(int lid);
 S32 EndDaqIntoSdramDMA(int lid);
 
-void MapWriteData(PVOID* pBuf, unsigned long long nNumberOfBytes);
+void MapWriteData(int lid, PVOID* pBuf, unsigned long long nNumberOfBytes);
 void MapWrFlagSinc(int lid, int flg, int isNewParam);
 int MapRdFlagSinc(int lid);
-S32 MapDataFromMemWriteData(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBufSize, unsigned long long bMemBufSize, ULONG DmaOn);
+S32 MapDataFromMemWriteData(int lid, PVOID* pBuf, unsigned long long bBufSize, unsigned long long bMemBufSize, ULONG DmaOn);
 
 void ContinueDaq(int lid, ULONG BlkSize, ULONG BlkNum);
 void printLids(void);

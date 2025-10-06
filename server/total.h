@@ -81,8 +81,11 @@ struct ParamsAdc {
         , g_bPostTrigSize(32768)
         , g_iniFileNameAdc(_BRDC("exam_adc.ini"))
         , g_StopFlag(0)
-        , g_flbreak(0)
+        , g_flbreak_cont(0)
+        , g_flbreak_adc(0)
         , g_hBufFileMap(nullptr)
+        , g_hBufFileMap_cont(nullptr)
+        , g_hFlgFileMap_cont(nullptr)
         , g_hFlgFileMap(nullptr)
         , g_hPostfixFileMap(nullptr)
 #ifdef _WIN32
@@ -93,7 +96,8 @@ struct ParamsAdc {
     }
     int g_subNo; // номер службы АЦП из командной строки
     int g_fileMap;
-    ULONG* g_pFlags;
+    ULONG* g_pFlags_cont;
+    ULONG* g_pFlags_adc;
     char* g_pPostfix;
     ULONG g_MsTimeout;
     BRDctrl_StreamCBufAlloc g_buf_dscr;
@@ -142,24 +146,29 @@ struct ParamsAdc {
     BRD_Info g_info;
     int g_regdbg;
     int g_StopFlag;
-    int g_flbreak;
+    int g_flbreak_cont;
+    int g_flbreak_adc;
     ULONG g_BlkSize;
     ULONG g_BlkNum;
     void* g_pBufFileMap;
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-    IPC_handle g_hBufFileMap;
+    IPC_handle g_hBufFileMap_cont;
+    IPC_handle g_hFlgFileMap_cont;
+    IPC_handle* g_hBufFileMap = NULL;
     IPC_handle g_hFlgFileMap;
-    //   IPC_handle* g_hBufFileMap = NULL;
     IPC_handle g_hPostfixFileMap = NULL;
 #else
-    HANDLE g_hBufFileMap;
+    HANDLE g_hBufFileMap_cont;
+    HANDLE g_hFlgFileMap_cont;
+    HANDLE* g_hBufFileMap = NULL;
     HANDLE g_hFlgFileMap;
-    //   HANDLE* g_hBufFileMap = NULL;
     HANDLE g_hPostfixFileMap = NULL;
 #endif
 
     ULONG g_bufType;
     ULONG g_fileBufNum;
+    ULONG g_fileBlkNum;
+    ULONG g_fileBufSize;
 #ifdef _WIN32
     HANDLE g_hThread;
     HANDLE g_hUserEvent;

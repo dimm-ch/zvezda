@@ -194,8 +194,8 @@ void adcGetOptions(int lid, const std::string inifile)
     IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdcServiceNum"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
     p.g_AdcSrvNum = BRDC_atoi(Buffer);
     if (p.g_subNo >= 0)
-        p.g_AdcSrvNum = g_subNo;
-    BRDC_sprintf(g_AdcSrvName, _BRDC("%s%d"), p.g_SrvName, p.g_AdcSrvNum);
+        p.g_AdcSrvNum = p.g_subNo;
+    BRDC_sprintf(p.g_AdcSrvName, _BRDC("%s%d"), p.g_SrvName, p.g_AdcSrvNum);
 
     GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("PldFileName"), _BRDC("ambpcd_v10_adm212x200m.mcs"), p.g_pldFileName, sizeof(p.g_pldFileName));
     // GetPrivateProfileString("Option", "PldFileName", "ambpcd_v10_adm212x200m.mcs", g_pldFileName, sizeof(g_pldFileName), iniFilePath);
@@ -384,10 +384,10 @@ S32 SetParamSrv(int lid /*, BRD_ServList* srv, int idx*/)
             }
 
             // установка узла ЦОС в режим получения данных от ПЛИС ЦОС
-            // ULONG DspMode = 1;
-            // status = BRD_ctrl(hADC, 0, BRDctrl_DSPNODE_SETMODE, &DspMode);
+            // ULONG p.DspMode = 1;
+            // status = BRD_ctrl(hADC, 0, BRDctrl_DSPNODE_SETMODE, &p.DspMode);
             // if(status < 0) // с узлом ЦОС работать нельзя
-            //	DspMode = 0;
+            //	p.DspMode = 0;
         }
     }
 
@@ -520,7 +520,7 @@ S32 GetAdcData(int lid, unsigned long long bBufSize, unsigned long long bMemBufS
                 status = DaqIntoSdram(hADC); // выполнить сбор данных в память
                 status = DataFromMemWriteFile(lid, pSig, bBufSize, bMemBufSize, p.g_DmaOn); // передать данные из памяти в ОЗУ ПК, а затем в файл
             } else { // сбор в FIFO и программная передача данных
-                status = DaqIntoFifo(lid, pSigNonDMA, (ULONG)bBufSize, DspMode); // выполнить сбор данных
+                status = DaqIntoFifo(lid, pSigNonDMA, (ULONG)bBufSize, p.DspMode); // выполнить сбор данных
                 WriteDataFile(lid, pSig, bBufSize);
             }
             //				WriteDataFile(lid, pSig, bBufSize);
@@ -577,7 +577,7 @@ S32 GetAdcData(int lid, unsigned long long bBufSize, unsigned long long bMemBufS
                     status = DaqIntoSdram(hADC); // выполнить сбор данных в память
                     status = DataFromMemWriteFile(lid, pSig, bBufSize, bMemBufSize, p.g_DmaOn); // передать данные из памяти в ОЗУ ПК, а затем в файл
                 } else { // сбор в FIFO и программная передача данных
-                    status = DaqIntoFifo(lid, pSigNonDMA, (ULONG)bBufSize, DspMode); // выполнить сбор данных
+                    status = DaqIntoFifo(lid, pSigNonDMA, (ULONG)bBufSize, p.DspMode); // выполнить сбор данных
                     WriteDataFile(lid, pSig, bBufSize);
                 }
                 //					WriteDataFile(lid, pSig, bBufSize);
@@ -710,7 +710,7 @@ S32 DataFromMemWriteFile(int lid /*BRD_Handle hADC*/, PVOID* pBuf, unsigned long
 
 #ifdef __linux__
     if (p.g_fileMap)
-        return MapDataFromMemWriteData(hADC, pBuf, bBufSize, bMemBufSize, DmaOn);
+        return MapDataFromMemWriteData(lid, pBuf, bBufSize, bMemBufSize, DmaOn);
 #endif
 
     S32 status = BRDerr_OK;
@@ -771,7 +771,7 @@ void WriteDataFile(int lid, PVOID* pBuf, unsigned long long nNumberOfBytes)
 
 #ifdef __linux__
     if (p.g_fileMap) {
-        MapWriteData(pBuf, nNumberOfBytes);
+        MapWriteData(lid, pBuf, nNumberOfBytes);
         return;
     }
 #endif
@@ -834,6 +834,7 @@ void WriteIsviParamDirFile(int lid)
     printf("<DBG> WriteIsviParamDirFile: ADC-%d \n", lid);
 
     BRDCHAR fileName[MAX_PATH];
+    ParamsAdc& p = DevicesLid[lid].paramsAdc;
 
     BRDC_strcpy(fileName, p.g_dirFileName);
 
@@ -1094,7 +1095,7 @@ void WriteFlagSinc(int flg, int isNewParam, int lid)
     ParamsAdc& p = DevicesLid[lid].paramsAdc;
 
     if (p.g_fileMap)
-        MapWrFlagSinc(flg, isNewParam);
+        MapWrFlagSinc(lid, flg, isNewParam);
     else {
         BRDCHAR fileName[64];
         BRDC_sprintf(fileName, _BRDC("data_%d.flg"), lid);
@@ -1126,7 +1127,7 @@ int ReadFlagSinc(int lid)
     int flg;
     ParamsAdc& p = DevicesLid[lid].paramsAdc;
     if (p.g_fileMap)
-        flg = MapRdFlagSinc();
+        flg = MapRdFlagSinc(lid);
     else {
         BRDCHAR fileName[64];
         BRDC_sprintf(fileName, _BRDC("data_%d.flg"), lid);
@@ -1183,7 +1184,9 @@ void printLids(void)
     lidList.pLID = new U32[MAX_DEV];
     auto status = BRD_lidList(lidList.pLID, lidList.item, &lidList.itemReal);
 
-    BRD_Info info_.size = sizeof(info_);
+    BRD_Info info_;
+    info_.size = sizeof(info_);
+
     // BRD_Handle handle[MAX_DEV];
     int iDev = 0;
     // ULONG iDev = 0;
