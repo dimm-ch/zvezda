@@ -150,9 +150,9 @@ S32 CaptureAllDac(int lid, U32 modeCapture )
 		//
 		U32	mode = modeCapture; //BRDcapt_EXCLUSIVE;
 		U32	nItemReal, iSrv;
-		//BRD_ServList srvList[MAX_SERVICE_ON_DEVICE];
-		//S32	len = (S32)BRDC_strlen( p.g_sServiceName );
-/*		
+		BRD_ServList srvList[MAX_SERVICE_ON_DEVICE];
+		S32	len = (S32)BRDC_strlen( p.g_sServiceName );
+
 		err = BRD_serviceList( hDev, 0, srvList, MAX_SERVICE_ON_DEVICE, &nItemReal);
 		for( ii = 0; ii < (S32)nItemReal; ii++)
 			BRDC_printf( _BRDC("        Srv %d:  %15s, Attr = %X.\n"),ii, srvList[ii].name, srvList[ii].attr);
@@ -167,25 +167,30 @@ S32 CaptureAllDac(int lid, U32 modeCapture )
 				(srvList[iSrv].name[len+1] != '\0') )
 				continue;
 
-            BRDC_printf( _BRDC( "%s ..."),getStrCaptureModeService(mode).c_str() );
+            BRDC_printf( _BRDC( "<SRV> Try capture %s serv. in %s mode ...\n"), 
+						p.g_sServiceName, getStrCaptureModeService(mode).c_str() );
+
+			DacDevice dac;
+			dac.servDac.setMode(mode);
+			dac.servDac.capture(hDev,  srvList[iSrv].name, 10000);
+			if(dac.servDac.isCaptured())
+			{
+				printf(" - %s\n", dac.servDac.strMode().c_str());
+				dac.paramDac.handle = dac.servDac.handle();
+				dac.paramDac.dSignalFreq = p.g_dSignalFreq;
+				dac.paramDac.signalType  = p.g_dSignalType;
+				BRDC_sprintf( dac.paramDac.sSection, _BRDC("device%d_%s"), iDev++, srvList[iSrv].name);
+				DevicesLid[lid].dac.push_back(dac);				
+				BRDC_printf( _BRDC( "<SRV> Capture %s serv. in %s mode (section:%s)\n"), srvList[iSrv].name, 
+							getStrCaptureModeService(mode).c_str(),
+							dac.paramDac.sSection );
+			}
+			else
+				printf("<ERR> capture is fail: %s \n", dac.servDac.error().c_str());
 			
 
 		}
-*/
-	DacDevice dac;
-	dac.servDac.setMode(mode);
-	dac.servDac.capture(hDev,  p.g_sServiceName, 10000);
-	if(dac.servDac.isCaptured())
-	{
-		printf(" - %s\n", dac.servDac.strMode().c_str());
-		dac.paramDac.handle = dac.servDac.handle();
-		dac.paramDac.dSignalFreq = p.g_dSignalFreq;
-		dac.paramDac.signalType  = p.g_dSignalType;
-		BRDC_sprintf( dac.paramDac.sSection, _BRDC("device%d_%s"), iDev++, p.g_sServiceName);
-		DevicesLid[lid].dac.push_back(dac);				
-	}
-	else
-		BRDC_printf( _BRDC("Error!\n"));
+
 
     BRDC_printf( _BRDC( "\n" ));
 
@@ -245,13 +250,15 @@ S32 SetAllDac( int lid )
 		// Задать параметры работы ЦАП с помощью ini-файла
 		//
 		BRD_IniFile rIniFile;
-
+		
 		lstrcpy( rIniFile.fileName, p.g_sFullName );
 		lstrcpy( rIniFile.sectionName, dev.paramDac.sSection );
+		BRDC_printf(_BRDC("<SRV> DAC_READINIFILE: \n - name: %s\n - section : %s \n"), rIniFile.fileName,
+				rIniFile.sectionName);
 		err = BRD_ctrl( hdlSrv, 0, BRDctrl_DAC_READINIFILE, &rIniFile );
 		
 		if (BRD_errext(err) != BRDerr_OK) {
-			printf("Error BRDctrl_DAC_READINIFILE: err=0x%X, handle=0%X, rIniFile.fileName=%s, rIniFile.sectionName=%s \n", 
+			printf("<ERR> BRDctrl_DAC_READINIFILE: err=0x%X, handle=0%X, rIniFile.fileName=%s, rIniFile.sectionName=%s \n", 
 				err, hdlSrv, rIniFile.fileName, rIniFile.sectionName);
 			throw std::invalid_argument("Side-Driver rejection");
 		}
@@ -780,41 +787,8 @@ S32 CorrectOutFreq(TDacParam& dac)
 	return 0;
 }
 
-//=****************** GetInifileString ********************
-//=********************************************************
-S32 GetInifileString( const BRDCHAR *sSectionName, const BRDCHAR *sParamName, const BRDCHAR *defValue,
-							 BRDCHAR *strValue, int strSize, const BRDCHAR *sFullName )
-{
-	BRDCHAR		*pChar;
-	int			ii;
-	int			len;
 
-	IPC_getPrivateProfileString( sSectionName, sParamName, defValue, strValue, strSize, sFullName );
 
-	//
-	// удалить комментарий из строки
-	//
-	pChar = BRDC_strchr(strValue, ';');
-	if( pChar )
-		*pChar = 0;
-	pChar = BRDC_strchr(strValue, '/');
-	if( pChar )
-		if( *(pChar+1)=='/' )
-			*pChar = 0;
-
-	//
-	// Удалить пробелы в конце строки
-	//
-	len = (int)BRDC_strlen(strValue);
-	for( ii=len-1; ii>1; ii-- )
-		if(strValue[ii] != ' ' && strValue[ii] != '\t')
-		{
-			strValue[ii+1] = 0;
-			break;
-		}
-
-	return 0;
-}
 
 //=****************** ReadIniFileOption *******************
 //=********************************************************
@@ -836,50 +810,66 @@ S32  ReadIniFileOption( const std::string fileIni, int lid )
 	GetInifileString( _BRDC("Option"), _BRDC("ServiceName"), _BRDC("DACNAME"), p.g_sServiceName, sizeof(p.g_sServiceName), p.g_sFullName );
 	GetInifileString( _BRDC("Option"), _BRDC("PldFileName"), _BRDC("PLDNAME"), p.g_sPldFileName, sizeof(p.g_sPldFileName), p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsNew"), _BRDC("1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nIsNew = BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsNew"), _BRDC("1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nIsNew = BRDC_atoi( sBuffer );
+	GetInifileInt(_BRDC("Option"), _BRDC("IsNew"), _BRDC("1"), p.g_nIsNew, p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("DebugMarker"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nIsDebugMarker = BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("DebugMarker"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nIsDebugMarker = BRDC_atoi( sBuffer );
+	GetInifileInt( _BRDC("Option"), _BRDC("DebugMarker"), _BRDC("0"), p.g_nIsDebugMarker, p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("Cycle"), _BRDC("1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nCycle = BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("Cycle"), _BRDC("1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nCycle = BRDC_atoi( sBuffer );
+	GetInifileInt( _BRDC("Option"), _BRDC("Cycle"), _BRDC("1"), p.g_nCycle , p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("QuickQuit"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nQuickQuit = BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("QuickQuit"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nQuickQuit = BRDC_atoi( sBuffer );
+	GetInifileInt(_BRDC("Option"), _BRDC("QuickQuit"), _BRDC("0"), p.g_nQuickQuit , p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("WorkMode"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nWorkMode = BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("WorkMode"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nWorkMode = BRDC_atoi( sBuffer );
+	GetInifileInt(_BRDC("Option"), _BRDC("WorkMode"), _BRDC("0"), p.g_nWorkMode, p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsAlwaysWriteSdram"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nIsAlwaysWriteSdram = BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsAlwaysWriteSdram"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nIsAlwaysWriteSdram = BRDC_atoi( sBuffer );
+	GetInifileInt(_BRDC("Option"), _BRDC("IsAlwaysWriteSdram"), _BRDC("0"), p.g_nIsAlwaysWriteSdram, p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SamplesPerChannel"), _BRDC("1024"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nSamplesPerChannel = BRDC_atoi64( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SamplesPerChannel"), _BRDC("1024"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nSamplesPerChannel = BRDC_atoi64( sBuffer );
+	GetInifileBig(_BRDC("Option"), _BRDC("SamplesPerChannel"), _BRDC("1024"), p.g_nSamplesPerChannel, p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsSystemMemory"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nIsSystemMemory = BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsSystemMemory"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nIsSystemMemory = BRDC_atoi( sBuffer );
+	GetInifileInt(_BRDC("Option"), _BRDC("IsSystemMemory"), _BRDC("0"), p.g_nIsSystemMemory, p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SdramWriteBufSize"), _BRDC("4"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nSdramWriteBufSize = BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SdramWriteBufSize"), _BRDC("4"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nSdramWriteBufSize = BRDC_atoi( sBuffer );
+	GetInifileInt(_BRDC("Option"), _BRDC("SdramWriteBufSize"), _BRDC("4"), p.g_nSdramWriteBufSize, p.g_sFullName );
 	p.g_nSdramWriteBufSize *= 1024;
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsAlwaysLoadPld"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nIsAlwaysLoadPld = BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("IsAlwaysLoadPld"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nIsAlwaysLoadPld = BRDC_atoi( sBuffer );
+	GetInifileInt(_BRDC("Option"), _BRDC("IsAlwaysLoadPld"), _BRDC("0"), p.g_nIsAlwaysLoadPld, p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("MasterSlave"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nMasterSlave = BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("MasterSlave"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nMasterSlave = BRDC_atoi( sBuffer );
+	GetInifileInt(_BRDC("Option"), _BRDC("MasterSlave"), _BRDC("0"), p.g_nMasterSlave, p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("DmaBufFactor"), _BRDC("4096"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_nDmaBufFactor = BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("DmaBufFactor"), _BRDC("4096"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_nDmaBufFactor = BRDC_atoi( sBuffer );
+	GetInifileInt( _BRDC("Option"), _BRDC("DmaBufFactor"), _BRDC("4096"), p.g_nDmaBufFactor, p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalFreq"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_dSignalFreq = (double)BRDC_atoi( sBuffer );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalFreq"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_dSignalFreq = (double)BRDC_atoi( sBuffer );
+	GetInifileFloat(_BRDC("Option"), _BRDC("SignalFreq"), _BRDC("0"), p.g_dSignalFreq, p.g_sFullName );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalType"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-	p.g_dSignalType  = BRDC_atoi( sBuffer );
 
-	IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalFile"), _BRDC(""), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalType"), _BRDC("0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	//p.g_dSignalType  = BRDC_atoi( sBuffer );
+	GetInifileInt(_BRDC("Option"), _BRDC("SignalType"), _BRDC("0"), (int&)p.g_dSignalType, p.g_sFullName );
+
+	//IPC_getPrivateProfileString( _BRDC("Option"), _BRDC("SignalFile"), _BRDC(""), sBuffer, sizeof(sBuffer), p.g_sFullName );
+	GetInifileString(_BRDC("Option"), _BRDC("SignalFile"), _BRDC(""), sBuffer, sizeof(sBuffer), p.g_sFullName );
 	p.g_pFileDataBin = BRDC_fopen( sBuffer, _BRDC("rb") );
 	if( '\0' != sBuffer[0] )
 		if( NULL == p.g_pFileDataBin )
@@ -895,8 +885,9 @@ S32  ReadIniFileOption( const std::string fileIni, int lid )
 		printf("signalFreq = %.2f ", p.g_dSignalFreq);
 	}
 */
-	IPC_getPrivateProfileString( _BRDC( "Option" ), _BRDC( "TimeoutSec" ), _BRDC( "5" ), sBuffer, sizeof( sBuffer ), p.g_sFullName );
-	p.g_nMsTimeout = BRDC_atoi( sBuffer ) * 1000;
+	//IPC_getPrivateProfileString( _BRDC( "Option" ), _BRDC( "TimeoutSec" ), _BRDC( "5" ), sBuffer, sizeof( sBuffer ), p.g_sFullName );
+	GetInifileInt(_BRDC( "Option" ), _BRDC( "TimeoutSec" ), _BRDC( "5" ), p.g_nMsTimeout, p.g_sFullName );
+	p.g_nMsTimeout *= 1000;
 
 	return 0;
 }
@@ -909,37 +900,49 @@ S32  ReadIniFileDevice( int lid )
 	BRDCHAR sBuffer[512];
 	BRDCHAR sParamName[128];
 	double	dAmpl;
+	int rv;
 
 	ParamsDACs& p = DevicesLid[lid].paramsDac;
 
 	for( auto& dev : DevicesLid[lid].dac )
 	{
 		BRDC_printf("<SRV> Read ini-file >%s< from section >%s<\n", p.g_sFullName, dev.paramDac.sSection );		
-		IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("Ampl"), _BRDC("-1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-		dAmpl = BRDC_atof( sBuffer );
+		//IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("Ampl"), _BRDC("-1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+		//dAmpl = BRDC_atof( sBuffer );
+		GetInifileFloat(dev.paramDac.sSection, _BRDC("Ampl"), _BRDC("-1"), dAmpl, p.g_sFullName );
 
 		for( jj=0; jj<MAX_CHAN; jj++ )
 		{
 			BRDC_sprintf( sParamName, _BRDC("Ampl%d"), jj );
-			IPC_getPrivateProfileString( dev.paramDac.sSection, sParamName, _BRDC(""), sBuffer, sizeof(sBuffer), p.g_sFullName );
-			dev.paramDac.aAmpl[jj] = (*sBuffer) ? BRDC_atof(sBuffer) : dAmpl;
+			//IPC_getPrivateProfileString( dev.paramDac.sSection, sParamName, _BRDC(""), sBuffer, sizeof(sBuffer), p.g_sFullName );
+			//dev.paramDac.aAmpl[jj] = (*sBuffer) ? BRDC_atof(sBuffer) : dAmpl;
+			rv = GetInifileFloat(dev.paramDac.sSection, sParamName, _BRDC(""), dev.paramDac.aAmpl[jj], p.g_sFullName );
+			if(! rv)
+				dev.paramDac.aAmpl[jj] = dAmpl;
 
 			BRDC_sprintf( sParamName, _BRDC("Phase%d"), jj );
-			IPC_getPrivateProfileString( dev.paramDac.sSection, sParamName, _BRDC(""), sBuffer, sizeof(sBuffer), p.g_sFullName );
-			dev.paramDac.aPhase[jj] = (*sBuffer) ? BRDC_atof(sBuffer) : 0.0;
+			//IPC_getPrivateProfileString( dev.paramDac.sSection, sParamName, _BRDC(""), sBuffer, sizeof(sBuffer), p.g_sFullName );
+			//dev.paramDac.aPhase[jj] = (*sBuffer) ? BRDC_atof(sBuffer) : 0.0;
+			rv = GetInifileFloat(dev.paramDac.sSection, sParamName, _BRDC(""), dev.paramDac.aPhase[jj], p.g_sFullName );
+			if(! rv)
+				dev.paramDac.aPhase[jj] = 0.0;			
 			dev.paramDac.aPhase[jj] /= 360;
 			dev.paramDac.aPhase[jj] *= PI2;
 		}
 
-		IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("ThresholdComp0"), _BRDC("0.0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-		dev.paramDac.aThdac[0] = BRDC_atof(sBuffer);
-		IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("ThresholdComp1"), _BRDC("0.0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-		dev.paramDac.aThdac[1] = BRDC_atof(sBuffer);
+		//IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("ThresholdComp0"), _BRDC("0.0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+		//dev.paramDac.aThdac[0] = BRDC_atof(sBuffer);
+		GetInifileFloat(dev.paramDac.sSection, _BRDC("ThresholdComp0"), _BRDC("0.0"), dev.paramDac.aThdac[0], p.g_sFullName );
+		//IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("ThresholdComp1"), _BRDC("0.0"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+		//dev.paramDac.aThdac[1] = BRDC_atof(sBuffer);
+		GetInifileFloat(dev.paramDac.sSection, _BRDC("ThresholdComp1"), _BRDC("0.0"), dev.paramDac.aThdac[1], p.g_sFullName );
 
-		IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("SwitchIn"), _BRDC("-1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-		dev.paramDac.switchIn = BRDC_atoi(sBuffer);
-		IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("SwitchOut"), _BRDC("-1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
-		dev.paramDac.switchOut = BRDC_atoi(sBuffer);
+		//IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("SwitchIn"), _BRDC("-1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+		//dev.paramDac.switchIn = BRDC_atoi(sBuffer);
+		GetInifileInt(dev.paramDac.sSection, _BRDC("SwitchIn"), _BRDC("-1"), dev.paramDac.switchIn, p.g_sFullName );
+		//IPC_getPrivateProfileString( dev.paramDac.sSection, _BRDC("SwitchOut"), _BRDC("-1"), sBuffer, sizeof(sBuffer), p.g_sFullName );
+		//dev.paramDac.switchOut = BRDC_atoi(sBuffer);
+		GetInifileInt(dev.paramDac.sSection, _BRDC("SwitchOut"), _BRDC("-1"), dev.paramDac.switchOut, p.g_sFullName );
 
 		GetInifileString( dev.paramDac.sSection, _BRDC("RegFileName"), _BRDC(""),
 				dev.paramDac.sRegRwSpdFilename, sizeof(dev.paramDac.sRegRwSpdFilename), p.g_sFullName );

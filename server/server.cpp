@@ -860,7 +860,7 @@ json AdcControl::execute(const json& request)
             response["error"] = "ini-file dn't found ..";
             return response;
         }
-        BRD_displayMode(BRDdm_VISIBLE | BRDdm_CONSOLE); 
+        BRD_displayMode(BRDdm_VISIBLE | BRDdm_CONSOLE);         
         printLids();
         adcGetOptions(x_lid, sfile);
         return response;

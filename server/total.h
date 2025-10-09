@@ -409,4 +409,13 @@ extern int x_lid;
 extern BRD_Handle x_handleDevice;
 
 static int version_srv_hi = 3;
-static int version_srv_lo = 940;
+static int version_srv_lo = 942;
+
+S32 GetInifileString(const BRDCHAR* sSectionName, const BRDCHAR* sParamName, const BRDCHAR* defValue,
+    BRDCHAR* strValue, int strSize, const BRDCHAR* sFullName);
+S32 GetInifileInt(const BRDCHAR* sSectionName, const BRDCHAR* sParamName, const BRDCHAR* defValue,
+    int& value, const BRDCHAR* sFullName);
+S32 GetInifileBig(const BRDCHAR* sSectionName, const BRDCHAR* sParamName, const BRDCHAR* defValue,
+    long long& value, const BRDCHAR* sFullName);
+S32 GetInifileFloat(const BRDCHAR* sSectionName, const BRDCHAR* sParamName, const BRDCHAR* defValue,
+    double& value, const BRDCHAR* sFullName);

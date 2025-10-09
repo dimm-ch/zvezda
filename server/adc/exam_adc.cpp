@@ -130,6 +130,7 @@ void stop_exam(int sig)
 }
 #endif
 
+/*
 // Получить параметр типа строка из ini-файла:
 //    FileName - имя ini-файла (с путем, если нужно)
 //    SectionName - название секции
@@ -161,6 +162,7 @@ static void GetInifileString(const BRDCHAR* FileName, const BRDCHAR* SectionName
             break;
         }
 }
+*/
 
 // получить параметры из ini-файла
 void adcGetOptions(int lid, const std::string inifile)
@@ -182,65 +184,107 @@ void adcGetOptions(int lid, const std::string inifile)
         BRDC_printf(_BRDC("ERROR: Can't find ini-file '%s'\n\n"), inifile.c_str());
         return;
     }
+    strcpy(p.g_iniFileNameAdc, iniFilePath);
 
-    printf("Load filename: g_iniFileNameAdc=>%s< \n", p.g_iniFileNameAdc);
-    printf("Path to filename: iniFilePath=>%s< \n", iniFilePath);
+    printf("<SRV> Filename: g_iniFileNameAdc = %s \n", p.g_iniFileNameAdc);
 
     BRDCHAR* endptr;
     // GetPrivateProfileString("Option", "AdcServiceName", "ADC212X200M", g_SrvName, sizeof(g_SrvName), iniFilePath);
-    GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("AdcServiceName"), _BRDC("ADC214x3GDA"), p.g_SrvName, sizeof(p.g_SrvName));
-    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdcServiceName"), _BRDC("ADC214x3GDA"), Buffer, sizeof(Buffer), iniFilePath);
+    // GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("AdcServiceName"), _BRDC("ADC214x3GDA"), p.g_SrvName, sizeof(p.g_SrvName));
+    GetInifileString(_BRDC("Option"), _BRDC("AdcServiceName"), _BRDC("ADC214x3GDA"), p.g_SrvName, sizeof(p.g_SrvName), iniFilePath);
     // BRDC_strncpy(g_SrvName, Buffer, 64);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdcServiceNum"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_AdcSrvNum = BRDC_atoi(Buffer);
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdcServiceNum"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    GetInifileInt(_BRDC("Option"), _BRDC("AdcServiceNum"), _BRDC("0"), p.g_AdcSrvNum, iniFilePath);
+    // p.g_AdcSrvNum = BRDC_atoi(Buffer);
     if (p.g_subNo >= 0)
         p.g_AdcSrvNum = p.g_subNo;
     BRDC_sprintf(p.g_AdcSrvName, _BRDC("%s%d"), p.g_SrvName, p.g_AdcSrvNum);
 
-    GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("PldFileName"), _BRDC("ambpcd_v10_adm212x200m.mcs"), p.g_pldFileName, sizeof(p.g_pldFileName));
-    // GetPrivateProfileString("Option", "PldFileName", "ambpcd_v10_adm212x200m.mcs", g_pldFileName, sizeof(g_pldFileName), iniFilePath);
-    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("PldFileName"), _BRDC("ambpcd_v10_adm212x200m.mcs"), Buffer, sizeof(Buffer), iniFilePath);
-    // BRDC_strcpy(g_pldFileName, Buffer);
-    // GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("PldFileName"), _BRDC("ambpcd_v10_adm212x200m.mcs"), g_pldFileName, sizeof(g_pldFileName));
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("isPldLoadAlways"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_isPldLoadAlways = BRDC_atoi(Buffer);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("BusMasterEnable"), _BRDC("1"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_DmaOn = BRDC_atoi(Buffer);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("Cycle"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_Cycle = BRDC_atoi(Buffer);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("Pause"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_Pause = BRDC_atoi(Buffer);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DaqIntoMemory"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_MemOn = BRDC_atoi(Buffer);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("IsWriteFile"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_IsWriteFile = BRDC_atoi(Buffer);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("SamplesPerChannel"), _BRDC("16384"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_samplesOfChannel = BRDC_atoi64(Buffer);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("MemSamplesPerChan"), _BRDC("16384"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_memorySamplesOfChannel = BRDC_atoi64(Buffer);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("IsSystemMemory"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_IsSysMem = BRDC_atoi(Buffer);
+    GetInifileString(_BRDC("Option"), _BRDC("PldFileName"), _BRDC("ambpcd_v10_adm212x200m.mcs"), p.g_pldFileName, sizeof(p.g_pldFileName), iniFilePath);
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("isPldLoadAlways"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_isPldLoadAlways = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("isPldLoadAlways"), _BRDC("0"), p.g_isPldLoadAlways, iniFilePath);
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("BusMasterEnable"), _BRDC("1"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_DmaOn = BRDC_atoi(Buffer);
+    int temp;
+    GetInifileInt(_BRDC("Option"), _BRDC("BusMasterEnable"), _BRDC("1"), temp, iniFilePath);
+    p.g_DmaOn = temp;
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("Cycle"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_Cycle = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("Cycle"), _BRDC("0"), temp, iniFilePath);
+    p.g_Cycle = temp;
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("Pause"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_Pause = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("Pause"), _BRDC("0"), temp, iniFilePath);
+    p.g_Pause = temp;
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DaqIntoMemory"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_MemOn = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("DaqIntoMemory"), _BRDC("0"), temp, iniFilePath);
+    p.g_MemOn = temp;
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("IsWriteFile"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_IsWriteFile = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("IsWriteFile"), _BRDC("0"), temp, iniFilePath);
+    p.g_IsWriteFile = temp;
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("SamplesPerChannel"), _BRDC("16384"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_samplesOfChannel = BRDC_atoi64(Buffer);
+    long long bv;
+    GetInifileBig(_BRDC("Option"), _BRDC("SamplesPerChannel"), _BRDC("16384"), bv, iniFilePath);
+    p.g_samplesOfChannel = bv;
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("MemSamplesPerChan"), _BRDC("16384"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_memorySamplesOfChannel = BRDC_atoi64(Buffer);
+    GetInifileBig(_BRDC("Option"), _BRDC("MemSamplesPerChan"), _BRDC("16384"), bv, iniFilePath);
+    p.g_memorySamplesOfChannel = bv;
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("IsSystemMemory"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_IsSysMem = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("IsSystemMemory"), _BRDC("0"), temp, iniFilePath);
+    p.g_IsSysMem = temp;
+
     if (p.g_IsSysMem == 1 && p.g_info.busType == BRDbus_ETHERNET) {
         BRDC_printf(_BRDC("Ethernet: IsSystemMemory=0 or IsSystemMemory=2 (NOT EQUAL 1)!!!\n"));
         p.g_IsSysMem = 0;
     }
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DirFileBufSize"), _BRDC("64"), Buffer, sizeof(Buffer), iniFilePath); // KBytes
-    p.g_FileBufSize = BRDC_atoi(Buffer) * 1024;
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DirNumBufWrite"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath); // KBytes
-    p.g_DirWriteFile = BRDC_atoi(Buffer);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DirNumBlock"), _BRDC("2"), Buffer, sizeof(Buffer), iniFilePath); // KBytes
-    p.g_FileBlkNum = BRDC_atoi(Buffer);
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DirFileBufSize"), _BRDC("64"), Buffer, sizeof(Buffer), iniFilePath); // KBytes
+    // p.g_FileBufSize = BRDC_atoi(Buffer) * 1024;
+    GetInifileInt(_BRDC("Option"), _BRDC("DirFileBufSize"), _BRDC("64"), temp, iniFilePath);
+    p.g_FileBufSize = temp;
+    p.g_FileBufSize *= 1024;
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DirNumBufWrite"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath); // KBytes
+    // p.g_DirWriteFile = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("DirNumBufWrite"), _BRDC("0"), p.g_DirWriteFile, iniFilePath);
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("DirNumBlock"), _BRDC("2"), Buffer, sizeof(Buffer), iniFilePath); // KBytes
+    // p.g_FileBlkNum = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("DirNumBlock"), _BRDC("2"), temp, iniFilePath);
+    p.g_FileBlkNum = temp;
     if (p.g_FileBlkNum < 2)
         p.g_FileBlkNum = 2;
-    GetInifileString(iniFilePath, _BRDC("Option"), _BRDC("DirFileName"), _BRDC("adcdir.bin"), p.g_dirFileName, sizeof(p.g_dirFileName));
 
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdcDrqFlag"), _BRDC("2"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_AdcDrqFlag = BRDC_atoi(Buffer);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("MemDrqFlag"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_MemDrqFlag = BRDC_atoi(Buffer);
+    GetInifileString(_BRDC("Option"), _BRDC("DirFileName"), _BRDC("adcdir.bin"), p.g_dirFileName, sizeof(p.g_dirFileName), iniFilePath);
 
-    IPC_getPrivateProfileString(_BRDC("Debug"), _BRDC("IoDelay"), _BRDC("128"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_IoDelay = BRDC_atoi(Buffer);
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdcDrqFlag"), _BRDC("2"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_AdcDrqFlag = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("AdcDrqFlag"), _BRDC("2"), temp, iniFilePath);
+    p.g_AdcDrqFlag = temp;
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("MemDrqFlag"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_MemDrqFlag = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("MemDrqFlag"), _BRDC("0"), temp, iniFilePath);
+    p.g_MemDrqFlag = temp;
+
+    // IPC_getPrivateProfileString(_BRDC("Debug"), _BRDC("IoDelay"), _BRDC("128"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_IoDelay = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("IoDelay"), _BRDC("128"), p.g_IoDelay, iniFilePath);
 
     if (p.g_IsWriteFile == 4) {
         BRDC_printf(_BRDC("File mapping mode: IsWriteFile=0, IsSystemMemory=2 !!!\n"));
@@ -248,22 +292,35 @@ void adcGetOptions(int lid, const std::string inifile)
         p.g_fileMap = 1;
         p.g_IsSysMem = 2;
     }
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("RateRate"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_transRate = BRDC_atoi(Buffer);
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("TimeoutSec"), _BRDC("5"), Buffer, sizeof(Buffer), iniFilePath); // sec
-    p.g_MsTimeout = BRDC_atoi(Buffer) * 1000;
 
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("SwitchOutMask"), _BRDC("0x18"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_SwitchOutMask = BRDC_strtol(Buffer, &endptr, 0);
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("RateRate"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_transRate = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("RateRate"), _BRDC("0"), p.g_transRate, iniFilePath);
 
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("RegDbg"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_regdbg = BRDC_atoi(Buffer);
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("TimeoutSec"), _BRDC("5"), Buffer, sizeof(Buffer), iniFilePath); // sec
+    // p.g_MsTimeout = BRDC_atoi(Buffer) * 1000;
+    GetInifileInt(_BRDC("Option"), _BRDC("TimeoutSec"), _BRDC("5"), temp, iniFilePath);
+    p.g_MsTimeout = temp;
+    p.g_MsTimeout *= 1000;
 
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdjustMode"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_adjust_mode = BRDC_atoi(Buffer);
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("SwitchOutMask"), _BRDC("0x18"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_SwitchOutMask = BRDC_strtol(Buffer, &endptr, 0);
+    GetInifileInt(_BRDC("Option"), _BRDC("SwitchOutMask"), _BRDC("0x18"), temp, iniFilePath);
+    p.g_SwitchOutMask = temp;
 
-    IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("QuickQuit"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
-    p.g_quick_quit = BRDC_atoi(Buffer);
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("RegDbg"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_regdbg = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("RegDbg"), _BRDC("0"), p.g_regdbg, iniFilePath);
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("AdjustMode"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_adjust_mode = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("AdjustMode"), _BRDC("0"), temp, iniFilePath);
+    p.g_adjust_mode = temp;
+
+    // IPC_getPrivateProfileString(_BRDC("Option"), _BRDC("QuickQuit"), _BRDC("0"), Buffer, sizeof(Buffer), iniFilePath);
+    // p.g_quick_quit = BRDC_atoi(Buffer);
+    GetInifileInt(_BRDC("Option"), _BRDC("QuickQuit"), _BRDC("0"), temp, iniFilePath);
+    p.g_quick_quit = temp;
 }
 
 #include "ctrlbasef.h"
@@ -1164,7 +1221,7 @@ S32 RegProg(BRD_Handle hAdc, int idx, int isx)
 
     BRDCHAR regfname[128];
     // GetInifileString(iniFilePath, iniSectionName, _BRDC("RegFileName"), _BRDC("spd_dev.ini"), regfname, sizeof(regfname));
-    GetInifileString(iniFilePath, iniSectionName, _BRDC("RegFileName"), _BRDC(""), regfname, sizeof(regfname));
+    GetInifileString(iniSectionName, _BRDC("RegFileName"), _BRDC(""), regfname, sizeof(regfname), iniFilePath);
 
     // Если указан файл, то подгрузить регистры из файла
     if (regfname[0])
@@ -1184,30 +1241,29 @@ void printLids(void)
     lidList.pLID = new U32[MAX_DEV];
     auto status = BRD_lidList(lidList.pLID, lidList.item, &lidList.itemReal);
 
-    BRD_Info info_;
-    info_.size = sizeof(info_);
-
     // BRD_Handle handle[MAX_DEV];
     int iDev = 0;
     // ULONG iDev = 0;
 
     // отображаем информацию об всех устройствах, указанных в ini-файле
     for (iDev = 0; iDev < lidList.itemReal; iDev++) {
-        BRD_getInfo(lidList.pLID[iDev], &info_); // получить информацию об устройстве
-        if (info_.busType == BRDbus_ETHERNET)
+        BRD_Info& info = DevicesLid[iDev].paramsAdc.g_info;
+        info.size = sizeof(info);
+        BRD_getInfo(lidList.pLID[iDev], &info); // получить информацию об устройстве
+        if (info.busType == BRDbus_ETHERNET)
             BRDC_printf(_BRDC("%s, DevID = 0x%x, RevID = 0x%x, IP %u.%u.%u.%u, Port %u, PID = %d.\n"),
-                info_.name, info_.boardType >> 16, info_.boardType & 0xff,
-                (UCHAR)info_.bus, (UCHAR)(info_.bus >> 8), (UCHAR)(info_.bus >> 16), (UCHAR)(info_.bus >> 24),
-                info_.dev, info_.pid);
+                info.name, info.boardType >> 16, info.boardType & 0xff,
+                (UCHAR)info.bus, (UCHAR)(info.bus >> 8), (UCHAR)(info.bus >> 16), (UCHAR)(info.bus >> 24),
+                info.dev, info.pid);
         else {
-            ULONG dev_id = info_.boardType >> 16;
+            ULONG dev_id = info.boardType >> 16;
             if (dev_id == 0x53B1 || dev_id == 0x53B3) // FMC115cP or FMC117cP
                 BRDC_printf(_BRDC("%s, DevID = 0x%x, RevID = 0x%x, Bus = %d, Dev = %d, G.adr = %d, Order = %d, PID = %d.\n"),
-                    info_.name, info_.boardType >> 16, info_.boardType & 0xff, info_.bus, info_.dev,
-                    info_.slot & 0xffff, info_.pid >> 28, info_.pid & 0xfffffff);
+                    info.name, info.boardType >> 16, info.boardType & 0xff, info.bus, info.dev,
+                    info.slot & 0xffff, info.pid >> 28, info.pid & 0xfffffff);
             else
                 BRDC_printf(_BRDC("%s, DevID = 0x%x, RevID = 0x%x, Bus = %d, Dev = %d, Slot = %d, PID = %d.\n"),
-                    info_.name, info_.boardType >> 16, info_.boardType & 0xff, info_.bus, info_.dev, info_.slot, info_.pid);
+                    info.name, info.boardType >> 16, info.boardType & 0xff, info.bus, info.dev, info.slot, info.pid);
         }
     }
 }

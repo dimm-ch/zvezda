@@ -154,9 +154,11 @@ S32 FillSignalFromFile(int lid, void* pvBuf, SBIG nSamples, TDacParam& pDac, int
 
 S32 CorrectOutFreq(TDacParam& dac);
 S32 ReadIniFile2(TCHAR* pFileName);
+/*
 S32 GetInifileString(const BRDCHAR* FileName, const BRDCHAR* SectionName,
     const BRDCHAR* ParamName, BRDCHAR* defValue,
     BRDCHAR* strValue, int strSize);
+*/
 S32 ReadIniFileOption(const std::string fileIni, int lid);
 S32 ReadIniFileDevice(int lid);
 S32 DisplayDacTraceText(int loop, int lid);

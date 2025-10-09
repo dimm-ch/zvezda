@@ -28,6 +28,7 @@ S32 SdramSettings(ULONG mem_mode, int lid, uint64_t& bBuf_size)
 {
     S32 status;
     ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
 
     BRD_SdramCfgEx rSdramConfig;
     rSdramConfig.Size = sizeof(BRD_SdramCfgEx);

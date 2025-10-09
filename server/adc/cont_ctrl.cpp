@@ -84,6 +84,7 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
     PTHREAD_PARAM pThreadParam = (PTHREAD_PARAM)pParams;
     BRD_Handle hSrv = pThreadParam->handle;
     int idx = pThreadParam->idx;
+    ParamsAdc& p = DevicesLid[idx].paramsAdc;
 
     BRDctrl_StreamCBufAlloc buf_dscr;
     buf_dscr.dir = BRDstrm_DIR_IN;
@@ -112,21 +113,21 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
     // BRDC_sprintf(nameFlagMap, _BRDC("data_flg"), i);
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
     p.g_hBufFileMap_cont = IPC_createSharedMemory(nameBufMap, p.g_BlkSize);
-    p.g_pBufFileMap = IPC_mapSharedMemory(g_hBufFileMap_cont);
+    p.g_pBufFileMap = IPC_mapSharedMemory(p.g_hBufFileMap_cont);
     p.g_hFlgFileMap_cont = IPC_createSharedMemory(nameFlagMap, 3 * sizeof(ULONG));
-    p.g_pFlags_cont = (ULONG*)IPC_mapSharedMemory(g_hFlgFileMap_cont);
+    p.g_pFlags_cont = (ULONG*)IPC_mapSharedMemory(p.g_hFlgFileMap_cont);
 #else
     p.g_hBufFileMap_cont = CreateFileMapping(INVALID_HANDLE_VALUE,
         NULL, PAGE_READWRITE,
         0, p.g_BlkSize,
         nameBufMap);
-    p.g_pBufFileMap = (void*)MapViewOfFile(g_hBufFileMap_cont, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+    p.g_pBufFileMap = (void*)MapViewOfFile(p.g_hBufFileMap_cont, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 
     p.g_hFlgFileMap_cont = CreateFileMapping(INVALID_HANDLE_VALUE,
         NULL, PAGE_READWRITE,
         0, 3 * sizeof(ULONG),
         nameFlagMap);
-    p.g_pFlags_cont = (ULONG*)MapViewOfFile(g_hFlgFileMap_cont, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+    p.g_pFlags_cont = (ULONG*)MapViewOfFile(p.g_hFlgFileMap_cont, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 #endif
     p.g_pFlags_cont[0] = 0;
     p.g_pFlags_cont[1] = 0;
@@ -134,7 +135,7 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
 
     // установить источник для работы стрима
     ULONG tetrad;
-    if (g_MemAsFifo)
+    if (p.g_MemAsFifo)
         status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_GETSRCSTREAM, &tetrad); // стрим будет работать с SDRAM
     else
         status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_GETSRCSTREAM, &tetrad); // стрим будет работать с АЦП
@@ -145,14 +146,14 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
     //	ULONG flag = BRDstrm_DRQ_READY;
     //	ULONG flag = BRDstrm_DRQ_HALF; // рекомендуется флаг - FIFO наполовину заполнено
     ULONG flag = p.g_AdcDrqFlag;
-    if (g_MemAsFifo)
+    if (p.g_MemAsFifo)
         flag = p.g_MemDrqFlag;
     status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_SETDRQ, &flag);
 
     ULONG Enable = 1;
     status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_FIFORESET, NULL); // сброс FIFO АЦП
     status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_RESETFIFO, NULL);
-    if (g_MemAsFifo) {
+    if (p.g_MemAsFifo) {
         status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_FIFORESET, NULL); // сборс FIFO SDRAM
         status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_ENABLE, &Enable); // разрешение записи в SDRAM
     }
@@ -182,8 +183,8 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
             DisplayError(status, __FUNCTION__, _BRDC("TIME-OUT"));
             break;
         }
-        if (!buf_dscr.pStub->lastBlock && !g_pFlags_cont[0]) {
-            memcpy(g_pBufFileMap, buf_dscr.ppBlk[0], p.g_BlkSize);
+        if (!buf_dscr.pStub->lastBlock && !p.g_pFlags_cont[0]) {
+            memcpy(p.g_pBufFileMap, buf_dscr.ppBlk[0], p.g_BlkSize);
             p.g_pFlags_cont[0] = 0xffffffff;
             p.g_pFlags_cont[1] = cnt == 0 ? 1 : 0;
             p.g_pFlags_cont[2] = buf_dscr.blkSize;
@@ -219,11 +220,11 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
         if (Status & 0x80)
             BRDC_printf(_BRDC("\nERROR (%s): ADC FIFO is overflow (ADC FIFO Status = 0x%04X)\n"), nameBufMap, Status);
 
-    } while (!g_flbreak_cont);
+    } while (!p.g_flbreak_cont);
 
     Enable = 0;
     status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_ENABLE, &Enable); // запрет работы АЦП
-    if (g_MemAsFifo)
+    if (p.g_MemAsFifo)
         status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_ENABLE, &Enable); // запрет записи в SDRAM
 //	printf("                                             \r");
 //	if(errCnt)
@@ -231,31 +232,31 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
 #ifdef _WIN32
     double msTime = (double)(StopPerformCount.QuadPart - StartPerformCount.QuadPart) / (double)Frequency.QuadPart * 1.E3;
     BRDC_printf(_BRDC("Total: block = %d, DAQ & Transfer by bus rate is %.2f Mbytes/sec\n"),
-        buf_dscr.pStub->totalCounter, ((double)g_BlkSize * cnt / msTime) / 1000.);
+        buf_dscr.pStub->totalCounter, ((double)p.g_BlkSize * cnt / msTime) / 1000.);
 //	BRDC_printf(_BRDC("Total: Block (%s) = %d, DAQ & Transfer by bus rate is %.2f Mbytes/sec\n"),
-//										nameBufMap, buf_dscr.pStub->totalCounter, ((double)g_BlkSize*cnt / msTime)/1000.);
+//										nameBufMap, buf_dscr.pStub->totalCounter, ((double)p.g_BlkSize*cnt / msTime)/1000.);
 #else
     BRDC_printf(_BRDC("Total: block = %d\n"), buf_dscr.pStub->totalCounter);
 #endif
     status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_FIFOSTATUS, &Status);
     if (Status & 0x80)
         BRDC_printf(_BRDC("ERROR (%s): ADC FIFO is overflow\n"), nameBufMap);
-    if (g_MemAsFifo) {
+    if (p.g_MemAsFifo) {
         status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_FIFOSTATUS, &Status);
         if (Status & 0x80)
             BRDC_printf(_BRDC("ERROR (%s): SDRAM FIFO is overflow\n"), nameBufMap);
     }
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-    IPC_unmapSharedMemory(g_hFlgFileMap_cont);
-    IPC_deleteSharedMemory(g_hFlgFileMap_cont);
-    IPC_unmapSharedMemory(g_pBufFileMap);
-    IPC_deleteSharedMemory(g_pBufFileMap);
+    IPC_unmapSharedMemory(p.g_hFlgFileMap_cont);
+    IPC_deleteSharedMemory(p.g_hFlgFileMap_cont);
+    IPC_unmapSharedMemory(p.g_pBufFileMap);
+    IPC_deleteSharedMemory(p.g_pBufFileMap);
 #else
-    UnmapViewOfFile(g_pFlags_cont);
-    CloseHandle(g_hFlgFileMap_cont);
-    UnmapViewOfFile(g_pBufFileMap);
-    CloseHandle(g_hBufFileMap_cont);
+    UnmapViewOfFile(p.g_pFlags_cont);
+    CloseHandle(p.g_hFlgFileMap_cont);
+    UnmapViewOfFile(p.g_pBufFileMap);
+    CloseHandle(p.g_hBufFileMap_cont);
 #endif
 
     status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_FREE, &buf_dscr);
