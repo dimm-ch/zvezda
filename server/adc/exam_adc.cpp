@@ -1279,6 +1279,7 @@ void puListLoad(int lid)
     U32 ItemReal;
     BRD_Handle hdev = DevicesLid[lid].device.handle();
     auto status = BRD_puList(hdev, PuList, MAX_PU, &ItemReal); // получить список программируемых устройств
+    printf("<SRV> puListLoad: %d programmable units found/n", ItemReal);
     if (ItemReal <= MAX_PU) {
         for (U32 j = 0; j < ItemReal; j++) {
             if (PuList[j].puCode == PLD_CFG_TAG) { // Тип программируемого устройства - ПЛИС
@@ -1333,16 +1334,16 @@ bool checkPower(int lid)
         S32 status = BRD_extension(hdev, 0, BRDextn_GET_FMCPOWER, &power);
         if (BRD_errcmp(status, BRDerr_OK)) {
             if (power.onOff) {
-                BRDC_printf(_BRDC("FMC Power: ON %.2f Volt\n"), power.value / 100.);
+                BRDC_printf(_BRDC("<SRV> FMC Power: ON %.2f Volt\n"), power.value / 100.);
             } else {
-                BRDC_printf(_BRDC("FMC Power is turned off, enabling now...\n"));
+                BRDC_printf(_BRDC("<SRV> FMC Power is turned off, enabling now...\n"));
                 power.onOff = 1;
                 status = BRD_extension(hdev, 0, BRDextn_SET_FMCPOWER, &power);
                 status = BRD_extension(hdev, 0, BRDextn_GET_FMCPOWER, &power);
                 if (power.onOff)
-                    BRDC_printf(_BRDC("FMC Power: ON %.2f Volt\n"), power.value / 100.);
+                    BRDC_printf(_BRDC("<SRV> FMC Power: ON %.2f Volt\n"), power.value / 100.);
                 else
-                    BRDC_printf(_BRDC("FMC Power: OFF %.2f Volt\n"), power.value / 100.);
+                    BRDC_printf(_BRDC("<SRV> FMC Power: OFF %.2f Volt\n"), power.value / 100.);
             }
             return true;
         } else {

@@ -873,6 +873,10 @@ json AdcControl::execute(const json& request)
     } 
     x_handleDevice = DevicesLid[x_lid].device.handle();
 
+    if (scmd == "pu-load") {
+        puListLoad(x_lid);      
+    }     
+
     if (scmd == "setup") {
         int mode = BRDopen_EXCLUSIVE;
         if (request.contains("mode")) {
@@ -881,7 +885,7 @@ json AdcControl::execute(const json& request)
         }
         //DevicesLid[x_lid].device.reopen(x_lid);
         //x_handleDevice = DevicesLid[x_lid].device.handle();  
-        puListLoad(x_lid);      
+        //puListLoad(x_lid);      
         if (!checkPower(x_lid)) {
             printf("<ERR> ADC power error .. \n");
             response["error"] = "ADC power error";

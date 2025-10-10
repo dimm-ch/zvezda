@@ -347,6 +347,7 @@ S32 SetAllDac( int lid )
 					pStart->stndStart.reStartMode = 1;
 				}
 				err = BRD_ctrl( hdlSrv, 0, BRDctrl_DAC_SETSTARTMODE, &aStartStruct );
+				
 			}
 		}	
 		// Установить значения компараторов
