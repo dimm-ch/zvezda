@@ -50,3 +50,5 @@ build
 tmp
 CMakeUserPresets.json
 _distr
+build_arm32
+install

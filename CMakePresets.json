@@ -94,11 +94,21 @@
 			"generator": "Unix Makefiles",
 			"binaryDir": "${sourceDir}/build_arm32/${presetName}",
 			"cacheVariables": {
-			"CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/arm32-toolchain.cmake",
-			"CMAKE_BUILD_TYPE": "Debug",
-			"CMAKE_FIND_ROOT_PATH_MODE_PACKAGE": "BOTH"
+				"CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/arm32-toolchain.cmake",
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_FIND_ROOT_PATH_MODE_PACKAGE": "BOTH",
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+				"CMAKE_C_FLAGS_DEBUG": "-O0 -g -fno-omit-frame-pointer",
+				"CMAKE_CXX_FLAGS_DEBUG": "-O0 -g -fno-omit-frame-pointer",
+				"CMAKE_BUILD_RPATH_USE_ORIGIN": "ON",
+				"CMAKE_INSTALL_RPATH": "$ORIGIN:$ORIGIN/../lib",
+  				"CMAKE_INSTALL_PREFIX": "${sourceDir}/install/armhf-Debug"
+			},
+			"environment": {
+				"DEPLOY_HOST": "root@192.168.5.75",
+				"DEPLOY_DIR": "/root/srv/bin"
 			}
-		},		
+		}
 	],
 	"buildPresets": [
 		{

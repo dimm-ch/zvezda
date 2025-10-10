@@ -436,7 +436,7 @@ void ParseCommandLine(int argc, BRDCHAR* argv[])
                 ii++;
                 pLin = argv[ii];
             }
-            g_subNo = BRё1DC_strtoul(pLin, &endptr, 0);
+            g_subNo = BRDC_strtoul(pLin, &endptr, 0);
             BRDC_printf(_BRDC("Command line: -m %d\n"), g_subNo);
         }
 
