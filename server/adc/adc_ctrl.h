@@ -21,7 +21,7 @@ const U16 PLD_CFG_TAG = 0x0500; // tag of PLD
 // void DisplayError(S32 status, BRDCHAR* func_name, BRDCHAR* cmd_str);
 void DisplayError(S32 status, const char* func_name, const BRDCHAR* cmd_str);
 
-S32 AdcSettings(BRD_Handle hADC, int lid, int isx, BRDCHAR* srvName, BRDCHAR* iniFileName);
+S32 AdcSettings(int lid);
 S32 SdramSettings(ULONG mem_mode, int lid, uint64_t& bBuf_size);
 
 // S32 DaqIntoSdram(BRD_Handle hADC, PVOID pSig, ULONG bBufSize, int num_chan);

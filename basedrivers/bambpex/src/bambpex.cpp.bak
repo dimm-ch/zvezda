@@ -16,8 +16,8 @@
 #define CURRFILE _BRDC("BAMBPEX")
 
 //******************************************
-CBambpex::CBambpex() :
-	CBaseModule(MAX_BASE_CFGMEM_SIZE)
+CBambpex::CBambpex()
+    : CBaseModule(MAX_BASE_CFGMEM_SIZE)
 {
 #ifdef _c6x_
     m_devMem = IPC_openDeviceRaw("/dev/mem");
@@ -53,8 +53,7 @@ static void FindDlgDLLName(BRDCHAR** pLibName, PBRD_InitData pInitData, long ini
 {
     //	pLibName = NULL;
     // Search SubSections
-	for(long i = 0; i < initDataSize; i++)
-	{
+    for (long i = 0; i < initDataSize; i++) {
         // if(!_stricmp(pInitData[i].key, pKeyword))	// Keyword
         if (!BRDC_stricmp(pInitData[i].key, pKeyword)) // Keyword
         {
@@ -68,8 +67,8 @@ static void FindDlgDLLName(BRDCHAR** pLibName, PBRD_InitData pInitData, long ini
 // BASE_INI* pIniData - данные из ИИ (PID, BusNumber, SlotNumber) при полуавтоматической инициализации и
 //						NULL при автоматической инициализации
 //******************************************
-CBambpex::CBambpex(PBRD_InitData pBrdInitData, long sizeInitData) :
-	CBaseModule(MAX_BASE_CFGMEM_SIZE)
+CBambpex::CBambpex(PBRD_InitData pBrdInitData, long sizeInitData)
+    : CBaseModule(MAX_BASE_CFGMEM_SIZE)
 {
 #ifdef _c6x_
     m_devMem = IPC_openDeviceRaw("/dev/mem");
@@ -115,13 +114,10 @@ CBambpex::CBambpex(PBRD_InitData pBrdInitData, long sizeInitData) :
 
     pDlgLibName = NULL;
     FindDlgDLLName(&pDlgLibName, pBrdInitData, size, _BRDC("sdramdlgdll"));
-	if(pDlgLibName)
-	{
+    if (pDlgLibName) {
         for (int iMem = 0; iMem < MAX_MEMORY_SRV; iMem++)
             BRDC_strcpy(m_pIniData->MemIni[iMem].DlgDllName, pDlgLibName);
-	}
-	else
-	{
+    } else {
         for (int iMem = 0; iMem < MAX_MEMORY_SRV; iMem++)
             BRDC_strcpy(m_pIniData->MemIni[iMem].DlgDllName, _BRDC(""));
     }
@@ -129,8 +125,7 @@ CBambpex::CBambpex(PBRD_InitData pBrdInitData, long sizeInitData) :
     FindKeyWord(_BRDC("sysgen"), m_pIniData->SysGen, pInitData, size);
 
     BRDCHAR key_name[64];
-	for (int iMem = 0; iMem < MAX_MEMORY_SRV; iMem++)
-	{
+    for (int iMem = 0; iMem < MAX_MEMORY_SRV; iMem++) {
         BRDC_sprintf(key_name, _BRDC("slotcnt%d"), iMem);
         FindKeyWord(key_name, m_pIniData->MemIni[iMem].SlotCnt, pInitData, size);
         BRDC_sprintf(key_name, _BRDC("modulecnt%d"), iMem);
@@ -150,16 +145,22 @@ CBambpex::CBambpex(PBRD_InitData pBrdInitData, long sizeInitData) :
         BRDC_sprintf(key_name, _BRDC("attibutes%d"), iMem);
         FindKeyWord(key_name, m_pIniData->MemIni[iMem].Attributes, pInitData, size);
 
-		if(iMem)	BRDC_sprintf(key_name, _BRDC("memtetrnum%d"), iMem);
-		else		BRDC_strcpy(key_name, _BRDC("memtetrnum"));
+        if (iMem)
+            BRDC_sprintf(key_name, _BRDC("memtetrnum%d"), iMem);
+        else
+            BRDC_strcpy(key_name, _BRDC("memtetrnum"));
         FindKeyWord(key_name, m_pIniData->MemIni[iMem].TetrNum, pInitData, size);
 
         // настройка адреса при разделении одной физической памяти между двумя терадами
-		if (iMem)	BRDC_sprintf(key_name, _BRDC("memadrmask%d"), iMem);
-		else		BRDC_strcpy(key_name, _BRDC("memadrmask"));
+        if (iMem)
+            BRDC_sprintf(key_name, _BRDC("memadrmask%d"), iMem);
+        else
+            BRDC_strcpy(key_name, _BRDC("memadrmask"));
         FindKeyWord(key_name, m_pIniData->MemIni[iMem].AdrMask, pInitData, size);
-		if (iMem)	BRDC_sprintf(key_name, _BRDC("memadrconst%d"), iMem);
-		else		BRDC_strcpy(key_name, _BRDC("memadrconst"));
+        if (iMem)
+            BRDC_sprintf(key_name, _BRDC("memadrconst%d"), iMem);
+        else
+            BRDC_strcpy(key_name, _BRDC("memadrconst"));
         FindKeyWord(key_name, m_pIniData->MemIni[iMem].AdrConst, pInitData, size);
     }
 
@@ -184,8 +185,7 @@ CBambpex::CBambpex(PBRD_InitData pBrdInitData, long sizeInitData) :
 //******************************************
 CBambpex::~CBambpex()
 {
-	if(m_hMutex)
-	{
+    if (m_hMutex) {
         // CloseHandle(m_hMutex);
         IPC_deleteMutex(m_hMutex);
         m_hMutex = NULL;
@@ -194,18 +194,14 @@ CBambpex::~CBambpex()
         delete m_pIniData;
     // free(m_pIniData);
     int srv_num = (int)m_SrvList.size();
-	if(srv_num)
-	{
-		for(int i = 0; i < srv_num; i++)
-		{
+    if (srv_num) {
+        for (int i = 0; i < srv_num; i++) {
             // CRegSrv* pregsrv = m_SrvList.pop_back();
             m_SrvList.pop_back();
-
         }
     }
     DeleteServices();
     CleanUp();
-
 }
 
 static U16 flagPID = 0;
@@ -255,8 +251,7 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
         // if(m_pIniData->PID || m_pIniData->OrderNumber != (U32)-1)
         if (m_pIniData->PID != 0)
             CurDevNum = 0;
-		else
-			if(flagORDER == 1 && m_pIniData->OrderNumber != (U32)-1)
+        else if (flagORDER == 1 && m_pIniData->OrderNumber != (U32)-1)
             CurDevNum = 0;
     }
     AMB_LOCATION AmbLocation;
@@ -304,8 +299,7 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
         char buf[MAX_STRING_LEN];
         GetVersion(buf);
 
-		if(!m_hMutex)
-		{
+        if (!m_hMutex) {
             BRDCHAR nameMutex[MAX_PATH];
             BRDC_sprintf(nameMutex, _BRDC("mutex_BAMBPEX%d"), DeviceNumber);
             // m_hMutex = CreateMutex(NULL, FALSE, nameMutex);
@@ -320,10 +314,8 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
         //		ULONG pldStatus;
         //		ReadRegData(0, 4, pldStatus);
         // Get DeviceID, RevisionID, PCI Bus, PCI Device, PCI Slot, PID
-		if(GetDeviceID(m_DeviceID) != BRDerr_OK)
-		{
-			if(m_hMutex)
-			{
+        if (GetDeviceID(m_DeviceID) != BRDerr_OK) {
+            if (m_hMutex) {
                 // CloseHandle(m_hMutex);
                 IPC_deleteMutex(m_hMutex);
                 m_hMutex = NULL;
@@ -337,60 +329,9 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
                 //_BRDC("<Init> Undefined vital data into init source"));
                 _BRDC("<Init> Error by GetDeviceID"));
         }
-		if( m_DeviceID != AMBPEX8_DEVID &&
-			m_DeviceID != ADP201X1AMB_DEVID &&
-			m_DeviceID != ADP201X1DSP_DEVID &&
-			m_DeviceID != AMBPEX5_DEVID &&
-			m_DeviceID != FMC105P_DEVID &&
-			m_DeviceID != FMC106P_DEVID &&
-			m_DeviceID != FMC107P_DEVID &&
-			m_DeviceID != FMC103E_DEVID &&
-			m_DeviceID != FMC110P_DEVID &&
-			m_DeviceID != FMC111P_DEVID &&
-			m_DeviceID != FMC114V_DEVID &&
-			m_DeviceID != FMC113E_DEVID &&
-			m_DeviceID != FMC108V_DEVID &&
-			m_DeviceID != FMC115CP_DEVID &&
-			m_DeviceID != FMC117CP_DEVID &&
-			m_DeviceID != FMC112CP_DEVID &&
-			m_DeviceID != AC_ADC_DEVID &&
-			m_DeviceID != AC_DSP_DEVID &&
-			m_DeviceID != AC_SYNC_DEVID &&
-			m_DeviceID != PS_ADC_DEVID &&
-			m_DeviceID != PS_DSP_DEVID &&
-			m_DeviceID != PS_SYNC_DEVID &&
-			m_DeviceID != UADCPEX_DEVID &&
-			m_DeviceID != XM416X250M_DEVID &&
-			m_DeviceID != FMC121CP_DEVID &&
-			m_DeviceID != FMC123E_DEVID &&
-			m_DeviceID != FMC124P_DEVID &&
-			m_DeviceID != FMC125CP_DEVID &&
-			m_DeviceID != FMC127P_DEVID &&
-			m_DeviceID != FMC122P_DEVID &&
-			m_DeviceID != FMC126P_DEVID &&
-			m_DeviceID != FMC131VKU_DEVID &&
-			m_DeviceID != FMC131VZQ_DEVID &&
-			m_DeviceID != FMC141VKU1_DEVID &&
-			m_DeviceID != FMC141VKU2_DEVID &&
-			m_DeviceID != FMC141VZQ_DEVID &&
-			m_DeviceID != FMC143VKU_DEVID &&
-			m_DeviceID != FMC143VZQ_DEVID &&
-			m_DeviceID != FMC143VKUS_DEVID &&
-			m_DeviceID != FMC146VKU_DEVID &&
-			m_DeviceID != FMC146VZQ_DEVID &&
-			m_DeviceID != FMC132P_DEVID &&
-			m_DeviceID != FMC139P_DEVID &&
-			m_DeviceID != FMC133V_DEVID &&
-			m_DeviceID != DSP134V_DEVID &&
-			m_DeviceID != FMC121P_DEVID &&
-			m_DeviceID != RFG2_DEVID &&
-			m_DeviceID != PANORAMA_DEVID &&
-			m_DeviceID != D2XT006_DEVID &&
-			m_DeviceID != FMC130E_DEVID
-			) // все типы поддерживаемых модулей
-		{
-			if(m_hMutex)
+        if (m_DeviceID != AMBPEX8_DEVID && m_DeviceID != ADP201X1AMB_DEVID && m_DeviceID != ADP201X1DSP_DEVID && m_DeviceID != AMBPEX5_DEVID && m_DeviceID != FMC105P_DEVID && m_DeviceID != FMC106P_DEVID && m_DeviceID != FMC107P_DEVID && m_DeviceID != FMC103E_DEVID && m_DeviceID != FMC110P_DEVID && m_DeviceID != FMC111P_DEVID && m_DeviceID != FMC114V_DEVID && m_DeviceID != FMC113E_DEVID && m_DeviceID != FMC108V_DEVID && m_DeviceID != FMC115CP_DEVID && m_DeviceID != FMC117CP_DEVID && m_DeviceID != FMC112CP_DEVID && m_DeviceID != AC_ADC_DEVID && m_DeviceID != AC_DSP_DEVID && m_DeviceID != AC_SYNC_DEVID && m_DeviceID != PS_ADC_DEVID && m_DeviceID != PS_DSP_DEVID && m_DeviceID != PS_SYNC_DEVID && m_DeviceID != UADCPEX_DEVID && m_DeviceID != XM416X250M_DEVID && m_DeviceID != FMC121CP_DEVID && m_DeviceID != FMC123E_DEVID && m_DeviceID != FMC124P_DEVID && m_DeviceID != FMC125CP_DEVID && m_DeviceID != FMC127P_DEVID && m_DeviceID != FMC122P_DEVID && m_DeviceID != FMC126P_DEVID && m_DeviceID != FMC131VKU_DEVID && m_DeviceID != FMC131VZQ_DEVID && m_DeviceID != FMC141VKU1_DEVID && m_DeviceID != FMC141VKU2_DEVID && m_DeviceID != FMC141VZQ_DEVID && m_DeviceID != FMC143VKU_DEVID && m_DeviceID != FMC143VZQ_DEVID && m_DeviceID != FMC143VKUS_DEVID && m_DeviceID != FMC146VKU_DEVID && m_DeviceID != FMC146VZQ_DEVID && m_DeviceID != FMC132P_DEVID && m_DeviceID != FMC139P_DEVID && m_DeviceID != FMC133V_DEVID && m_DeviceID != DSP134V_DEVID && m_DeviceID != FMC121P_DEVID && m_DeviceID != RFG2_DEVID && m_DeviceID != PANORAMA_DEVID && m_DeviceID != D2XT006_DEVID && m_DeviceID != FMC130E_DEVID) // все типы поддерживаемых модулей
         {
+            if (m_hMutex) {
                 IPC_deleteMutex(m_hMutex);
                 m_hMutex = NULL;
             }
@@ -400,10 +341,8 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
             continue;
         }
 
-		if(GetRevisionID(m_RevisionID) != BRDerr_OK)
-		{
-			if(m_hMutex)
-			{
+        if (GetRevisionID(m_RevisionID) != BRDerr_OK) {
+            if (m_hMutex) {
                 IPC_deleteMutex(m_hMutex);
                 m_hMutex = NULL;
             }
@@ -415,10 +354,8 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
                 //_BRDC("<Init> Undefined vital data into init source"));
                 _BRDC("<Init> Error by GetRevisionID"));
         }
-		if(GetLocation(&AmbLocation) != BRDerr_OK)
-		{
-			if(m_hMutex)
-			{
+        if (GetLocation(&AmbLocation) != BRDerr_OK) {
+            if (m_hMutex) {
                 IPC_deleteMutex(m_hMutex);
                 m_hMutex = NULL;
             }
@@ -433,10 +370,8 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
         //		MessageBox(NULL, "<Init> GetDevice&GetLocation", "BAMBPEX", MB_OK);
         // errorCode = GetMemoryAddress();
         ICR_IdBase Info;
-		if (ReadNvRAM(&Info, sizeof(ICR_IdBase), 0x80) != BRDerr_OK)
-		{
-			if(m_hMutex)
-			{
+        if (ReadNvRAM(&Info, sizeof(ICR_IdBase), 0x80) != BRDerr_OK) {
+            if (m_hMutex) {
                 IPC_deleteMutex(m_hMutex);
                 m_hMutex = NULL;
             }
@@ -446,10 +381,8 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
                 CURRFILE, // ErrVitalText);
                 _BRDC("<Init> Error read data from ICR"));
         }
-		if(GetBaseIcrDataSize() != BRDerr_OK)
-		{
-			if(m_hMutex)
-			{
+        if (GetBaseIcrDataSize() != BRDerr_OK) {
+            if (m_hMutex) {
                 IPC_deleteMutex(m_hMutex);
                 m_hMutex = NULL;
             }
@@ -462,10 +395,8 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
                 _BRDC("<Init> Error by GetBaseIcrDataSize"));
         }
         BaseIcrCorrectError();
-		if(GetPid() != BRDerr_OK)
-		{
-			if(m_hMutex)
-			{
+        if (GetPid() != BRDerr_OK) {
+            if (m_hMutex) {
                 IPC_deleteMutex(m_hMutex);
                 m_hMutex = NULL;
             }
@@ -477,39 +408,21 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
                 //_BRDC("<Init> Undefined vital data into init source"));
                 _BRDC("<Init> Error by GetPid"));
         }
-		if(m_DeviceID == FMC115CP_DEVID ||
-			m_DeviceID == AC_SYNC_DEVID ||
-			m_DeviceID == PS_DSP_DEVID ||
-			m_DeviceID == PS_ADC_DEVID ||
-			m_DeviceID == FMC131VKU_DEVID ||
-			m_DeviceID == FMC131VZQ_DEVID ||
-			m_DeviceID == FMC141VKU1_DEVID ||
-			m_DeviceID == FMC141VKU2_DEVID ||
-			m_DeviceID == FMC141VZQ_DEVID ||
-			m_DeviceID == FMC143VKU_DEVID ||
-			m_DeviceID == FMC143VKUS_DEVID ||
-			m_DeviceID == FMC143VZQ_DEVID ||
-			m_DeviceID == FMC146VKU_DEVID ||
-			m_DeviceID == FMC146VZQ_DEVID ||
-			m_DeviceID == FMC117CP_DEVID)
-		{
+        if (m_DeviceID == FMC115CP_DEVID || m_DeviceID == AC_SYNC_DEVID || m_DeviceID == PS_DSP_DEVID || m_DeviceID == PS_ADC_DEVID || m_DeviceID == FMC131VKU_DEVID || m_DeviceID == FMC131VZQ_DEVID || m_DeviceID == FMC141VKU1_DEVID || m_DeviceID == FMC141VKU2_DEVID || m_DeviceID == FMC141VZQ_DEVID || m_DeviceID == FMC143VKU_DEVID || m_DeviceID == FMC143VKUS_DEVID || m_DeviceID == FMC143VZQ_DEVID || m_DeviceID == FMC146VKU_DEVID || m_DeviceID == FMC146VZQ_DEVID || m_DeviceID == FMC117CP_DEVID) {
             flagORDER = 1;
-			if(m_pIniData)
-			{
+            if (m_pIniData) {
                 save_pid = m_pIniData->PID;
                 save_slot = m_pIniData->SlotNumber;
                 save_order_num = m_pIniData->OrderNumber;
                 // BRDC_printf(_BRDC("IniData(before): PID = %d(%x), Slot = %d(%x), order = %d\n"),
                 //						m_pIniData->PID, m_pIniData->PID, m_pIniData->SlotNumber, m_pIniData->SlotNumber, m_pIniData->OrderNumber);
                 // BRDC_printf(_BRDC("Location(before): PID = %d(%x), SlotNumber = %x\n"), m_PID, m_PID, AmbLocation.SlotNumber);
-				if((m_pIniData->PID != (U32)-1) && (m_pIniData->OrderNumber != (U32)-1))
-				{ // к PID из ini-файла замешиваю order из ini-файла
+                if ((m_pIniData->PID != (U32)-1) && (m_pIniData->OrderNumber != (U32)-1)) { // к PID из ini-файла замешиваю order из ini-файла
                     if (!m_pIniData->PID)
                         m_pIniData->PID = m_PID;
                     m_pIniData->PID += (m_pIniData->OrderNumber << 28);
                 }
-				if(m_pIniData->SlotNumber != (U32)-1)
-				{ // идентификация по номеру слота (географическому адресу) и order'у
+                if (m_pIniData->SlotNumber != (U32)-1) { // идентификация по номеру слота (географическому адресу) и order'у
                     m_pIniData->SlotNumber += (m_pIniData->OrderNumber << 16);
                 }
             }
@@ -526,68 +439,39 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
             // BRDC_printf(_BRDC("IniData(after): PID = %d(%x), Slot = %d(%x), order = %d\n"),
             //						m_pIniData->PID, m_pIniData->PID, m_pIniData->SlotNumber, m_pIniData->SlotNumber, m_pIniData->OrderNumber);
             // BRDC_printf(_BRDC("Location(after): PID = %d(%x), SlotNumber = %x\n\n"), m_PID, m_PID, AmbLocation.SlotNumber);
-		}
-		else
-			if(m_pIniData)
-			{
+        } else if (m_pIniData) {
             save_order_num = m_pIniData->OrderNumber;
             m_pIniData->OrderNumber = (U32)-1;
         }
-		if(m_pIniData)
-		{
-			if(m_pIniData->PID == (U32)-1)
-			{
-				if(m_pIniData->SlotNumber == (U32)-1)
-				{
-					if(m_pIniData->BusNumber == AmbLocation.BusNumber && m_pIniData->DevNumber == AmbLocation.DeviceNumber)
-						{
+        if (m_pIniData) {
+            if (m_pIniData->PID == (U32)-1) {
+                if (m_pIniData->SlotNumber == (U32)-1) {
+                    if (m_pIniData->BusNumber == AmbLocation.BusNumber && m_pIniData->DevNumber == AmbLocation.DeviceNumber) {
                         m_PID += ((AmbLocation.BusNumber & 0xff) << 18);
                         break;
                     }
-				}
-				else
-				{
+                } else {
                     if (m_pIniData->SlotNumber == AmbLocation.SlotNumber)
                         // if(m_pIniData->SlotNumber == (AmbLocation.SlotNumber & 0xFFFF))
                         break;
                 }
-			}
-			else
-			{
+            } else {
                 if ((!m_pIniData->PID && m_pIniData->OrderNumber == (U32)-1) || m_pIniData->PID == m_PID)
                     // if(!m_pIniData->PID || m_pIniData->PID == m_PID)
                     break;
             }
-			if(m_hMutex)
-			{
+            if (m_hMutex) {
                 IPC_deleteMutex(m_hMutex);
                 m_hMutex = NULL;
             }
             IPC_closeDevice(m_hWDM); // Wrong Board
             m_hWDM = NULL;
             DeviceNumber++;
-			if(m_DeviceID == FMC115CP_DEVID ||
-				m_DeviceID == AC_SYNC_DEVID ||
-				m_DeviceID == PS_DSP_DEVID ||
-				m_DeviceID == PS_ADC_DEVID ||
-				m_DeviceID == FMC131VKU_DEVID ||
-				m_DeviceID == FMC131VZQ_DEVID ||
-				m_DeviceID == FMC141VKU1_DEVID ||
-				m_DeviceID == FMC141VKU2_DEVID ||
-				m_DeviceID == FMC141VZQ_DEVID ||
-				m_DeviceID == FMC143VKU_DEVID ||
-				m_DeviceID == FMC143VZQ_DEVID ||
-				m_DeviceID == FMC143VKUS_DEVID ||
-				m_DeviceID == FMC146VKU_DEVID ||
-				m_DeviceID == FMC146VZQ_DEVID ||
-				m_DeviceID == FMC117CP_DEVID)
-			{
+            if (m_DeviceID == FMC115CP_DEVID || m_DeviceID == AC_SYNC_DEVID || m_DeviceID == PS_DSP_DEVID || m_DeviceID == PS_ADC_DEVID || m_DeviceID == FMC131VKU_DEVID || m_DeviceID == FMC131VZQ_DEVID || m_DeviceID == FMC141VKU1_DEVID || m_DeviceID == FMC141VKU2_DEVID || m_DeviceID == FMC141VZQ_DEVID || m_DeviceID == FMC143VKU_DEVID || m_DeviceID == FMC143VZQ_DEVID || m_DeviceID == FMC143VKUS_DEVID || m_DeviceID == FMC146VKU_DEVID || m_DeviceID == FMC146VZQ_DEVID || m_DeviceID == FMC117CP_DEVID) {
                 m_pIniData->PID = save_pid;
                 m_pIniData->SlotNumber = save_slot;
                 m_pIniData->OrderNumber = save_order_num;
-			}
-			else
-				if(m_pIniData)
+            } else if (m_pIniData)
                 m_pIniData->OrderNumber = save_order_num;
         }
     } while (m_pIniData);
@@ -601,11 +485,10 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
     m_DevNum = AmbLocation.DeviceNumber;
     m_SlotNum = AmbLocation.SlotNumber;
 
-	BRDC_sprintf(m_name, _BRDC("CAMBPEX_%X"), m_PID);
+    BRDC_sprintf(m_name, _BRDC("_%X"), m_PID);
     BRDC_strcpy(pBoardName, m_name);
 
-	if(pIniString)
-	{
+    if (pIniString) {
         BRDC_sprintf(pIniString, _BRDC("pid=0x%X\npcibus=0x%X\npcidev=0x%X\npcislot=0x%X\n"), m_PID, m_BusNum, m_DevNum, m_SlotNum);
     }
 
@@ -638,8 +521,7 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
         m_BlockFifoAddr[2] = 0;
         m_BlockFifoAddr[3] = 0;
         if (BlockCnt <= 0xFF)
-			for(ULONG iBlock = 1; iBlock < BlockCnt; iBlock++)
-			{
+            for (ULONG iBlock = 1; iBlock < BlockCnt; iBlock++) {
                 ULONG BlkAddr = iBlock * 64;
                 ULONG temp = BlockMem[BlkAddr];
                 // temp = ReadOperationWordReg(PEFIDadr_BLOCK_ID + FidAddr);
@@ -656,14 +538,12 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
     //	PUCHAR pBaseCfgMem = new UCHAR[MAX_BASE_CFGMEM_SIZE];
     PUCHAR pBaseCfgMem = new UCHAR[m_sizeICR];
     ULONG BaseCfgSize = m_sizeICR;
-	if(GetBaseEEPROM(pBaseCfgMem, BaseCfgSize) != BRDerr_OK)
-	{
+    if (GetBaseEEPROM(pBaseCfgMem, BaseCfgSize) != BRDerr_OK) {
         delete[] pBaseCfgMem;
         pBaseCfgMem = NULL;
     }
     ULONG SubCfgSize = 0;
-	for(int i = 0; i < m_AdmIfCnt; i++)
-	{
+    for (int i = 0; i < m_AdmIfCnt; i++) {
         errorCode = SetSubEeprom(i, SubCfgSize);
         // if(errorCode != BRDerr_OK)
         //	return ErrorPrint(DRVERR(BRDerr_BAD_DEVICE_VITAL_DATA),
@@ -676,13 +556,10 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
     if (pBaseCfgMem)
         delete[] pBaseCfgMem;
 
-	if(!m_pIniData)
-	{
+    if (!m_pIniData) {
         if (GetAdmIfCntICR(m_AdmIfCnt) == BRDerr_OK)
             errorCode = SetSubunitAuto();
-	}
-	else
-	{
+    } else {
         m_AdmIfCnt = 0;
         m_SubunitCnt = 0;
     }
@@ -700,8 +577,7 @@ S32 CBambpex::Init(short CurDevNum, BRDCHAR* pBoardName, BRDCHAR* pIniString)
 //***************************************************************************************
 void CBambpex::CleanUp()
 {
-	if(m_hWDM)
-	{
+    if (m_hWDM) {
         UnmapDeviceMemory(m_AmbConfiguration, 0);
         UnmapDeviceMemory(m_AmbConfiguration, 1);
         UnmapDeviceMemory(m_AmbConfiguration, 2);
@@ -716,8 +592,7 @@ void CBambpex::GetDeviceInfo(BRD_Info* pInfo) const
 {
     pInfo->boardType = ((ULONG)m_DeviceID << 16) | (ULONG)m_RevisionID;
     pInfo->pid = m_PID;
-	switch(m_DeviceID)
-	{
+    switch (m_DeviceID) {
     case AMBPEX8_DEVID:
         BRDC_strcpy(pInfo->name, _BRDC("AMBPEX8"));
         break;
@@ -912,8 +787,7 @@ ULONG CBambpex::HardwareInit()
             return ErrorPrint(BRDerr_HW_ERROR,
                 CURRFILE,
                 _BRDC("<HardwareInit> Hardware error"));
-		if(pld_status)
-		{
+        if (pld_status) {
             Status = AdmPldStartTest();
             //		if(Status != BRDerr_OK)
             //			return;
@@ -925,15 +799,10 @@ ULONG CBambpex::HardwareInit()
         // Status = GetMemoryAddress();
     }
 
-	if (m_DeviceID == FMC131VZQ_DEVID ||
-	    m_DeviceID == FMC141VZQ_DEVID ||
-	    m_DeviceID == FMC143VZQ_DEVID ||
-	    m_DeviceID == FMC146VZQ_DEVID ||
-	    m_DeviceID == DSP134V_DEVID)
+    if (m_DeviceID == FMC131VZQ_DEVID || m_DeviceID == FMC141VZQ_DEVID || m_DeviceID == FMC143VZQ_DEVID || m_DeviceID == FMC146VZQ_DEVID || m_DeviceID == DSP134V_DEVID)
         return Status;
 
-	if((!m_pIniData) || (m_pIniData && m_pIniData->FmcPower))
-	{
+    if ((!m_pIniData) || (m_pIniData && m_pIniData->FmcPower)) {
         BRDextn_FMCPOWER pow;
         pow.onOff = 1;
         PowerOnOff(&pow, 0);
@@ -1012,8 +881,7 @@ ULONG CBambpex::GetPower(PBRDextn_FMCPOWER pow)
     //	 m_DeviceID == FMC112CP_DEVID
     //	 ) && m_BlockFidAddr
     //	)
-	if(m_BlockFidAddr)
-	{
+    if (m_BlockFidAddr) {
         PULONG BlockMem = m_pMemBuf[0] + m_BlockFidAddr;
         // ULONG blk_id = BlockMem[0];
         // ULONG blk_ver = BlockMem[2];
@@ -1033,9 +901,7 @@ ULONG CBambpex::GetPower(PBRDextn_FMCPOWER pow)
             pow->onOff = 0;
         pow->value = blk_v0;
         pow->slot = PowerStat;
-	}
-	else
-	{
+    } else {
         pow->value = 0;
         pow->slot = 0;
         Status = BRDerr_INVALID_FUNCTION;
@@ -1058,8 +924,7 @@ ULONG CBambpex::PowerOnOff(PBRDextn_FMCPOWER pow, int force)
     //	 m_DeviceID == FMC112CP_DEVID
     //	 ) && m_BlockFidAddr
     //	)
-	if(m_BlockFidAddr)
-	{// программируем источник питания для FMC-субмодуля
+    if (m_BlockFidAddr) { // программируем источник питания для FMC-субмодуля
         ULONG PowerStat;
         PULONG BlockMem = m_pMemBuf[0] + m_BlockFidAddr;
         // ULONG blk_id = BlockMem[0];
@@ -1068,14 +933,11 @@ ULONG CBambpex::PowerOnOff(PBRDextn_FMCPOWER pow, int force)
         // ULONG blk_v1 = BlockMem[6];
         // ULONG blk_v2 = BlockMem[8];
         // ULONG blk_v3 = BlockMem[10];
-		if(pow->onOff ==0)
-		{
+        if (pow->onOff == 0) {
             BlockMem[22] = 0; // POWER_CTRL[power_en] = 0
             IPC_delay(100);
             PowerStat = BlockMem[32]; // POWER_STATUS
-		}
-		else
-		{
+        } else {
             // ULONG PowerNum;
             // for(int i = 0; i < 4; i++)
             //{
@@ -1089,18 +951,15 @@ ULONG CBambpex::PowerOnOff(PBRDextn_FMCPOWER pow, int force)
             ULONG PowerCtrl;
             PowerCtrl = BlockMem[22]; // POWER_CTRL
             PowerStat0 = PowerCtrl & 0x8000; // mask POWER_CTRL[power_en]
-			if(!PowerStat0 || force)
-			{
+            if (!PowerStat0 || force) {
                 // ULONG PowerNum = 0;
                 BlockMem[42] = 1; // SPD_DEVICE = 1
-				for(int i = 0; i < 3; i++)
-				{
+                for (int i = 0; i < 3; i++) {
                     BlockMem[24] = 0; // POWER_ROM[num] = 0
                     BlockMem[22] = 9; // POWER_CTRL[key] = 9
                     BlockMem[24] = 0x100; // POWER_ROM[start] = 1
                     IPC_delay(1);
-					for(int j = 0; j < 50; j++)
-					{
+                    for (int j = 0; j < 50; j++) {
                         IPC_delay(100);
                         PowerStat = BlockMem[32]; // POWER_STATUS
                         if (!(PowerStat & 0x10)) // POWER_RUN
@@ -1109,8 +968,7 @@ ULONG CBambpex::PowerOnOff(PBRDextn_FMCPOWER pow, int force)
                     if (PowerStat & 1) // POWER_OK
                     {
                         BlockMem[22] = 0x8000; // POWER_CTRL[power_en] = 1
-						for(int j = 0; j < 50; j++)
-						{
+                        for (int j = 0; j < 50; j++) {
                             IPC_delay(100);
                             PowerStat = BlockMem[32]; // POWER_STATUS
                             if (PowerStat & 0x20) // POWER_GOOD
@@ -1118,10 +976,8 @@ ULONG CBambpex::PowerOnOff(PBRDextn_FMCPOWER pow, int force)
                         }
                         if (PowerStat & 0x20) // POWER_GOOD
                         {
-							if(PowerStat & 0x1500)
-							{
-								for(int j = 0; j < 30; j++)
-								{
+                            if (PowerStat & 0x1500) {
+                                for (int j = 0; j < 30; j++) {
                                     IPC_delay(100);
                                     PowerStat = BlockMem[32]; // POWER_STATUS
                                     ULONG flag_on = (PowerStat & 0x1500) << 1; // FMCx_PRESENT -> FMCx_POWER_ON
@@ -1133,21 +989,17 @@ ULONG CBambpex::PowerOnOff(PBRDextn_FMCPOWER pow, int force)
                     }
                     if ((PowerStat & 2) || // POWER_ERROR
                         (!(PowerStat & 0x20)) // NO POWER_GOOD
-					   )
-					{
+                    ) {
                         BlockMem[22] = 0; // POWER_CTRL[key] = 0
                         IPC_delay(1);
-					}
-					else
+                    } else
                         break;
                 }
             }
         }
         pow->value = blk_v0;
         pow->slot = PowerStat;
-	}
-	else
-	{
+    } else {
         pow->value = 0;
         pow->slot = 0;
         Status = BRDerr_INVALID_FUNCTION;
@@ -1182,8 +1034,7 @@ ULONG CBambpex::InitSensorsFMC107()
     double aPG_MAX[] = { 320, 320 }; // максимальное значение напряжения
 
     U32 i = 0;
-	for (i = 0; i < SENSOR_COUNT_FMC107P; ++i)
-	{
+    for (i = 0; i < SENSOR_COUNT_FMC107P; ++i) {
         // корректировка PG_MAX в сторону большего: 320, 160, 80, 40
         double PG_MAX = Cur_MAX[i] * R_SHUNT[i];
         if (PG_MAX <= 160)
@@ -1198,15 +1049,18 @@ ULONG CBambpex::InitSensorsFMC107()
     }
 
     INA219_CONFREG cfg_val[SENSOR_COUNT_FMC107P];
-	for (i = 0; i < SENSOR_COUNT_FMC107P; i++)
-	{
+    for (i = 0; i < SENSOR_COUNT_FMC107P; i++) {
         cfg_val[i].EnBlock = 0xA5A5;
         Status = ReadI2C(SENSOR_NUM_FMC107P, SENSOR_ADR_FMC107P[i], CONFIGURATION_REGISTER_ADDR, &(cfg_val[i].EnBlock), 1);
         cfg_val[i].ByFields.BRNG = 0; // Bus Voltage Range = 16V
-		if (aPG_MAX[i] == 40) cfg_val[i].ByFields.PG = 0x0;
-		if (aPG_MAX[i] == 80) cfg_val[i].ByFields.PG = 0x1;
-		if (aPG_MAX[i] == 160) cfg_val[i].ByFields.PG = 0x2;
-		if (aPG_MAX[i] == 320) cfg_val[i].ByFields.PG = 0x3;
+        if (aPG_MAX[i] == 40)
+            cfg_val[i].ByFields.PG = 0x0;
+        if (aPG_MAX[i] == 80)
+            cfg_val[i].ByFields.PG = 0x1;
+        if (aPG_MAX[i] == 160)
+            cfg_val[i].ByFields.PG = 0x2;
+        if (aPG_MAX[i] == 320)
+            cfg_val[i].ByFields.PG = 0x3;
         Status = WriteI2C(SENSOR_NUM_FMC107P, SENSOR_ADR_FMC107P[i], CONFIGURATION_REGISTER_ADDR, cfg_val[i].EnBlock, 1);
 
         g_Cur_LSB[i] = Cur_MAX[i] / 1000 / 32768;
@@ -1252,10 +1106,14 @@ ULONG CBambpex::InitSensorsFMC132(U32 devnum)
     cfg_val.EnBlock = 0xA5A5;
     Status = ReadI2C(devnum, DEVADR_INA219_132P, CONFIGURATION_REGISTER_ADDR, &(cfg_val.EnBlock), 1);
     cfg_val.ByFields.BRNG = 0; // Bus Voltage Range = 16V
-	if (aPG_MAX == 40) cfg_val.ByFields.PG = 0x0;
-	if (aPG_MAX == 80) cfg_val.ByFields.PG = 0x1;
-	if (aPG_MAX == 160) cfg_val.ByFields.PG = 0x2;
-	if (aPG_MAX == 320) cfg_val.ByFields.PG = 0x3;
+    if (aPG_MAX == 40)
+        cfg_val.ByFields.PG = 0x0;
+    if (aPG_MAX == 80)
+        cfg_val.ByFields.PG = 0x1;
+    if (aPG_MAX == 160)
+        cfg_val.ByFields.PG = 0x2;
+    if (aPG_MAX == 320)
+        cfg_val.ByFields.PG = 0x3;
     Status = WriteI2C(devnum, DEVADR_INA219_132P, CONFIGURATION_REGISTER_ADDR, cfg_val.EnBlock, 1);
 
     g_Cur_LSB[0] = Cur_MAX / 1000 / 32768;
@@ -1272,19 +1130,11 @@ ULONG CBambpex::InitSensors()
     ULONG Status = BRDerr_INVALID_FUNCTION;
 
     if ((m_DeviceID == FMC107P_DEVID)
-		&& m_BlockFidAddr
-		)
-	{
+        && m_BlockFidAddr) {
         InitSensorsFMC107();
     }
-	if ((m_DeviceID == FMC132P_DEVID ||
-		m_DeviceID == FMC126P_DEVID ||
-		m_DeviceID == FMC139P_DEVID ||
-		m_DeviceID == FMC133V_DEVID ||
-		m_DeviceID == DSP134V_DEVID)
-		&& m_BlockFidAddr
-		)
-	{
+    if ((m_DeviceID == FMC132P_DEVID || m_DeviceID == FMC126P_DEVID || m_DeviceID == FMC139P_DEVID || m_DeviceID == FMC133V_DEVID || m_DeviceID == DSP134V_DEVID)
+        && m_BlockFidAddr) {
         InitSensorsFMC132(DEVNUM_SENSOR_132P);
         g_FMC132ModeMonitor = 0xFF;
     }
@@ -1318,8 +1168,7 @@ ULONG CBambpex::GetSensorsFMC132(PBRDextn_Fmc132PSensors pSensors, U32 dev_num)
     {
         U32 ctrl_val = 0x0000;
         U32 flten = 0;
-		if (pSensors->mode)
-		{ // режим 1 - это режим с усреднением (Filter Enabled)
+        if (pSensors->mode) { // режим 1 - это режим с усреднением (Filter Enabled)
             flten = 1;
             ctrl_val |= 0x8888;
         }
@@ -1328,8 +1177,7 @@ ULONG CBambpex::GetSensorsFMC132(PBRDextn_Fmc132PSensors pSensors, U32 dev_num)
         double _tempr;
         double _vcc;
 
-		if (g_FMC132ModeMonitor != pSensors->mode)
-		{
+        if (g_FMC132ModeMonitor != pSensors->mode) {
             g_FMC132ModeMonitor = pSensors->mode;
             Status = setModeSensors(dev_num, DEVADR_LTC2991_132P, flten, ctrl_val & 0xFF, ctrl_val >> 8);
         }
@@ -1338,8 +1186,7 @@ ULONG CBambpex::GetSensorsFMC132(PBRDextn_Fmc132PSensors pSensors, U32 dev_num)
 
         Status = readSensors(dev_num, DEVADR_LTC2991_132P, _vchan, &_tempr, &_vcc);
 
-		for (int i = 0; i < 8; i++)
-		{
+        for (int i = 0; i < 8; i++) {
             double out = _vchan[i];
 
             //			if (i == 0 || i == 1)
@@ -1358,9 +1205,7 @@ ULONG CBambpex::GetSensors(void* parg)
 {
     ULONG Status = BRDerr_INVALID_FUNCTION;
     if ((m_DeviceID == FMC107P_DEVID)
-		&& m_BlockFidAddr
-		)
-	{
+        && m_BlockFidAddr) {
         PBRDextn_Sensors pSensors = (PBRDextn_Sensors)parg;
         if (pSensors->chip > 1) // на модуле установлено 2 микросхемы INA219 (Voltage, Current and Power)
             return BRDerr_BAD_PARAMETER;
@@ -1382,20 +1227,12 @@ ULONG CBambpex::GetSensors(void* parg)
         pSensors->current = double(cur_val) * g_Cur_LSB[iChip];
 
         pSensors->power = double(pow_val) * (20 * g_Cur_LSB[iChip]);
-
     }
 
-	if ((m_DeviceID == FMC132P_DEVID ||
-		m_DeviceID == FMC126P_DEVID ||
-		m_DeviceID == FMC139P_DEVID ||
-		m_DeviceID == FMC133V_DEVID ||
-		m_DeviceID == DSP134V_DEVID)
-		&& m_BlockFidAddr
-		)
-	{
+    if ((m_DeviceID == FMC132P_DEVID || m_DeviceID == FMC126P_DEVID || m_DeviceID == FMC139P_DEVID || m_DeviceID == FMC133V_DEVID || m_DeviceID == DSP134V_DEVID)
+        && m_BlockFidAddr) {
         PBRDextn_Fmc132PSensors pSensors = (PBRDextn_Fmc132PSensors)parg;
         Status = GetSensorsFMC132(pSensors, DEVNUM_SENSOR_132P);
-
     }
     return Status;
 }
@@ -1436,7 +1273,6 @@ ULONG CBambpex::setPWM(U32 dev_num, U32 dev_adr, U32 pwm_enbl, U32 pwm_inv, U32 
     // val = 0x80;
     // WriteI2C(DEVNUM_SENSOR_132P, dev_adr, 0x9, val, 0);	//  устанавливаем значение
 
-
     // val = 0;
     // WriteI2C(DEVNUM_SENSOR_132P, dev_adr, 0x9, val, 0);	//  устанавливаем значение
     //
@@ -1463,13 +1299,10 @@ ULONG CBambpex::setModeSensors(U32 dev_num, U32 dev_adr, U32 flt, U32 ctrl_reg6,
     U32 stH = 0xF8;
     Status = WriteI2C(dev_num, dev_adr, 0x1, stH, 0); // разрешаем измерение всего (V1-V8, Vcc и Tinternal)
 
-	if (flt)
-	{ // если включено усреднение, то требуется до 100 итераций, пока переходный процесс завершится
+    if (flt) { // если включено усреднение, то требуется до 100 итераций, пока переходный процесс завершится
         U32 MSB, LSB;
-		for (int i = 0; i < 8; i++)
-		{
-			for (int j = 0; j < 16; j++)
-			{
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 16; j++) {
                 do {
                     Status = ReadI2C(dev_num, dev_adr, 0xA + i * 2, &MSB, 0);
                 } while (!(MSB & 0x80));
@@ -1492,8 +1325,7 @@ ULONG CBambpex::readSensors(U32 dev_num, U32 dev_adr, double* v_chan, double* te
     //	ReadI2C(DEVNUM_SENSOR_132P, dev_adr, 0x1, &MSB);
 
     // Inputs V1-V8 (format D0-D13)
-	for (int i = 0; i < 8; i++)
-	{
+    for (int i = 0; i < 8; i++) {
         icnt = 0;
         do {
             IPC_delay(10);
@@ -1560,8 +1392,7 @@ ULONG CBambpex::WaitSemaReady(ULONG* BlockMem, int SemaOrReady)
     ULONG SpdStatus;
     int stat = 0;
     int j = 0;
-	for (j = 0; j < 1000; j++)
-	{
+    for (j = 0; j < 1000; j++) {
         SpdStatus = BlockMem[44]; // SPD_CTRL
         if (SemaOrReady)
             stat = SpdStatus & 0x4000; // Sema
@@ -1596,7 +1427,6 @@ ULONG CBambpex::ReadMainSpd(int devid, USHORT* buf, USHORT Offset, int Length)
     if (Status != BRDerr_OK)
         return BRDerr_NOT_READY;
 
-
     // if (WaitSemaReady(BlockMem, 1) != BRDerr_OK)
     // return BRDerr_NOT_READY;
     // Status = BRDerr_NOT_READY;
@@ -1610,12 +1440,10 @@ ULONG CBambpex::ReadMainSpd(int devid, USHORT* buf, USHORT Offset, int Length)
     // BRDC_sprintf(buf_str, _BRDC("SpdStatus2 = 0x%08X\n"), g_SpdStatus);
     // MessageBox(NULL, buf_str, _BRDC("ReadMainSpd"), MB_OK);
 
-	for (int i = 0; i < Length; i++)
-	{
+    for (int i = 0; i < Length; i++) {
         BlockMem[46] = Offset; // SPD_ADR
         BlockMem[44] = spd_ctrl + 1; // SPD_CTRL, type operation - read
-		if (WaitSemaReady(BlockMem, 0) != BRDerr_OK)
-		{
+        if (WaitSemaReady(BlockMem, 0) != BRDerr_OK) {
             buf[i] = (USHORT)BlockMem[48]; // read data
             Status = BRDerr_NOT_READY;
             break;
@@ -1633,8 +1461,7 @@ ULONG CBambpex::ReadMainSpd(int devid, USHORT* buf, USHORT Offset, int Length)
 ULONG CBambpex::WaitFidReady(ULONG* BlockMem)
 {
     ULONG SpdStatus;
-	for(int j = 0; j < 1000; j++)
-	{
+    for (int j = 0; j < 1000; j++) {
         SpdStatus = BlockMem[44]; // SPD_CTRL
         if (SpdStatus & 0x8000) // Ready
             break;
@@ -1660,13 +1487,11 @@ ULONG CBambpex::ReadFidSpd(int devnum, int devadr, UCHAR* buf, USHORT Offset, in
     if (WaitFidReady(BlockMem) != BRDerr_OK)
         return BRDerr_NOT_READY;
 
-	for(int i = 0; i < Length; i++)
-	{
+    for (int i = 0; i < Length; i++) {
         int sector = Offset / 256;
         BlockMem[46] = Offset; // SPD_ADR
         BlockMem[44] = ((devadr + sector) << 4) + 1; // SPD_CTRL, type operation - read
-		if(WaitFidReady(BlockMem) != BRDerr_OK)
-		{
+        if (WaitFidReady(BlockMem) != BRDerr_OK) {
             buf[i] = (UCHAR)BlockMem[48]; // read data
             Status = BRDerr_NOT_READY;
             break;
@@ -1694,8 +1519,7 @@ ULONG CBambpex::WriteFidSpd(int devnum, int devadr, UCHAR* buf, USHORT Offset, i
     if (WaitFidReady(BlockMem) != BRDerr_OK)
         return BRDerr_NOT_READY;
 
-	for(int i = 0; i < Length; i++)
-	{
+    for (int i = 0; i < Length; i++) {
         int sector = Offset / 256;
         BlockMem[46] = Offset; // SPD_ADR
         BlockMem[48] = buf[i]; // write data
@@ -1839,8 +1663,7 @@ ULONG CBambpex::GetIrqMinTime(ULONG* pTimeVal)
     ULONG* BlockMem = m_pMemBuf[0];
 
     ULONG reg_val = BlockMem[36];
-	if(((reg_val & 0xFF00) >> 8) == 0xB5)
-	{
+    if (((reg_val & 0xFF00) >> 8) == 0xB5) {
         *pTimeVal = reg_val & 0xf;
         return BRDerr_OK;
     }
@@ -1854,8 +1677,7 @@ ULONG CBambpex::SetIrqMinTime(ULONG* pTimeVal)
     ULONG* BlockMem = m_pMemBuf[0];
 
     ULONG reg_val = BlockMem[36];
-	if(((reg_val & 0xFF00) >> 8) == 0xB5)
-	{
+    if (((reg_val & 0xFF00) >> 8) == 0xB5) {
         BlockMem[36] = *pTimeVal;
         *pTimeVal = BlockMem[36] & 0xf;
         return BRDerr_OK;
@@ -1868,19 +1690,15 @@ void CBambpex::GetPldCfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_CfgAdmPld
 {
     PVOID pEndCfgMem = (PVOID)((PUCHAR)pCfgMem + RealBaseCfgSize);
     int end_flag = 0;
-	do
-	{
+    do {
         USHORT sign = *((USHORT*)pCfgMem);
         USHORT size = 0;
-		if(sign == PLD_CFG_TAG)
-		{
+        if (sign == PLD_CFG_TAG) {
             PICR_CfgAdmPld pPldCfg = (PICR_CfgAdmPld)pCfgMem;
             memcpy(pCfgPld, pPldCfg, sizeof(ICR_CfgAdmPld));
             size += sizeof(ICR_CfgAdmPld);
             end_flag = 1;
-		}
-		else
-		{
+        } else {
             size = *((USHORT*)pCfgMem + 1);
             size += 4;
             //			break;
@@ -1892,15 +1710,13 @@ void CBambpex::GetPldCfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_CfgAdmPld
 //***************************************************************************************
 ULONG CBambpex::GetPldDescription(BRDCHAR* Description, PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize)
 {
-	if(BaseEEPROMSize)
-	{
+    if (BaseEEPROMSize) {
         ICR_CfgAdmPld cfgPld;
         GetPldCfgICR(pBaseEEPROMMem, BaseEEPROMSize, &cfgPld);
         m_pldType = cfgPld.bType;
         m_pldSpeedGrade = cfgPld.bSpeedGrade;
         BRDC_sprintf(Description, _BRDC("%d (%d %d %d)"), cfgPld.bType, cfgPld.wVolume, cfgPld.bSpeedGrade, cfgPld.wPins);
-		switch(cfgPld.bType)
-		{
+        switch (cfgPld.bType) {
         // case 3:
         //	sprintf_s(Description, MAX_DESCRIPLEN, _BRDC("XCVE%d-FF%d-%dC"), cfgPld.wVolume, cfgPld.wPins, cfgPld.bSpeedGrade);
         //	break;
@@ -1982,13 +1798,11 @@ ULONG CBambpex::GetPldDescription(BRDCHAR* Description, PUCHAR pBaseEEPROMMem, U
 //***************************************************************************************
 ULONG CBambpex::GetDspPldDescription(BRDCHAR* Description, PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize)
 {
-	if(BaseEEPROMSize)
-	{
+    if (BaseEEPROMSize) {
         ICR_CfgDspNode cfgDspNode;
         GetDspNodeCfgICR(pBaseEEPROMMem, BaseEEPROMSize, &cfgDspNode);
         BRDC_sprintf(Description, _BRDC("%d (%d %d %d)"), cfgDspNode.bPldType, cfgDspNode.wPldVolume, cfgDspNode.bPldSpeedGrade, cfgDspNode.wPldPins);
-		switch(cfgDspNode.bPldType)
-		{
+        switch (cfgDspNode.bPldType) {
         case 21:
             BRDC_sprintf(Description, _BRDC("XC6VSX%dT-%dFFG%d"), cfgDspNode.wPldVolume, cfgDspNode.bPldSpeedGrade, cfgDspNode.wPldPins);
             break;
@@ -2004,21 +1818,17 @@ ULONG CBambpex::GetDspPldDescription(BRDCHAR* Description, PUCHAR pBaseEEPROMMem
 //***************************************************************************************
 ULONG CBambpex::GetDspPld(PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize, UCHAR& DspPldCnt)
 {
-	if(BaseEEPROMSize)
-	{
-		if(m_DeviceID == FMC106P_DEVID)
-		{
+    if (BaseEEPROMSize) {
+        if (m_DeviceID == FMC106P_DEVID) {
             ICR_CfgFmc105p cfgAmbp;
             GetFmcCfgICR(pBaseEEPROMMem, BaseEEPROMSize, &cfgAmbp);
             DspPldCnt = cfgAmbp.bDspNodeCfgCnt;
             // if(m_FdspTetrNum == -1)
             //	DspPldCnt = 0;
-		}
-		else
+        } else
             DspPldCnt = 0;
         return 1;
-	}
-	else
+    } else
         DspPldCnt = 0;
     return 0;
 }
@@ -2026,8 +1836,7 @@ ULONG CBambpex::GetDspPld(PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize, UCHAR& Ds
 //***************************************************************************************
 ULONG CBambpex::SetPuInfo(PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize)
 {
-	if (m_DeviceID == DSP134V_DEVID)
-	{
+    if (m_DeviceID == DSP134V_DEVID) {
         m_puCnt = 0;
         return BRDerr_OK;
     }
@@ -2041,39 +1850,33 @@ ULONG CBambpex::SetPuInfo(PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize)
         m_AdmPldInfo.Attr = 0;
     BRDCHAR Description0[MAX_DESCRIPLEN] = _BRDC("ADM PLD ");
     BRDCHAR Description[MAX_DESCRIPLEN] = _BRDC("ADM PLD XILINX"); // Programmable Unit Description Text
-	if(GetPldDescription(Description, pBaseEEPROMMem, BaseEEPROMSize))
-	{
+    if (GetPldDescription(Description, pBaseEEPROMMem, BaseEEPROMSize)) {
         BRDC_strcpy(m_AdmPldInfo.Description, Description0);
         BRDC_strcat(m_AdmPldInfo.Description, Description);
-	}
-	else
+    } else
         BRDC_strcpy(m_AdmPldInfo.Description, Description);
 
     m_PuInfos.push_back(m_AdmPldInfo);
 
     UCHAR DspPldCnt = 0;
     GetDspPld(pBaseEEPROMMem, BaseEEPROMSize, DspPldCnt);
-	if(DspPldCnt)
-	{
+    if (DspPldCnt) {
         m_puCnt++;
         m_DspPldInfo.Id = BRDpui_PLD + 1;
         m_DspPldInfo.Type = PLD_CFG_TAG;
         m_DspPldInfo.Attr = BRDpua_Load;
         BRDCHAR Description0[MAX_DESCRIPLEN] = _BRDC("DSP PLD ");
         BRDCHAR Description[MAX_DESCRIPLEN] = _BRDC("DSP PLD XILINX"); // Programmable Unit Description Text
-		if(GetDspPldDescription(Description, pBaseEEPROMMem, BaseEEPROMSize))
-		{
+        if (GetDspPldDescription(Description, pBaseEEPROMMem, BaseEEPROMSize)) {
             BRDC_strcpy(m_DspPldInfo.Description, Description0);
             BRDC_strcat(m_DspPldInfo.Description, Description);
-		}
-		else
+        } else
             BRDC_strcpy(m_DspPldInfo.Description, Description);
 
         m_PuInfos.push_back(m_DspPldInfo);
     }
 
-	if(1)
-	{
+    if (1) {
         m_puCnt++;
         m_BaseIcrInfo.Id = BRDpui_BASEICR;
         m_BaseIcrInfo.Type = BASE_ID_TAG;
@@ -2085,24 +1888,19 @@ ULONG CBambpex::SetPuInfo(PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize)
         m_PuInfos.push_back(m_BaseIcrInfo);
     }
 
-
     int subm[2] = { 1, 0 }; // субмодуль FMC1 присутствует, а субмодуль FMC2 отсутствует
 
-	if(m_BlockFidAddr)
-	{ // FMC субмодули
+    if (m_BlockFidAddr) { // FMC субмодули
         PULONG BlockMem = m_pMemBuf[0];
         ULONG pldver = BlockMem[8];
         ULONG coreid = BlockMem[14];
-		if(coreid != 0x22 || (coreid == 0x22 && pldver > 0x104))
-		{
+        if (coreid != 0x22 || (coreid == 0x22 && pldver > 0x104)) {
             BlockMem = m_pMemBuf[0] + m_BlockFidAddr;
             ULONG PowerStat = BlockMem[32]; // POWER_STATUS
-			if (!(PowerStat & 0x100))
-			{
+            if (!(PowerStat & 0x100)) {
                 subm[0] = 0; // субмодуль FM0 отсутствует
                 PUSHORT pSubCfgMem = (PUSHORT)(m_Subunit[0].pSubEEPROM); // пытаемся исправить ошибки на субмодуле (в частности, FM416x250M)
-				if (pSubCfgMem)
-				{
+                if (pSubCfgMem) {
                     if (pSubCfgMem[0] == 0x0080) // определяем наличие прописанного ППЗУ на субмодуле
                         subm[0] = 1; // субмодуль FM0 все же присутствует
                 }
@@ -2112,8 +1910,7 @@ ULONG CBambpex::SetPuInfo(PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize)
         }
     }
 
-	for(int i = 0; i < m_AdmIfCnt; i++)
-	{
+    for (int i = 0; i < m_AdmIfCnt; i++) {
         if (!subm[i])
             continue; // NO submodule
         PUSHORT pSubCfgMem = (PUSHORT)(m_Subunit[i].pSubEEPROM);
@@ -2127,19 +1924,16 @@ ULONG CBambpex::SetPuInfo(PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize)
             m_AdmIcrInfo.Id = BRDpui_SUBICR + i;
             m_AdmIcrInfo.Type = ADM_ID_TAG;
             m_AdmIcrInfo.Attr = BRDpua_Read | BRDpua_Write | BRDpua_Danger;
-			if(m_DeviceID == FMC112CP_DEVID || m_DeviceID == FMC127P_DEVID || m_DeviceID == FMC114V_DEVID)
-			{
+            if (m_DeviceID == FMC112CP_DEVID || m_DeviceID == FMC127P_DEVID || m_DeviceID == FMC114V_DEVID) {
                 BRDC_strcpy(m_AdmIcrInfo.Description, _BRDC("ICR on FMC1"));
                 if (i)
                     BRDC_strcpy(m_AdmIcrInfo.Description, _BRDC("ICR on FMC2"));
-			}
-			else
+            } else
                 BRDC_strcpy(m_AdmIcrInfo.Description, _BRDC("ID & CFG EEPROM on subunit"));
             m_PuInfos.push_back(m_AdmIcrInfo);
         }
 
-		if(m_BlockFidAddr)
-		{
+        if (m_BlockFidAddr) {
             m_puCnt++;
             m_AdmFruInfo.Id = BRDpui_FRUID + i;
             m_AdmFruInfo.Type = 0;
@@ -2149,7 +1943,6 @@ ULONG CBambpex::SetPuInfo(PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize)
                 BRDC_strcpy(m_AdmFruInfo.Description, _BRDC("FRU EEPROM on FMC2"));
             m_PuInfos.push_back(m_AdmFruInfo);
         }
-
     }
     /*
             USHORT buf_read[2];
@@ -2170,8 +1963,7 @@ ULONG CBambpex::SetPuInfo(PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize)
             }
     */
 
-	if(ICAP_SIG == m_IcapSig)
-	{
+    if (ICAP_SIG == m_IcapSig) {
         // m_puCnt += 8; // BRDpui_PLD : 0x120-0x127
         m_puCnt++;
         m_PartPldInfo.Id = BRDpui_PLD + 0x20;
@@ -2181,7 +1973,6 @@ ULONG CBambpex::SetPuInfo(PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize)
         m_PuInfos.push_back(m_PartPldInfo);
     }
 
-
     return BRDerr_OK;
 }
 
@@ -2189,8 +1980,7 @@ ULONG CBambpex::SetPuInfo(PUCHAR pBaseEEPROMMem, ULONG BaseEEPROMSize)
 void CBambpex::GetPuList(BRD_PuList* pu_list) const
 {
     int pu_num = (int)m_PuInfos.size();
-	for(int i = 0; i < pu_num; i++)
-	{
+    for (int i = 0; i < pu_num; i++) {
         pu_list[i].puId = m_PuInfos[i].Id;
         pu_list[i].puCode = m_PuInfos[i].Type;
         pu_list[i].puAttr = m_PuInfos[i].Attr;
@@ -2203,15 +1993,13 @@ void CBambpex::GetPuList(BRD_PuList* pu_list) const
 ULONG CBambpex::PuFileLoad(ULONG id, const BRDCHAR* fileName, PUINT pState)
 {
     *pState = 0;
-	if(BRDC_strlen(fileName) == 0)
-	{
+    if (BRDC_strlen(fileName) == 0) {
         //		return BRDerr_BAD_FILE;
         return ErrorPrintf(BRDerr_BAD_FILE,
             CURRFILE,
             _BRDC("<PuFileLoad> Bad File Name = %s"), fileName);
     }
-	if((id >= m_PartPldInfo.Id && id < m_PartPldInfo.Id+32) && (ICAP_SIG == m_IcapSig))
-	{
+    if ((id >= m_PartPldInfo.Id && id < m_PartPldInfo.Id + 32) && (ICAP_SIG == m_IcapSig)) {
         ULONG status = LoadPldFile(fileName, id - BRDpui_PLD);
         if (status != BRDerr_OK)
             return status;
@@ -2246,9 +2034,7 @@ ULONG CBambpex::PuFileLoad(ULONG id, const BRDCHAR* fileName, PUINT pState)
                 CURRFILE,
                 _BRDC("<PuFileLoad> Hardware error"));
         *pState = pld_status;
-	}
-	else
-	{
+    } else {
         //	    return BRDerr_BAD_ID;
         return ErrorPrintf(BRDerr_BAD_ID,
             CURRFILE,
@@ -2261,8 +2047,7 @@ ULONG CBambpex::PuFileLoad(ULONG id, const BRDCHAR* fileName, PUINT pState)
 ULONG CBambpex::GetPuState(ULONG id, PUINT pState)
 {
     // Check Partial reloaded PLD
-	if((id >= m_PartPldInfo.Id && id < m_PartPldInfo.Id+32) && (ICAP_SIG == m_IcapSig))
-	{
+    if ((id >= m_PartPldInfo.Id && id < m_PartPldInfo.Id + 32) && (ICAP_SIG == m_IcapSig)) {
         ULONG pld_status;
         if (GetPldStatus(pld_status, id - BRDpui_PLD) != BRDerr_OK)
             //			return BRDerr_HW_ERROR;
@@ -2273,8 +2058,7 @@ ULONG CBambpex::GetPuState(ULONG id, PUINT pState)
         return BRDerr_OK;
     }
     // Check ADM PLD
-	if(id == m_AdmPldInfo.Id)
-	{
+    if (id == m_AdmPldInfo.Id) {
         ULONG pld_status;
         if (GetPldStatus(pld_status, id - BRDpui_PLD) != BRDerr_OK)
             //			return BRDerr_HW_ERROR;
@@ -2282,29 +2066,21 @@ ULONG CBambpex::GetPuState(ULONG id, PUINT pState)
                 CURRFILE,
                 _BRDC("<GetPuState> Hardware error"));
         *pState = pld_status;
-	}
-	else
-	{
-		if(id == m_DspPldInfo.Id)
-		{
+    } else {
+        if (id == m_DspPldInfo.Id) {
             ULONG pld_status;
-			if(m_FdspTetrNum != -1)
-			{
+            if (m_FdspTetrNum != -1) {
                 if (GetPldStatus(pld_status, id - BRDpui_PLD) != BRDerr_OK)
                     //			return BRDerr_HW_ERROR;
                     return ErrorPrint(BRDerr_HW_ERROR,
                         CURRFILE,
                         _BRDC("<GetPuState> Hardware error"));
-			}
-			else
+            } else
                 pld_status = 0;
             *pState = pld_status;
-		}
-		else
-		{
+        } else {
             // Check base module ICR
-			if(id == m_BaseIcrInfo.Id)
-			{
+            if (id == m_BaseIcrInfo.Id) {
                 ULONG base_status;
                 if (GetBaseIcrStatus(base_status) != BRDerr_OK)
                     //				return BRDerr_HW_ERROR;
@@ -2312,12 +2088,9 @@ ULONG CBambpex::GetPuState(ULONG id, PUINT pState)
                         CURRFILE,
                         _BRDC("<GetPuState> Hardware error"));
                 *pState = base_status;
-			}
-			else
-			{
+            } else {
                 // Check subunit ICR
-				if(id == m_AdmIcrInfo.Id)
-				{
+                if (id == m_AdmIcrInfo.Id) {
                     ULONG adm_status;
                     if (GetAdmIcrStatus(adm_status, m_AdmIcrInfo.Id - BRDpui_SUBICR) != BRDerr_OK)
                         //					return BRDerr_HW_ERROR;
@@ -2325,16 +2098,11 @@ ULONG CBambpex::GetPuState(ULONG id, PUINT pState)
                             CURRFILE,
                             _BRDC("<GetPuState> Hardware error"));
                     *pState = adm_status;
-				}
-				else
-				{
+                } else {
                     // Check subunit FRU EEPROM
-					if(id == m_AdmFruInfo.Id)
-					{
+                    if (id == m_AdmFruInfo.Id) {
                         *pState = 0;
-					}
-					else
-					{
+                    } else {
                         //				return BRDerr_BAD_ID;
                         return ErrorPrintf(BRDerr_BAD_ID,
                             CURRFILE,
@@ -2366,21 +2134,18 @@ ULONG CBambpex::GetPid()
     //   )
     //	if(1)
     {
-		if(m_sizeICR)
-		{
+        if (m_sizeICR) {
             ULONG BufferSize = 4;
             ULONG Offset = 128 + 6;
             // ULONG Offset = 6;
             // if(ReadNvRAM(&m_PID, BufferSize, Offset) != BRDerr_OK)
-			if(GetNvRAM(&m_PID, BufferSize, Offset) != BRDerr_OK)
-			{
+            if (GetNvRAM(&m_PID, BufferSize, Offset) != BRDerr_OK) {
                 //			return BRDerr_BAD_DEVICE_VITAL_DATA;
                 return ErrorPrint(BRDerr_BAD_DEVICE_VITAL_DATA,
                     CURRFILE,
                     _BRDC("<GetPid> Undefined vital data into ICR"));
             }
-		}
-		else
+        } else
             m_PID = 0;
     }
     //	else
@@ -2394,15 +2159,13 @@ ULONG CBambpex::ReadPldFile(const BRDCHAR* PldFileName, UCHAR*& fileBuffer, ULON
     BRDCHAR FullFileName[MAX_PATH];
     IPC_getFullPath(PldFileName, FullFileName);
     IPC_handle hFile = IPC_openFile(FullFileName, IPC_OPEN_FILE | IPC_FILE_RDONLY);
-    if(!hFile)
-	{
+    if (!hFile) {
         return ErrorPrintf(BRDerr_BAD_FILE,
             CURRFILE,
             _BRDC("<LoadPldFile>  Can't open PLD file '%s'"), FullFileName);
     }
     long long file_size;
-    if(IPC_getFileSize(hFile, &file_size) != IPC_OK)
-	{
+    if (IPC_getFileSize(hFile, &file_size) != IPC_OK) {
         return ErrorPrintf(BRDerr_BAD_FILE,
             CURRFILE,
             _BRDC("<LoadPldFile>  Can't open PLD file '%s'"), FullFileName);
@@ -2410,23 +2173,20 @@ ULONG CBambpex::ReadPldFile(const BRDCHAR* PldFileName, UCHAR*& fileBuffer, ULON
     fileSize = (ULONG)file_size;
     // fileBuffer = VirtualAlloc(NULL, fileSize, MEM_COMMIT, PAGE_READWRITE);
     fileBuffer = new UCHAR[fileSize];
-	if(fileBuffer == NULL)
-	{
+    if (fileBuffer == NULL) {
         return ErrorPrint(BRDerr_NOT_ENOUGH_MEMORY,
             CURRFILE,
             _BRDC("<LoadPldFile> Not Enough memory for file buffer"));
     }
     int dwNumBytesRead = IPC_readFile(hFile, fileBuffer, fileSize);
-	if(dwNumBytesRead < 0)
-	{
+    if (dwNumBytesRead < 0) {
         // VirtualFree(fileBuffer, 0, MEM_RELEASE);
         delete fileBuffer;
         return ErrorPrintf(BRDerr_BAD_FILE,
             CURRFILE,
             _BRDC("<LoadPldFile>  Read error PLD file '%s'"), FullFileName);
     }
-	if(IPC_closeFile(hFile) != IPC_OK)
-	{
+    if (IPC_closeFile(hFile) != IPC_OK) {
         // VirtualFree(fileBuffer, 0, MEM_RELEASE);
         delete fileBuffer;
         return ErrorPrintf(BRDerr_BAD_FILE,
@@ -2506,8 +2266,7 @@ ULONG CBambpex::CheckPldFile(const BRDCHAR* PldFileName)
     //							NULL);
     IPC_handle hFile = IPC_openFile(FullFileName, IPC_OPEN_FILE | IPC_FILE_RDONLY);
     // if(hFile == INVALID_HANDLE_VALUE)
-    if(!hFile)
-	{
+    if (!hFile) {
         //	    return BRDerr_BAD_FILE;
         return ErrorPrintf(BRDerr_BAD_FILE,
             CURRFILE,
@@ -2523,11 +2282,9 @@ void* CBambpex::SearchInfoStart(UCHAR* fileBuffer, ULONG& fileSize)
 {
     UCHAR* buf = fileBuffer;
     ULONG cnt = fileSize / 4;
-	for(ULONG i = 0; i < cnt; i++)
-	{
+    for (ULONG i = 0; i < cnt; i++) {
         ULONG uval = *(ULONG*)(buf + i);
-		if(uval == 0xFFFFFFFF)
-		{
+        if (uval == 0xFFFFFFFF) {
             i += 4;
             fileSize -= i;
             return &(buf[i]);
@@ -2556,8 +2313,7 @@ ULONG CBambpex::LoadPldFile(const BRDCHAR* PldFileName, ULONG PldNum)
 {
     ULONG Status;
     UCHAR PldLoadStatus;
-	if(PldNum)
-	{
+    if (PldNum) {
 #ifdef _WIN32
         LARGE_INTEGER Frequency, StartPerformCount, StopPerformCount;
         int bHighRes = QueryPerformanceFrequency(&Frequency);
@@ -2568,12 +2324,10 @@ ULONG CBambpex::LoadPldFile(const BRDCHAR* PldFileName, ULONG PldNum)
         Status = ReadPldFile(PldFileName, fileBuffer, fileSize);
         if (Status != BRDerr_OK)
             return Status;
-		if(PldNum == 1)
-		{
+        if (PldNum == 1) {
             LPVOID startBuffer = NULL;
             startBuffer = SearchInfoStart(fileBuffer, fileSize);
-			if(startBuffer)
-			{
+            if (startBuffer) {
                 if (m_hMutex)
                     // WaitForSingleObject(m_hMutex, INFINITE);
                     IPC_captureMutex(m_hMutex, INFINITE);
@@ -2583,12 +2337,9 @@ ULONG CBambpex::LoadPldFile(const BRDCHAR* PldFileName, ULONG PldNum)
                 if (m_hMutex)
                     // ReleaseMutex(m_hMutex);
                     IPC_releaseMutex(m_hMutex);
-			}
-			else
+            } else
                 Status = BRDerr_BAD_FILE_FORMAT;
-		}
-		else
-		{
+        } else {
             if (m_hMutex)
                 IPC_captureMutex(m_hMutex, INFINITE);
             Status = LoadPartPld((UCHAR)PldNum - 0x20, PldLoadStatus, fileBuffer, fileSize);
@@ -2617,8 +2368,7 @@ ULONG CBambpex::LoadPldFile(const BRDCHAR* PldFileName, ULONG PldNum)
         return Status;
     // Status = BRDerr_HW_ERROR;
 
-	if(PldLoadStatus)
-	{
+    if (PldLoadStatus) {
         Status = AdmPldStartTest();
         //		if(Status != BRDerr_OK)
         //			return Status;
@@ -2656,8 +2406,7 @@ ULONG CBambpex::DspPldConnect()
         if (Status != BRDerr_OK)
             return BRDerr_HW_ERROR;
         tdr_stat = RegParam.val;
-		if(tdr_stat & 0x8000)
-		{
+        if (tdr_stat & 0x8000) {
             RegParam.reg = 10;
             RegParam.val = 6;
             Status = RegCtrl(DEVScmd_REGWRITEIND, &RegParam);
@@ -2685,8 +2434,7 @@ ULONG CBambpex::isFdsp()
     DEVS_CMD_Reg RegParam;
     RegParam.idxMain = 0;
     int i = 0;
-	for(i = 0; i < MAX_TETRNUM; i++)
-	{
+    for (i = 0; i < MAX_TETRNUM; i++) {
         RegParam.tetr = i;
         RegParam.reg = ADM2IFnr_ID;
         Status = RegCtrl(DEVScmd_REGREADIND, &RegParam);
@@ -2696,8 +2444,7 @@ ULONG CBambpex::isFdsp()
             break;
     }
     m_FdspTetrNum = i;
-	if(i >= MAX_TETRNUM)
-	{
+    if (i >= MAX_TETRNUM) {
         m_FdspTetrNum = -1;
         //		m_DspPldInfo.Id = 0;
     }
@@ -2746,7 +2493,6 @@ ULONG CBambpex::AdmPldStartTest()
     Status = RegCtrl(DEVScmd_REGREADDIR, &RegParam);
     Status = RegCtrl(DEVScmd_REGREADDIR, &RegParam);
 
-
     RegParam.reg = ADM2IFnr_CMDADR;
     RegParam.val = 0; // установили адрес регистра MODE0
     Status = RegCtrl(DEVScmd_REGWRITEDIR, &RegParam);
@@ -2771,8 +2517,7 @@ ULONG CBambpex::AdmPldStartTest()
 
     // тест шины данных
     __int64 test_mask = 0;
-	for(i = 0; i < fifo_width; i++)
-	{
+    for (i = 0; i < fifo_width; i++) {
         __int64 value = 0;
         Status = RegCtrl(DEVScmd_REGREADDIR, &RegParam);
         if (Status != BRDerr_OK)
@@ -2786,8 +2531,7 @@ ULONG CBambpex::AdmPldStartTest()
             return BRDerr_PLD_TEST_DATA_ERROR;
         test_mask = (test_mask << 1) + 1;
     }
-	for(i = 0; i < fifo_width; i++)
-	{
+    for (i = 0; i < fifo_width; i++) {
         __int64 value = 0;
         Status = RegCtrl(DEVScmd_REGREADDIR, &RegParam);
         if (Status != BRDerr_OK)
@@ -3026,20 +2770,15 @@ ULONG CBambpex::GetPldInfo(PBRDextn_PLDINFO pInfo)
     SetAdmPldFileInfo();
     if (m_FdspTetrNum != -1)
         SetDspPldFileInfo();
-	if(pInfo->pldId == m_pldFileInfo.pldId)
-	{
+    if (pInfo->pldId == m_pldFileInfo.pldId) {
         pInfo->version = m_pldFileInfo.version;
         pInfo->modification = m_pldFileInfo.modification;
         pInfo->build = m_pldFileInfo.build;
-	}
-	else
-		if(pInfo->pldId == m_FdspFileInfo.pldId)
-		{
+    } else if (pInfo->pldId == m_FdspFileInfo.pldId) {
         pInfo->version = m_FdspFileInfo.version;
         pInfo->modification = m_FdspFileInfo.modification;
         pInfo->build = m_FdspFileInfo.build;
-		}
-		else
+    } else
         return ErrorPrint(BRDerr_BAD_PARAMETER,
             CURRFILE,
             _BRDC("<GetPldInfo> PLD ID is wrong"));
@@ -3076,8 +2815,7 @@ void CBambpex::GetAdmPldFileInfo(PBRDextn_PLDFILEINFO pInfo) const
 ULONG CBambpex::ShowDialog(PBRDextn_PropertyDlg pDlg)
 {
 #ifdef _WIN32
-	if(pDlg->ListCnt)
-	{
+    if (pDlg->ListCnt) {
         //		HINSTANCE hLib = LoadLibrary("BambpDlg.dll");
         HINSTANCE hLib = LoadLibrary(m_pDlgDllName);
         if (hLib <= (HINSTANCE)HINSTANCE_ERROR)
@@ -3085,20 +2823,16 @@ ULONG CBambpex::ShowDialog(PBRDextn_PropertyDlg pDlg)
 
         AMBINFO_DlgProp_Type* pDlgProp;
         pDlgProp = (AMBINFO_DlgProp_Type*)GetProcAddress(hLib, "AMBINFO_DialogProperty");
-		if(!pDlgProp)
-		{
+        if (!pDlgProp) {
             FreeLibrary(hLib);
             return BRDerr_BAD_DEVICE_VITAL_DATA;
         }
         int nResponse = (pDlgProp)(this, pDlg->DlgMode, pDlg->ListCnt, pDlg->pList, pDlg->pChangeFlag, pDlg->pCurPage);
-		if (nResponse == IDOK)
-		{
+        if (nResponse == IDOK) {
             // TODO: Place code here to handle when the dialog is
             //  dismissed with OK
             //			SetPropertyFromDialog(pDev, pInfo);
-		}
-		else if (nResponse == IDCANCEL)
-		{
+        } else if (nResponse == IDCANCEL) {
             // TODO: Place code here to handle when the dialog is
             //  dismissed with Cancel
         }
@@ -3107,9 +2841,7 @@ ULONG CBambpex::ShowDialog(PBRDextn_PropertyDlg pDlg)
             FreeLibrary(hLib);
         else
             pDlg->hLib = hLib;
-	}
-	else
-	{
+    } else {
         return ErrorPrint(BRDerr_BAD_PARAMETER,
             CURRFILE,
             _BRDC("<ShowDialog> Not Property Pages for Dialog"));
@@ -3122,16 +2854,13 @@ ULONG CBambpex::ShowDialog(PBRDextn_PropertyDlg pDlg)
 ULONG CBambpex::DeleteDialog(PBRDextn_PropertyDlg pDlg)
 {
 #ifdef _WIN32
-	if(pDlg->hLib)
-	{
+    if (pDlg->hLib) {
         AMBINFO_DelDlg_Type* pDelDlg;
         pDelDlg = (AMBINFO_DelDlg_Type*)GetProcAddress(pDlg->hLib, "AMBINFO_DeleteDialog");
         int nResponse = (pDelDlg)(this, pDlg->DlgMode, pDlg->ListCnt, pDlg->pList, pDlg->pChangeFlag, pDlg->pCurPage);
         FreeLibrary(pDlg->hLib);
         pDlg->hLib = NULL;
-	}
-	else
-	{
+    } else {
         return ErrorPrint(BRDerr_BAD_PARAMETER,
             CURRFILE,
             _BRDC("<DeleteDialog> Error HINSTANCE Dialog library"));
@@ -3153,8 +2882,7 @@ ULONG CBambpex::GetBaseIcrDataSize()
     // ULONG ret_status = ReadNvRAM(&buf_read, 6, 128);
     ULONG ret_status = GetNvRAM(&buf_read, 6, 128);
     //	ULONG ret_status = ReadNvRAM(&buf_read, 6, 0);
-	if(ret_status == BRDerr_OK)
-	{
+    if (ret_status == BRDerr_OK) {
         if (buf_read[0] == BASE_ID_TAG)
             m_sizeICR = buf_read[2];
         else
@@ -3162,8 +2890,7 @@ ULONG CBambpex::GetBaseIcrDataSize()
         if (m_sizeICR > MAX_BASE_CFGMEM_SIZE)
             m_sizeICR = 0;
         return ret_status;
-	}
-	else
+    } else
         return ret_status;
 }
 
@@ -3173,15 +2900,13 @@ ULONG CBambpex::GetBaseIcrStatus(ULONG& Status)
     USHORT buf_read[3];
     buf_read[0] = buf_read[1] = buf_read[2] = 0xffff;
     ULONG ret_status = GetNvRAM(&buf_read, 6, 128);
-	if(ret_status == BRDerr_OK)
-	{
+    if (ret_status == BRDerr_OK) {
         if (buf_read[0] == BASE_ID_TAG && buf_read[2] <= MAX_BASE_CFGMEM_SIZE)
             Status = 1;
         else
             Status = 0;
         return ret_status;
-	}
-	else
+    } else
         return ret_status;
 }
 
@@ -3191,8 +2916,7 @@ ULONG CBambpex::GetBaseIcrStatus(ULONG& Status)
 ULONG CBambpex::GetAdmIcrStatus(ULONG& Status, int idxSub)
 {
     Status = 0;
-	if(m_Subunit[idxSub].pSubEEPROM)
-	{
+    if (m_Subunit[idxSub].pSubEEPROM) {
         USHORT buf_read = *(PUSHORT)m_Subunit[idxSub].pSubEEPROM;
         if (buf_read == ADM_ID_TAG)
             Status = 1;
@@ -3251,12 +2975,10 @@ void CBambpex::GetAmbpexCfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_CfgAmb
 {
     PVOID pEndCfgMem = (PVOID)((PUCHAR)pCfgMem + RealBaseCfgSize);
     int end_flag = 0;
-	do
-	{
+    do {
         USHORT sign = *((USHORT*)pCfgMem);
         USHORT size = 0;
-		if(sign == BASE_ID_TAG)
-		{
+        if (sign == BASE_ID_TAG) {
             PICR_IdBase pBaseId = (PICR_IdBase)pCfgMem;
             ICR_IdBase idBase;
             memcpy(&idBase, pBaseId, sizeof(ICR_IdBase));
@@ -3267,9 +2989,7 @@ void CBambpex::GetAmbpexCfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_CfgAmb
             memcpy(pCfgBase, pBambpexCfg, sizeof(ICR_CfgAmbpex));
             size += sizeof(ICR_CfgAmbpex);
             end_flag = 1;
-		}
-		else
-		{
+        } else {
             size = *((USHORT*)pCfgMem + 1);
             size += 4;
             //			break;
@@ -3283,12 +3003,10 @@ void CBambpex::GetAdp201x1CfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_CfgA
 {
     PVOID pEndCfgMem = (PVOID)((PUCHAR)pCfgMem + RealBaseCfgSize);
     int end_flag = 0;
-	do
-	{
+    do {
         USHORT sign = *((USHORT*)pCfgMem);
         USHORT size = 0;
-		if(sign == BASE_ID_TAG)
-		{
+        if (sign == BASE_ID_TAG) {
             PICR_IdBase pBaseId = (PICR_IdBase)pCfgMem;
             ICR_IdBase idBase;
             memcpy(&idBase, pBaseId, sizeof(ICR_IdBase));
@@ -3299,9 +3017,7 @@ void CBambpex::GetAdp201x1CfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_CfgA
             memcpy(pCfgBase, pBadp201x1Cfg, sizeof(ICR_CfgAdp201x1));
             size += sizeof(ICR_CfgAdp201x1);
             end_flag = 1;
-		}
-		else
-		{
+        } else {
             size = *((USHORT*)pCfgMem + 1);
             size += 4;
             //			break;
@@ -3315,12 +3031,10 @@ void CBambpex::GetFmcCfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_CfgFmc105
 {
     PVOID pEndCfgMem = (PVOID)((PUCHAR)pCfgMem + RealBaseCfgSize);
     int end_flag = 0;
-	do
-	{
+    do {
         USHORT sign = *((USHORT*)pCfgMem);
         USHORT size = 0;
-		if(sign == BASE_ID_TAG)
-		{
+        if (sign == BASE_ID_TAG) {
             PICR_IdBase pBaseId = (PICR_IdBase)pCfgMem;
             ICR_IdBase idBase;
             memcpy(&idBase, pBaseId, sizeof(ICR_IdBase));
@@ -3328,21 +3042,16 @@ void CBambpex::GetFmcCfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_CfgFmc105
             PUCHAR pBaseCfg = (PUCHAR)pCfgMem + sizeof(ICR_IdBase);
             size = sizeof(ICR_IdBase);
             PICR_CfgFmc105p pBfmcCfg = (PICR_CfgFmc105p)pBaseCfg;
-			if(pBfmcCfg->wSize+4 == sizeof(ICR_CfgFmc112cp))
-			{
+            if (pBfmcCfg->wSize + 4 == sizeof(ICR_CfgFmc112cp)) {
                 PICR_CfgFmc112cp pF112Cfg = (PICR_CfgFmc112cp)pBaseCfg;
                 memcpy(pCfgBase, pF112Cfg, sizeof(ICR_CfgFmc112cp));
                 size += sizeof(ICR_CfgFmc112cp);
-			}
-			else
-			{
+            } else {
                 memcpy(pCfgBase, pBfmcCfg, sizeof(ICR_CfgFmc105p));
                 size += sizeof(ICR_CfgFmc105p);
             }
             end_flag = 1;
-		}
-		else
-		{
+        } else {
             size = *((USHORT*)pCfgMem + 1);
             size += 4;
             //			break;
@@ -3356,12 +3065,10 @@ void CBambpex::GetXm5516CfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_Cfg551
 {
     PVOID pEndCfgMem = (PVOID)((PUCHAR)pCfgMem + RealBaseCfgSize);
     int end_flag = 0;
-	do
-	{
+    do {
         USHORT sign = *((USHORT*)pCfgMem);
         USHORT size = 0;
-		if(sign == BASE_ID_TAG)
-		{
+        if (sign == BASE_ID_TAG) {
             PICR_IdBase pBaseId = (PICR_IdBase)pCfgMem;
             ICR_IdBase idBase;
             memcpy(&idBase, pBaseId, sizeof(ICR_IdBase));
@@ -3372,9 +3079,7 @@ void CBambpex::GetXm5516CfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_Cfg551
             memcpy(pCfgBase, pBambpexCfg, sizeof(ICR_Cfg5516));
             size += sizeof(ICR_Cfg5516);
             end_flag = 1;
-		}
-		else
-		{
+        } else {
             size = *((USHORT*)pCfgMem + 1);
             size += 4;
             //			break;
@@ -3388,12 +3093,10 @@ void CBambpex::GetFmc551FCfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_Cfg55
 {
     PVOID pEndCfgMem = (PVOID)((PUCHAR)pCfgMem + RealBaseCfgSize);
     int end_flag = 0;
-	do
-	{
+    do {
         USHORT sign = *((USHORT*)pCfgMem);
         USHORT size = 0;
-		if(sign == BASE_ID_TAG)
-		{
+        if (sign == BASE_ID_TAG) {
             PICR_IdBase pBaseId = (PICR_IdBase)pCfgMem;
             ICR_IdBase idBase;
             memcpy(&idBase, pBaseId, sizeof(ICR_IdBase));
@@ -3403,9 +3106,7 @@ void CBambpex::GetFmc551FCfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_Cfg55
             memcpy(pCfgBase, pBambpexCfg, sizeof(ICR_Cfg551F));
             size += sizeof(ICR_Cfg551F);
             end_flag = 1;
-		}
-		else
-		{
+        } else {
             size = *((USHORT*)pCfgMem + 1);
             size += 4;
             //			break;
@@ -3419,18 +3120,15 @@ void CBambpex::GetDdr3CfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_CfgDdr3 
 {
     PVOID pEndCfgMem = (PVOID)((PUCHAR)pCfgMem + RealBaseCfgSize);
     int end_flag = 0;
-	do
-	{
+    do {
         USHORT sign = *((USHORT*)pCfgMem);
         USHORT size = 0;
-		switch(sign)
-		{
+        switch (sign) {
         case END_TAG:
         case ALT_END_TAG:
             end_flag = 1;
             break;
-		case DDR3_CFG_TAG:
-		{
+        case DDR3_CFG_TAG: {
             PICR_CfgDdr3 pSdramCfg = (PICR_CfgDdr3)pCfgMem;
             memcpy(pCfgDdr3, pSdramCfg, sizeof(ICR_CfgDdr3));
             size += sizeof(ICR_CfgDdr3);
@@ -3450,8 +3148,7 @@ ULONG CBambpex::SetSdramConfig(PBASE_INI pIniData, PUCHAR pBaseEEPROMMem, ULONG 
 {
     // устанавливаем конфигурацию по умолчанию
     m_SysGen = 66000000; // 66 МГц
-	for(int i = 0; i < MAX_MEMORY_SRV; i++)
-	{
+    for (int i = 0; i < MAX_MEMORY_SRV; i++) {
         memcpy(&m_MemCfg[i], &MemCfg_dflt, sizeof(MEM_CFG));
         m_MemCfg[i].ModuleCnt |= 0x80;
         m_MemCfg[i].ModuleBanks |= 0x80;
@@ -3484,78 +3181,40 @@ ULONG CBambpex::SetSdramConfig(PBASE_INI pIniData, PUCHAR pBaseEEPROMMem, ULONG 
     //	m_DeviceID != UADCPEX_DEVID &&
     //	m_DeviceID != D2XT006_DEVID
 
-	if((m_DeviceID == AMBPEX5_DEVID) ||
-	   (m_DeviceID == FMC105P_DEVID) ||
-		(m_DeviceID == FMC106P_DEVID) ||
-		(m_DeviceID == FMC107P_DEVID) ||
-		(m_DeviceID == FMC115CP_DEVID) ||
-		(m_DeviceID == FMC112CP_DEVID) ||
-	   (m_DeviceID == FMC114V_DEVID) ||
-	   (m_DeviceID == FMC117CP_DEVID) ||
-		(m_DeviceID == FMC121CP_DEVID) ||
-		(m_DeviceID == FMC121P_DEVID) ||
-		(m_DeviceID == PANORAMA_DEVID) ||
-	   (m_DeviceID == FMC125CP_DEVID) ||
-	   (m_DeviceID == FMC127P_DEVID) ||
-		(m_DeviceID == FMC132P_DEVID) ||
-		(m_DeviceID == FMC139P_DEVID) ||
-		(m_DeviceID == FMC130E_DEVID) ||
-	   (m_DeviceID == XM416X250M_DEVID) ||
-	   (m_DeviceID == FMC110P_DEVID))
-	{
+    if ((m_DeviceID == AMBPEX5_DEVID) || (m_DeviceID == FMC105P_DEVID) || (m_DeviceID == FMC106P_DEVID) || (m_DeviceID == FMC107P_DEVID) || (m_DeviceID == FMC115CP_DEVID) || (m_DeviceID == FMC112CP_DEVID) || (m_DeviceID == FMC114V_DEVID) || (m_DeviceID == FMC117CP_DEVID) || (m_DeviceID == FMC121CP_DEVID) || (m_DeviceID == FMC121P_DEVID) || (m_DeviceID == PANORAMA_DEVID) || (m_DeviceID == FMC125CP_DEVID) || (m_DeviceID == FMC127P_DEVID) || (m_DeviceID == FMC132P_DEVID) || (m_DeviceID == FMC139P_DEVID) || (m_DeviceID == FMC130E_DEVID) || (m_DeviceID == XM416X250M_DEVID) || (m_DeviceID == FMC110P_DEVID)) {
         m_MemCfg[0].SlotCnt = 1;
         m_MemCfg[1].SlotCnt = 0;
         // m_MemCfg[0].ModuleCnt = 1;
         // return BRDerr_OK;
-	}
-	else
-	{
+    } else {
         if (m_DeviceID == FMC126P_DEVID)
-			if (pIniData)
-			{	// уточняем конфигурацию из источника инициализации
+            if (pIniData) { // уточняем конфигурацию из источника инициализации
                 SetSdramfromIniFile(pIniData);
             }
         return BRDerr_OK;
     }
     // m_Ddr3Cfg.CfgSrc = 2;	// использовать SPD
-	if(BaseEEPROMSize)
-	{
-		if( m_DeviceID == XM416X250M_DEVID ||
-			m_DeviceID == FMC117CP_DEVID ||
-			m_DeviceID == FMC121CP_DEVID ||
-			(m_DeviceID == FMC121P_DEVID) ||
-			(m_DeviceID == PANORAMA_DEVID) ||
-			m_DeviceID == FMC125CP_DEVID ||
-			m_DeviceID == FMC127P_DEVID ||
-			m_DeviceID == FMC112CP_DEVID)
-		{
+    if (BaseEEPROMSize) {
+        if (m_DeviceID == XM416X250M_DEVID || m_DeviceID == FMC117CP_DEVID || m_DeviceID == FMC121CP_DEVID || (m_DeviceID == FMC121P_DEVID) || (m_DeviceID == PANORAMA_DEVID) || m_DeviceID == FMC125CP_DEVID || m_DeviceID == FMC127P_DEVID || m_DeviceID == FMC112CP_DEVID) {
             ICR_CfgFmc112cp icr_base;
-			if( m_DeviceID == XM416X250M_DEVID)
-			{
+            if (m_DeviceID == XM416X250M_DEVID) {
                 PICR_Cfg5516 pCfg5516 = (PICR_Cfg5516)&icr_base;
                 GetXm5516CfgICR(pBaseEEPROMMem, BaseEEPROMSize, pCfg5516);
                 m_Ddr3Cfg.CfgSrc = pCfg5516->isDDR3;
-			}
-			else
-				if( m_DeviceID == FMC127P_DEVID)
-				{
+            } else if (m_DeviceID == FMC127P_DEVID) {
                 ICR_Cfg551F* pCfg551F = (ICR_Cfg551F*)&icr_base;
                 GetFmc551FCfgICR(pBaseEEPROMMem, BaseEEPROMSize, pCfg551F);
                 m_Ddr3Cfg.CfgSrc = pCfg551F->bIsInternalDDR3;
-				}
-				else
-				{
+            } else {
                 GetFmcCfgICR(pBaseEEPROMMem, BaseEEPROMSize, (PICR_CfgFmc105p)&icr_base);
                 m_Ddr3Cfg.CfgSrc = icr_base.isDDR3;
             }
             m_SysGen = icr_base.dSysGen;
-			if(!m_Ddr3Cfg.CfgSrc)
-			{
+            if (!m_Ddr3Cfg.CfgSrc) {
                 m_Ddr3Cfg.ModuleCnt = 0;
                 m_Ddr3Cfg.CapacityMbits = 0;
             }
-			if(m_Ddr3Cfg.CfgSrc == 1)
-			{
+            if (m_Ddr3Cfg.CfgSrc == 1) {
                 ICR_CfgDdr3 icr_memory;
                 GetDdr3CfgICR(pBaseEEPROMMem, BaseEEPROMSize, &icr_memory);
                 m_Ddr3Cfg.ModuleCnt = icr_memory.bModuleCnt;
@@ -3567,9 +3226,7 @@ ULONG CBambpex::SetSdramConfig(PBASE_INI pIniData, PUCHAR pBaseEEPROMMem, ULONG 
                 m_Ddr3Cfg.ChipWidth = icr_memory.bChipWidth;
                 m_Ddr3Cfg.CapacityMbits = (U64)icr_memory.wCapacityMbits * 1024 * 1024;
             }
-		}
-		else
-		{
+        } else {
             ICR_CfgAmbpex icr_base;
             GetAmbpexCfgICR(pBaseEEPROMMem, BaseEEPROMSize, &icr_base);
             m_SysGen = icr_base.dSysGen;
@@ -3577,8 +3234,7 @@ ULONG CBambpex::SetSdramConfig(PBASE_INI pIniData, PUCHAR pBaseEEPROMMem, ULONG 
         }
     }
 
-	if (pIniData)
-	{	// уточняем конфигурацию из источника инициализации
+    if (pIniData) { // уточняем конфигурацию из источника инициализации
         SetSdramfromIniFile(pIniData);
     }
     return BRDerr_OK;
@@ -3589,8 +3245,7 @@ void CBambpex::SetSdramfromIniFile(PBASE_INI pIniData)
 { // уточняем конфигурацию из источника инициализации
     if (pIniData->SysGen != 0xffffffff)
         m_SysGen = pIniData->SysGen;
-	for (int iMem = 0; iMem < MAX_MEMORY_SRV; iMem++)
-	{
+    for (int iMem = 0; iMem < MAX_MEMORY_SRV; iMem++) {
         if (BRDC_strlen(m_pIniData->MemIni[iMem].DlgDllName))
             BRDC_strcpy(m_MemCfg[iMem].DlgDllName, m_pIniData->MemIni[iMem].DlgDllName);
         if (pIniData->MemIni[iMem].SlotCnt != 0xffffffff)
@@ -3627,18 +3282,15 @@ void CBambpex::GetDspNodeCfgICR(PVOID pCfgMem, ULONG RealBaseCfgSize, PICR_CfgDs
     PVOID pEndCfgMem = (PVOID)((PUCHAR)pCfgMem + RealBaseCfgSize);
     int idxDsp = 0;
     int end_flag = 0;
-	do
-	{
+    do {
         USHORT sign = *((USHORT*)pCfgMem);
         USHORT size = 0;
-		switch(sign)
-		{
+        switch (sign) {
         case END_TAG:
         case ALT_END_TAG:
             end_flag = 1;
             break;
-		case DSPNODE_CFG_TAG:
-		{
+        case DSPNODE_CFG_TAG: {
             PICR_CfgDspNode pDspNodeCfg = (PICR_CfgDspNode)pCfgMem;
             memcpy(pCfgDspNode + idxDsp, pDspNodeCfg, sizeof(ICR_CfgDspNode));
             idxDsp++;
@@ -3663,8 +3315,7 @@ ULONG CBambpex::SetDspNodeConfig(PBASE_INI pIniData, PUCHAR pBaseEEPROMMem, ULON
     // PUCHAR pBaseCfgMem = new UCHAR[MAX_BASE_CFGMEM_SIZE];
     // ULONG BaseCfgSize = MAX_BASE_CFGMEM_SIZE;
     // if(GetBaseEEPROM(pBaseCfgMem, BaseCfgSize) == BRDerr_OK)
-	if(BaseEEPROMSize)
-	{
+    if (BaseEEPROMSize) {
         //		ICR_CfgAmbp icr_base;
         ////		GetBaseCfgICR(pBaseCfgMem, BaseCfgSize, &icr_base);
         //		GetBaseCfgICR(pBaseEEPROMMem, BaseEEPROMSize, &icr_base);
@@ -3677,8 +3328,7 @@ ULONG CBambpex::SetDspNodeConfig(PBASE_INI pIniData, PUCHAR pBaseEEPROMMem, ULON
         m_DspCfg.PioType = icr_dspnode.bPioType;
     }
     //	delete pBaseCfgMem;
-	if(pIniData)
-	{	// уточняем конфигурацию из источника инициализации
+    if (pIniData) { // уточняем конфигурацию из источника инициализации
         if (pIniData->DspIni.PldType != 0xffffffff)
             m_DspCfg.PldType = pIniData->DspIni.PldType;
         if (pIniData->DspIni.PldVolume != 0xffffffff)
@@ -3703,8 +3353,7 @@ ULONG CBambpex::GetAdmIfCntICR(int& AdmIfCnt)
         return ErrorPrint(BRDerr_HW_ERROR,
             CURRFILE,
             _BRDC("<GetAdmIfCntICR> Hardware error by get base ICR status"));
-	if(icr_base_status)
-	{	// получаем конфигурацию из ППЗУ
+    if (icr_base_status) { // получаем конфигурацию из ППЗУ
         PUCHAR pBaseCfgMem = new UCHAR[MAX_BASE_CFGMEM_SIZE];
         ULONG BufferSize = MAX_BASE_CFGMEM_SIZE;
         ULONG Offset = OFFSET_BASE_CFGMEM;
@@ -3715,23 +3364,18 @@ ULONG CBambpex::GetAdmIfCntICR(int& AdmIfCnt)
                 CURRFILE,
                 _BRDC("<GetAdmIfCntICR> Bad device vital data by read base ICR"));
         ULONG dRealBaseCfgSize;
-		if(*(PUSHORT)pBaseCfgMem == BASE_ID_TAG)
-		{
+        if (*(PUSHORT)pBaseCfgMem == BASE_ID_TAG) {
             dRealBaseCfgSize = *((PUSHORT)pBaseCfgMem + 2);
-			if(m_DeviceID == ADP201X1AMB_DEVID || m_DeviceID == ADP201X1DSP_DEVID)
-			{
+            if (m_DeviceID == ADP201X1AMB_DEVID || m_DeviceID == ADP201X1DSP_DEVID) {
                 ICR_CfgAdp201x1 cfgBase;
                 GetAdp201x1CfgICR(pBaseCfgMem, dRealBaseCfgSize, &cfgBase);
                 AdmIfCnt = cfgBase.bAdmIfCnt;
-			}
-			else
-			{ // AMBPEX8, AMBPEX5, FMC105P
+            } else { // AMBPEX8, AMBPEX5, FMC105P
                 ICR_CfgAmbpex cfgBase;
                 GetAmbpexCfgICR(pBaseCfgMem, dRealBaseCfgSize, &cfgBase);
                 AdmIfCnt = cfgBase.bAdmIfCnt;
             }
-		}
-		else
+        } else
             //			return BRDerr_BAD_DEVICE_VITAL_DATA;
             return ErrorPrint(BRDerr_BAD_DEVICE_VITAL_DATA,
                 CURRFILE,
@@ -3774,43 +3418,34 @@ ULONG CBambpex::GetBaseEEPROM(PUCHAR pBaseCfgMem, ULONG& BaseCfgSize)
 //***************************************************************************************
 ULONG CBambpex::GetBaseEEPROM(PUCHAR pBaseCfgMem, ULONG& BaseCfgSize)
 {
-	if(BaseCfgSize)
-	{	// получаем содержимое ППЗУ базового модуля
+    if (BaseCfgSize) { // получаем содержимое ППЗУ базового модуля
         ULONG BufferSize = BaseCfgSize;
         ULONG Offset = OFFSET_BASE_CFGMEM;
         // if(ReadNvRAM(pBaseCfgMem, BufferSize, Offset) != BRDerr_OK)
         if (GetNvRAM(pBaseCfgMem, BufferSize, Offset) != BRDerr_OK)
             return BRDerr_BAD_DEVICE_VITAL_DATA;
-		else
-		{
+        else {
             ULONG dRealBaseCfgSize;
-			if(*(PUSHORT)pBaseCfgMem == BASE_ID_TAG)
-			{
+            if (*(PUSHORT)pBaseCfgMem == BASE_ID_TAG) {
                 dRealBaseCfgSize = *((PUSHORT)pBaseCfgMem + 2);
-				if(m_DeviceID == ADP201X1AMB_DEVID || m_DeviceID == ADP201X1DSP_DEVID)
-				{
+                if (m_DeviceID == ADP201X1AMB_DEVID || m_DeviceID == ADP201X1DSP_DEVID) {
                     ICR_CfgAdp201x1 cfgBase;
                     GetAdp201x1CfgICR(pBaseCfgMem, dRealBaseCfgSize, &cfgBase);
                     m_AdmIfCnt = cfgBase.bAdmIfCnt;
-				}
-				else
-				{
+                } else {
                     if (m_DeviceID == RFG2_DEVID)
                         m_AdmIfCnt = 0;
-					else
-					{ // AMBPEX8, AMBPEX5, FMC105P
+                    else { // AMBPEX8, AMBPEX5, FMC105P
                         ICR_CfgAmbpex cfgBase;
                         GetAmbpexCfgICR(pBaseCfgMem, dRealBaseCfgSize, &cfgBase);
                         m_AdmIfCnt = cfgBase.bAdmIfCnt;
                     }
                 }
-			}
-			else
+            } else
                 return BRDerr_BAD_DEVICE_VITAL_DATA;
         }
 
-	}
-	else
+    } else
         return BRDerr_BAD_DEVICE_VITAL_DATA;
     return BRDerr_OK;
 }
@@ -3818,8 +3453,7 @@ ULONG CBambpex::GetBaseEEPROM(PUCHAR pBaseCfgMem, ULONG& BaseCfgSize)
 //***************************************************************************************
 ULONG CBambpex::SetSubEeprom(int idxSub, ULONG& SubCfgSize)
 {
-	if(!m_Subunit[idxSub].pSubEEPROM)
-	{
+    if (!m_Subunit[idxSub].pSubEEPROM) {
         BRDCHAR nameFileMap[MAX_PATH];
         BRDC_sprintf(nameFileMap, _BRDC("subeeprom_%s_%d_%d"), m_name, m_PID, idxSub);
         // m_Subunit[idxSub].hFileMap = CreateFileMapping(INVALID_HANDLE_VALUE,
@@ -3837,8 +3471,7 @@ ULONG CBambpex::SetSubEeprom(int idxSub, ULONG& SubCfgSize)
             return BRDerr_HW_ERROR;
 
         PUSHORT pSubCfgMem = (PUSHORT)(m_Subunit[idxSub].pSubEEPROM);
-		if(m_Subunit[idxSub].pSubEEPROM && !isAlreadyCreated)
-		{	// если 1-й раз, то заполняем
+        if (m_Subunit[idxSub].pSubEEPROM && !isAlreadyCreated) { // если 1-й раз, то заполняем
             pSubCfgMem[0] = 0xA55A;
             pSubCfgMem[1] = 0x5AA5;
             // получаем конфигурацию субмодуля из его ППЗУ
@@ -3849,13 +3482,11 @@ ULONG CBambpex::SetSubEeprom(int idxSub, ULONG& SubCfgSize)
                 return BRDerr_HW_ERROR;
         }
         // в любом случае получаем размер
-		if(pSubCfgMem[0] == ADM_ID_TAG)
-		{
+        if (pSubCfgMem[0] == ADM_ID_TAG) {
             SubCfgSize = pSubCfgMem[1];
             if (!SubCfgSize)
                 return BRDerr_BAD_DEVICE_VITAL_DATA;
-		}
-		else
+        } else
             return BRDerr_BAD_DEVICE_VITAL_DATA;
     }
     return BRDerr_OK;
@@ -3868,8 +3499,7 @@ ULONG CBambpex::GetSubEEPROM(int idxSub, PUCHAR pSubCfgMem, ULONG& SubCfgSize)
     ULONG icr_adm_status;
     if (GetAdmIcrStatus(icr_adm_status, idxSub + m_isFMC2) != BRDerr_OK)
         return BRDerr_HW_ERROR;
-	if(icr_adm_status)
-	{	// получаем конфигурацию субмодуля из его ППЗУ
+    if (icr_adm_status) { // получаем конфигурацию субмодуля из его ППЗУ
         memcpy(pSubCfgMem, m_Subunit[idxSub + m_isFMC2].pSubEEPROM, SubCfgSize);
         //		if(ReadAdmIdROM(pSubCfgMem, SubCfgSize, 0) != BRDerr_OK)
         //			return BRDerr_BAD_DEVICE_VITAL_DATA;
@@ -3880,16 +3510,13 @@ ULONG CBambpex::GetSubEEPROM(int idxSub, PUCHAR pSubCfgMem, ULONG& SubCfgSize)
         memcpy(&tag, pSubCfgMem, 2);
         memcpy(&size, (USHORT*)pSubCfgMem + 2, 2);
 
-		if(tag == ADM_ID_TAG)
-		{
+        if (tag == ADM_ID_TAG) {
             SubCfgSize = size;
             if (!SubCfgSize)
                 return BRDerr_BAD_DEVICE_VITAL_DATA;
-		}
-		else
+        } else
             return BRDerr_BAD_DEVICE_VITAL_DATA;
-	}
-	else
+    } else
         return BRDerr_BAD_DEVICE_VITAL_DATA;
     return BRDerr_OK;
 }
@@ -3899,24 +3526,14 @@ ULONG CBambpex::SetServices()
 {
     DeleteServices();
     int iSrv = 0, iMemorySrv = 0, iTestSrv = 0, iStreamSrv = 0, iSysMonSrv = 0;
-	for(int iTst = 0; iTst < MAX_TEST_SRV; iTst++)
-	{
+    for (int iTst = 0; iTst < MAX_TEST_SRV; iTst++) {
         TESTSRV_CFG tst_srv_cfg;
         tst_srv_cfg.isAlreadyInit = 0;
         m_pTestSrv[iTestSrv] = new CTestSrv(iSrv++, iTestSrv, this, &tst_srv_cfg);
         m_SrvList.push_back(m_pTestSrv[iTestSrv++]);
     }
-	for(int iMem = 0; iMem < MAX_MEMORY_SRV; iMem++)
-	{
-		if (FMC126P_DEVID == m_DeviceID ||
-			FMC139P_DEVID == m_DeviceID ||
-			FMC131VKU_DEVID == m_DeviceID ||
-			FMC141VKU1_DEVID == m_DeviceID ||
-			FMC141VKU2_DEVID == m_DeviceID ||
-			FMC143VKU_DEVID == m_DeviceID ||
-			FMC146VKU_DEVID == m_DeviceID ||
-			FMC132P_DEVID == m_DeviceID)
-		{ // модули с DDR4
+    for (int iMem = 0; iMem < MAX_MEMORY_SRV; iMem++) {
+        if (FMC126P_DEVID == m_DeviceID || FMC139P_DEVID == m_DeviceID || FMC131VKU_DEVID == m_DeviceID || FMC141VKU1_DEVID == m_DeviceID || FMC141VKU2_DEVID == m_DeviceID || FMC143VKU_DEVID == m_DeviceID || FMC146VKU_DEVID == m_DeviceID || FMC132P_DEVID == m_DeviceID) { // модули с DDR4
             DDR4SDRAMSRV_CFG mem_srv_cfg;
             BRDC_strcpy(mem_srv_cfg.DlgDllName, _BRDC(""));
             mem_srv_cfg.isAlreadyInit = 0;
@@ -3936,29 +3553,9 @@ ULONG CBambpex::SetServices()
             mem_srv_cfg.ChipWidth = m_Ddr3Cfg.ChipWidth;
             mem_srv_cfg.CapacityMbits = 0;
             m_pMemorySrv[iMemorySrv] = new CDdr4SdramSrv(iSrv++, iMemorySrv, this, &mem_srv_cfg);
-		}
-		else
-		if(	(FMC106P_DEVID == m_DeviceID) ||
-			(FMC107P_DEVID == m_DeviceID) ||
+        } else if ((FMC106P_DEVID == m_DeviceID) || (FMC107P_DEVID == m_DeviceID) ||
             //(PS_SYNC_DEVID == m_DeviceID) || // ВРЕМЕННЫЙ КОД - НЕ ЗАБЫТЬ УБРАТЬ !!!!!!!!!!!!!!!!!!!
-			(FMC110P_DEVID == m_DeviceID) ||
-			(FMC111P_DEVID == m_DeviceID) ||
-			(FMC113E_DEVID == m_DeviceID) ||
-			(FMC112CP_DEVID == m_DeviceID) ||
-			(FMC114V_DEVID == m_DeviceID) ||
-			(FMC117CP_DEVID == m_DeviceID) ||
-			(FMC121CP_DEVID == m_DeviceID) ||
-			(FMC121P_DEVID == m_DeviceID) ||
-			(PANORAMA_DEVID == m_DeviceID) ||
-            (FMC123E_DEVID == m_DeviceID) ||
-			(FMC124P_DEVID == m_DeviceID) ||
-			(FMC125CP_DEVID == m_DeviceID) ||
-			(FMC127P_DEVID == m_DeviceID) ||
-                        (FMC130E_DEVID == m_DeviceID) ||
-			(FMC122P_DEVID == m_DeviceID) ||
-			(XM416X250M_DEVID == m_DeviceID) ||
-			(FMC115CP_DEVID == m_DeviceID) )
-		{ // модули с DDR3
+            (FMC110P_DEVID == m_DeviceID) || (FMC111P_DEVID == m_DeviceID) || (FMC113E_DEVID == m_DeviceID) || (FMC112CP_DEVID == m_DeviceID) || (FMC114V_DEVID == m_DeviceID) || (FMC117CP_DEVID == m_DeviceID) || (FMC121CP_DEVID == m_DeviceID) || (FMC121P_DEVID == m_DeviceID) || (PANORAMA_DEVID == m_DeviceID) || (FMC123E_DEVID == m_DeviceID) || (FMC124P_DEVID == m_DeviceID) || (FMC125CP_DEVID == m_DeviceID) || (FMC127P_DEVID == m_DeviceID) || (FMC130E_DEVID == m_DeviceID) || (FMC122P_DEVID == m_DeviceID) || (XM416X250M_DEVID == m_DeviceID) || (FMC115CP_DEVID == m_DeviceID)) { // модули с DDR3
             DDR3SDRAMSRV_CFG mem_srv_cfg;
             BRDC_strcpy(mem_srv_cfg.DlgDllName, _BRDC(""));
             mem_srv_cfg.isAlreadyInit = 0;
@@ -3966,15 +3563,7 @@ ULONG CBambpex::SetServices()
             mem_srv_cfg.TetrNum = m_MemCfg[iMem].TetrNum;
             mem_srv_cfg.AdrMask = m_MemCfg[iMem].AdrMask;
             mem_srv_cfg.AdrConst = m_MemCfg[iMem].AdrConst;
-			if(XM416X250M_DEVID == m_DeviceID ||
-				FMC117CP_DEVID == m_DeviceID ||
-				FMC121CP_DEVID == m_DeviceID ||
-				FMC121P_DEVID == m_DeviceID ||
-				PANORAMA_DEVID == m_DeviceID ||
-				FMC125CP_DEVID == m_DeviceID ||
-				FMC127P_DEVID == m_DeviceID ||
-				FMC112CP_DEVID == m_DeviceID)
-			{
+            if (XM416X250M_DEVID == m_DeviceID || FMC117CP_DEVID == m_DeviceID || FMC121CP_DEVID == m_DeviceID || FMC121P_DEVID == m_DeviceID || PANORAMA_DEVID == m_DeviceID || FMC125CP_DEVID == m_DeviceID || FMC127P_DEVID == m_DeviceID || FMC112CP_DEVID == m_DeviceID) {
                 mem_srv_cfg.CfgSource = m_Ddr3Cfg.CfgSrc;
                 mem_srv_cfg.SlotCnt = m_Ddr3Cfg.ModuleCnt;
                 mem_srv_cfg.ModuleCnt = m_Ddr3Cfg.ModuleCnt;
@@ -3985,9 +3574,7 @@ ULONG CBambpex::SetServices()
                 mem_srv_cfg.PrimWidth = m_Ddr3Cfg.PrimWidth;
                 mem_srv_cfg.ChipWidth = m_Ddr3Cfg.ChipWidth;
                 mem_srv_cfg.CapacityMbits = m_Ddr3Cfg.CapacityMbits;
-			}
-			else
-			{
+            } else {
                 mem_srv_cfg.CfgSource = 2; // from SPD only
                 mem_srv_cfg.SlotCnt = m_MemCfg[iMem].SlotCnt;
                 mem_srv_cfg.ModuleCnt = m_MemCfg[iMem].ModuleCnt;
@@ -4003,9 +3590,7 @@ ULONG CBambpex::SetServices()
 #ifndef __linux__
             m_pMemorySrv[iMemorySrv]->SetPropDlg((void*)DEVS_propDlg);
 #endif
-		}
-		else
-		{ // модули с DDR2
+        } else { // модули с DDR2
             SDRAMAMBPCDSRV_CFG mem_srv_cfg;
             BRDC_strcpy(mem_srv_cfg.SdramCfg.DlgDllName, m_MemCfg[iMem].DlgDllName);
             //			mem_srv_cfg.SdramCfg.pPropDlg = DEVS_propDlg;
@@ -4026,14 +3611,12 @@ ULONG CBambpex::SetServices()
         }
         m_SrvList.push_back(m_pMemorySrv[iMemorySrv++]);
     }
-	for(int iStrm = 0; iStrm < MAX_STREAM_SRV; iStrm++)
-	{
+    for (int iStrm = 0; iStrm < MAX_STREAM_SRV; iStrm++) {
         STREAMSRV_CFG strm_srv_cfg;
         m_pStreamSrv[iStreamSrv] = new CStreamSrv(iSrv++, iStreamSrv, this, &strm_srv_cfg);
         m_SrvList.push_back(m_pStreamSrv[iStreamSrv++]);
     }
-	for(int iSysMon = 0; iSysMon < MAX_SYSMON_SRV; iSysMon++)
-	{
+    for (int iSysMon = 0; iSysMon < MAX_SYSMON_SRV; iSysMon++) {
         SYSMONSRV_CFG sysmon_srv_cfg;
         sysmon_srv_cfg.isAlreadyInit = 0;
         sysmon_srv_cfg.DeviceID = m_DeviceID;
@@ -4048,29 +3631,25 @@ ULONG CBambpex::SetServices()
 //******************************************
 void CBambpex::DeleteServices()
 {
-	for(int i = 0; i < MAX_SYSMON_SRV; i++)
-	{
+    for (int i = 0; i < MAX_SYSMON_SRV; i++) {
         if (m_pSysMonSrv[i]) {
             delete m_pSysMonSrv[i];
             m_pSysMonSrv[i] = NULL;
         }
     }
-	for(int i = 0; i < MAX_TEST_SRV; i++)
-	{
+    for (int i = 0; i < MAX_TEST_SRV; i++) {
         if (m_pTestSrv[i]) {
             delete m_pTestSrv[i];
             m_pTestSrv[i] = NULL;
         }
     }
-	for(int i = 0; i < MAX_MEMORY_SRV; i++)
-	{
+    for (int i = 0; i < MAX_MEMORY_SRV; i++) {
         if (m_pMemorySrv[i]) {
             delete m_pMemorySrv[i];
             m_pMemorySrv[i] = NULL;
         }
     }
-	for(int i = 0; i < MAX_STREAM_SRV; i++)
-	{
+    for (int i = 0; i < MAX_STREAM_SRV; i++) {
         if (m_pStreamSrv[i]) {
             delete m_pStreamSrv[i];
             m_pStreamSrv[i] = NULL;
@@ -4084,14 +3663,12 @@ void CBambpex::SetCandidateSrv()
     int srv_num = (int)m_ServInfoList.size();
     //	int srv_num = m_SrvList.size();
     BRDCHAR* pchar;
-	for(int i = 0; i < srv_num; i++)
-	{
+    for (int i = 0; i < srv_num; i++) {
         ULONG attr = m_ServInfoList[i]->attribute;
         //		LPTSTR srv_name = m_ServInfoList[i]->name;
         //		ULONG attr = m_SrvList[i]->GetAttribute();
         int ius = 0;
-		if(attr & BRDserv_ATTR_CMPABLE)
-		{
+        if (attr & BRDserv_ATTR_CMPABLE) {
             int j = 0;
             do {
                 pchar = BRDC_strstr(m_ServInfoList[j++]->name, _BRDC("CMPSC"));
@@ -4102,44 +3679,33 @@ void CBambpex::SetCandidateSrv()
                 m_ServInfoList[i]->idxCandidSrv[ius++] = j - 1;
             //				m_SrvList[i]->SetCandidIndex(ius++, j - 1);
         }
-		if(attr & BRDserv_ATTR_STREAMABLE_OUT)
-		{
-			for(int j = 0; j < srv_num; j++)
-			{
-				if( (m_ServInfoList[j]->attribute & BRDserv_ATTR_STREAM) &&
-					(m_ServInfoList[j]->attribute & BRDserv_ATTR_DIRECTION_OUT))
+        if (attr & BRDserv_ATTR_STREAMABLE_OUT) {
+            for (int j = 0; j < srv_num; j++) {
+                if ((m_ServInfoList[j]->attribute & BRDserv_ATTR_STREAM) && (m_ServInfoList[j]->attribute & BRDserv_ATTR_DIRECTION_OUT))
                     m_ServInfoList[i]->idxCandidSrv[ius++] = j;
                 //				if( (m_SrvList[j]->GetAttribute() & BRDserv_ATTR_STREAM) &&
                 //					(m_SrvList[j]->GetAttribute() & BRDserv_ATTR_DIRECTION_OUT))
                 //					m_SrvList[i]->SetCandidIndex(ius++, j);
             }
         }
-		if(attr & BRDserv_ATTR_STREAMABLE_IN)
-		{
-			for(int j = 0; j < srv_num; j++)
-			{
-				if( (m_ServInfoList[j]->attribute & BRDserv_ATTR_STREAM) &&
-					(m_ServInfoList[j]->attribute & BRDserv_ATTR_DIRECTION_IN))
+        if (attr & BRDserv_ATTR_STREAMABLE_IN) {
+            for (int j = 0; j < srv_num; j++) {
+                if ((m_ServInfoList[j]->attribute & BRDserv_ATTR_STREAM) && (m_ServInfoList[j]->attribute & BRDserv_ATTR_DIRECTION_IN))
                     m_ServInfoList[i]->idxCandidSrv[ius++] = j;
                 //				if( (m_SrvList[j]->GetAttribute() & BRDserv_ATTR_STREAM) &&
                 //					(m_SrvList[j]->GetAttribute() & BRDserv_ATTR_DIRECTION_IN))
                 //					m_SrvList[i]->SetCandidIndex(ius++, j);
             }
         }
-		if(attr & BRDserv_ATTR_SDRAMABLE)
-		{
-			for(int j = 0; j < srv_num; j++)
-			{
+        if (attr & BRDserv_ATTR_SDRAMABLE) {
+            for (int j = 0; j < srv_num; j++) {
                 //				if(m_ServInfoList[j]->attribute & BRDserv_ATTR_SDRAM)
                 {
                     pchar = BRDC_strstr(m_ServInfoList[j]->name, _BRDC("BASESDRAM"));
-					if(pchar)
-					{
-						if ((attr & BRDserv_ATTR_STREAMABLE_IN) &&
-							(m_ServInfoList[j]->attribute & BRDserv_ATTR_DIRECTION_IN))
+                    if (pchar) {
+                        if ((attr & BRDserv_ATTR_STREAMABLE_IN) && (m_ServInfoList[j]->attribute & BRDserv_ATTR_DIRECTION_IN))
                             m_ServInfoList[i]->idxCandidSrv[ius++] = j;
-						if ((attr & BRDserv_ATTR_STREAMABLE_OUT) &&
-							(m_ServInfoList[j]->attribute & BRDserv_ATTR_DIRECTION_OUT))
+                        if ((attr & BRDserv_ATTR_STREAMABLE_OUT) && (m_ServInfoList[j]->attribute & BRDserv_ATTR_DIRECTION_OUT))
                             m_ServInfoList[i]->idxCandidSrv[ius++] = j;
                         // break;
                     }
@@ -4161,15 +3727,12 @@ void CBambpex::SetCandidateSrv()
         //				}
         //			}
         //		}
-		if(attr & BRDserv_ATTR_ADCABLE)
-		{
-			for(int j = 0; j < srv_num; j++)
-			{
+        if (attr & BRDserv_ATTR_ADCABLE) {
+            for (int j = 0; j < srv_num; j++) {
                 //				if(m_ServInfoList[j]->attribute & BRDserv_ATTR_DSPNODE)
                 {
                     pchar = BRDC_strstr(m_ServInfoList[j]->name, _BRDC("ADC"));
-					if(pchar)
-					{
+                    if (pchar) {
                         m_ServInfoList[i]->idxCandidSrv[ius++] = j;
                         break;
                     }
@@ -4201,8 +3764,7 @@ LONG CBambpex::RegCtrl(ULONG cmd, PDEVS_CMD_Reg pRegParam)
             _BRDC("<RegCtrl> Cmd = %d, Tetr = 0x%04X, Reg = 0x%04X, Val = 0x%04X, One or more parameters are bad"),
             cmd, pRegParam->tetr, pRegParam->reg, pRegParam->val);
 
-	switch(cmd)
-	{
+    switch (cmd) {
     case DEVScmd_REGREADIND:
         status = ReadRegData(admif, pRegParam->tetr, pRegParam->reg, pRegParam->val);
         break;
@@ -4260,8 +3822,7 @@ LONG CBambpex::RegCtrl(ULONG cmd, PDEVS_CMD_Reg pRegParam)
     case DEVScmd_PACKEXECUTE:
         return BRDerr_CMD_UNSUPPORTED;
         // break;
-		default:
-			{
+    default: {
         // if(m_hMutex)
         //	ReleaseMutex(m_hMutex);
         // return BRDerr_CMD_UNSUPPORTED;
@@ -4303,10 +3864,8 @@ ULONG CBambpex::StreamCtrl(ULONG cmd, PVOID pParam, ULONG sizeParam, LPOVERLAPPE
     // RegParam.idxMain = 0;
     // if(m_hMutex)
     //	WaitForSingleObject(m_hMutex, INFINITE);
-	switch(cmd)
-	{
-		case STRMcmd_SETMEMORY:
-		{
+    switch (cmd) {
+    case STRMcmd_SETMEMORY: {
         // SERV_CMD_IsAvailable srvAvail;
         // int idx	 = (m_curHandle >> 16) & 0x3F;
         // if(idx < (long)m_SrvList.size())
@@ -4329,24 +3888,19 @@ ULONG CBambpex::StreamCtrl(ULONG cmd, PVOID pParam, ULONG sizeParam, LPOVERLAPPE
         //	}
         // }
         ULONG addr_data = 0;
-			if(m_curHandle)
-			{
+        if (m_curHandle) {
             int idx = (m_curHandle >> 16) & 0x3F;
             if (idx < (long)m_SrvList.size())
                 Status = m_SrvList[idx]->DoCmd(this, SERVcmd_SYS_GETADDRDATA, 0, &addr_data, NULL);
-				else
-				{
+            else {
                 DEV_CMD_Ctrl param;
                 param.handle = m_curHandle;
                 param.cmd = SERVcmd_SYS_GETADDRDATA;
                 param.arg = &addr_data;
-					if(m_ServInfoList[idx]->baseORsideDLL)
-					{
+                if (m_ServInfoList[idx]->baseORsideDLL) {
                     SIDE_API_entry* pSIDE_Entry = (SIDE_API_entry*)m_ServInfoList[idx]->pSideEntry;
                     Status = pSIDE_Entry(m_ServInfoList[idx]->pSideDll, NULL, SIDEcmd_CTRL, &param);
-					}
-					else
-					{
+                } else {
                     DEV_API_entry* pDEV_Entry = (DEV_API_entry*)m_ServInfoList[idx]->pSideEntry;
                     Status = pDEV_Entry(m_ServInfoList[idx]->pSideDll, DEVcmd_CTRL, &param);
                 }
@@ -4355,20 +3909,16 @@ ULONG CBambpex::StreamCtrl(ULONG cmd, PVOID pParam, ULONG sizeParam, LPOVERLAPPE
                 ((PAMB_MEM_DMA_CHANNEL)pParam)->LocalAddr = addr_data;
             else
                 ((PAMB_MEM_DMA_CHANNEL)pParam)->LocalAddr = 0;
-			}
-			else
+        } else
             ((PAMB_MEM_DMA_CHANNEL)pParam)->LocalAddr = 0;
         Status = SetMemory(pParam, sizeParam);
-		}
-			break;
+    } break;
     case STRMcmd_FREEMEMORY:
         Status = FreeMemory(pParam, sizeParam);
         break;
-		case STRMcmd_STARTMEMORY:
-		{
+    case STRMcmd_STARTMEMORY: {
         Status = StartMemory(pParam, sizeParam, pOverlap);
-		}
-			break;
+    } break;
     case STRMcmd_STOPMEMORY:
         Status = StopMemory(pParam, sizeParam);
         break;
@@ -4400,8 +3950,7 @@ ULONG CBambpex::StreamCtrl(ULONG cmd, PVOID pParam, ULONG sizeParam, LPOVERLAPPE
         Status = SetIrqMode(pParam, sizeParam);
         break;
 
-		case STRMcmd_GETIRQCNT:
-			{
+    case STRMcmd_GETIRQCNT: {
         ULONG* pBufpar = (ULONG*)pParam;
         ULONG chan_num = pBufpar[0];
         PULONG BlockMem = m_pMemBuf[0] + m_BlockFifoAddr[chan_num];

@@ -57,6 +57,8 @@ S32			g_nMsTimeout = 5000;
 
 //------------------------------------------------------------------------
 
+#define HI_VER 1
+#define LO_VER 0
 
 //=****************************** main **************************************
 //=**************************************************************************
@@ -66,6 +68,7 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
 	S32			devNum;
 
 	IPC_initKeyboard();
+	printf("exam_edac: version %d.%d (%s), build:%s \n\n", HI_VER, LO_VER, "Shared", __DATE__);
 
 	ParseCommandLine( argc, argv );
 
@@ -275,7 +278,9 @@ S32 CaptureAllDac( void )
 		//
 		// Захватить все подходящие службы на данном устройстве
 		//
-		U32			mode = BRDcapt_EXCLUSIVE;
+		//dch
+		//U32			mode = BRDcapt_EXCLUSIVE;
+		U32			mode = BRDcapt_SHARED;
 		U32			nItemReal, iSrv;
 		BRD_ServList srvList[MAX_SERVICE_ON_DEVICE];
 		S32			len = (S32)BRDC_strlen( g_sServiceName );
@@ -293,7 +298,7 @@ S32 CaptureAllDac( void )
 				(srvList[iSrv].name[len+1] != '\0') )
 				continue;
 
-            BRDC_printf( _BRDC( "   Capture %s mode: EXCLUSIVE..."), g_sServiceName );
+            BRDC_printf( _BRDC( "   Capture %s mode: SHARED ..."), g_sServiceName );
 			BRD_Handle hSrv = BRD_capture( g_hDev[g_nDevNum], 0, &mode,srvList[iSrv].name, 10000);
 			if(hSrv > 0)
 			{

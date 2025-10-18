@@ -1115,6 +1115,7 @@ auto SrvADC::CtrlSetPreSync(void* pDev, void* pServData, ULONG cmd, void* args) 
 
     // ждём результат
     auto presync_result = false;
+    m_timeout_msec = 10000;
     const auto timeout = std::chrono::steady_clock::now() + std::chrono::milliseconds(m_timeout_msec);
     do {
         presync_result = (sub_module.DirRegRead(m_tetr_num, ADM2IFnr_STATUS) & (1 << 13)) != 0;

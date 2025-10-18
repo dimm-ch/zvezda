@@ -59,7 +59,7 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
     decltype(auto) ini = ArgumentCast<BRD_IniFile>(args);
     auto status = uint32_t {};
 
-    LOG("BRDctrl_ADC_READINIFILE { fileName: %s, sectionName: %s }",
+    LOG("MFM414x3G:BRDctrl_ADC_READINIFILE { fileName: %s, sectionName: %s }",
         BARDY_STR(ini.fileName), BARDY_STR(ini.sectionName));
 
     INIReader reader(BARDY_STR(ini.fileName));

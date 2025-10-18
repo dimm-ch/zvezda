@@ -365,12 +365,17 @@ S32 SetParamSrv(int lid /*, BRD_ServList* srv, int idx*/)
 {
     S32 status = BRDerr_OK;
 
-    if (!DevicesLid[lid].device.isOpen() || !DevicesLid[lid].adc.isCaptured()) {
-        printf("<ERR> SetParamSrv: service d'nt capture .. \n");
+    if (!DevicesLid[lid].device.isOpen()) {
+        printf("<ERR> SetParamSrv: device d'nt open .. \n");
         return -1;
     }
     ParamsAdc& p = DevicesLid[lid].paramsAdc;
     BRD_Handle handle = DevicesLid[lid].device.handle();
+    DevicesLid[lid].adc.capture(handle, p.g_AdcSrvName, 10000);
+    if (!DevicesLid[lid].adc.isCaptured()) {
+        printf("<ERR> SetParamSrv: service %s not captured ..\n", p.g_AdcSrvName);
+        return -1;
+    }
 
     U32 md = DevicesLid[lid].adc.mode();
     BRD_Handle hADC = DevicesLid[lid].adc.handle();
@@ -381,7 +386,7 @@ S32 SetParamSrv(int lid /*, BRD_ServList* srv, int idx*/)
         if (p.g_SwitchOutMask <= 0xFF)
             SetSwitchAdc(lid /*handle*/);
 
-        p.g_numChan = AdcSettings(hADC, lid, p.g_AdcSrvNum, p.g_SrvName, p.g_iniFileNameAdc); // установить параметры АЦП
+        p.g_numChan = AdcSettings(lid); // установить параметры АЦП
 
         ULONG format = 0;
         BRD_ctrl(hADC, 0, BRDctrl_ADC_GETFORMAT, &format);
@@ -704,7 +709,7 @@ S32 GetAdcData(int lid, unsigned long long bBufSize, unsigned long long bMemBufS
                             loop = 0;
                         if (0x20 == ch) { // Space
                             // my//status = AdcSettings(hADC, idx, p.g_AdcSrvNum, p.g_SrvName, p.g_iniFileNameAdc); // установить параметры АЦП
-                            status = AdcSettings(hADC, lid, p.g_AdcSrvNum, p.g_SrvName, p.g_iniFileNameAdc); // установить параметры АЦП
+                            status = AdcSettings(lid); // установить параметры АЦП
                             status = BRD_ctrl(hADC, 0, BRDctrl_ADC_PREPARESTART, NULL);
                             newParam_fl = 0xffffffff;
                         }
@@ -1371,10 +1376,13 @@ bool captureServiceAndSetParams(int lid, int mode)
         S32 status = BRD_serviceList(handleDevice, 0, srvList, MAX_SRV, &ItemReal);
         if (ItemReal <= MAX_SRV) {
             for (U32 j = 0; j < ItemReal; j++) {
-                BRDC_printf(_BRDC("Service %d: %s, Attr = 0x%X\n"),
-                    j, srvList[j].name, srvList[j].attr);
+                BRDC_printf(_BRDC("Service %d: %s, Attr = 0x%X\n"), j, srvList[j].name, srvList[j].attr);
+                if (strcasecmp(srvList[j].name, p.g_AdcSrvName) == 0)
+                    SetParamSrv(lid);
             }
-            DevicesLid[lid].adc.capture(handleDevice, p.g_AdcSrvName, 10000);
+        } else {
+            BRDC_printf(_BRDC("<ERR> captureServiceAndSetParams: RealItems = %d (> %d)!\n"), ItemReal, MAX_SRV);
+            return false;
         }
         if (!DevicesLid[lid].adc.isCaptured()) {
             BRDC_printf(_BRDC("<ERR> service %s is not found!\n"), p.g_AdcSrvName);
@@ -1382,11 +1390,6 @@ bool captureServiceAndSetParams(int lid, int mode)
             DevicesLid[lid].adc.setMode(mode);
             return false;
         }
-        SetParamSrv(lid);
-
-    } else {
-        BRDC_printf(_BRDC("<ERR> captureServiceAndSetParams: RealItems = %d (> %d)!\n"), ItemReal, MAX_SRV);
-        return false;
     }
 
     return true;

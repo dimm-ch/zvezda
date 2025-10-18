@@ -90,10 +90,9 @@
 			"xutility": "cpp"
 		},
 		"C_Cpp.clang_format_fallbackStyle": "WebKit",
-		"C_Cpp.formatting": "clangFormat",
 		"C_Cpp.clang_format_style": "WebKit",
 		"editor.formatOnPaste": false,
-		"editor.formatOnSave": true
+		"editor.formatOnSave": false
 	},
 	"extensions": {
 		"recommendations": []

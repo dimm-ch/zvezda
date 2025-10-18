@@ -59,34 +59,22 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
     decltype(auto) ini = ArgumentCast<BRD_IniFile>(args);
     auto status = uint32_t {};
 
-    LOG("MFM214x3GDA:BRDctrl_ADC_READINIFILE { fileName: %s, sectionName: %s }",
+    LOG("BRDctrl_ADC_READINIFILE { fileName: %s, sectionName: %s }",
         BARDY_STR(ini.fileName), BARDY_STR(ini.sectionName));
-    int x = 0;
-    LOG("CHECK_LOG begining");
-    LOG("CHECK_LOG %d", x++);
+
     INIReader reader(BARDY_STR(ini.fileName));
     if (reader.ParseError() < 0) {
         LOG(" - ERROR: Can't load '%s'", BARDY_STR(ini.fileName));
         return BRDerr_ERROR;
     }
-    LOG("CHECK_LOG %d", x++);
+
     // получаем параметры из INI-файла
     // и производим настройку оборудования
     // без INI-файла необходимо отправлять команды сайд-драйверу
     // -------------------------------------------------------------------------
-    LOG("CHECK_LOG before debug_info");
-    try {
         auto debug_info = reader.GetBoolean(BARDY_STR(ini.sectionName), "DebugInfo", false);
-    } catch (...) {
-        LOG("CHECK_LOG was exception");
-    }
-    LOG("CHECK_LOG %d, debug_info = %d", x++, debug_info);
-    status = CtrlSetDebugInfo(pDev, pServData, BRDctrl_SETDEBUGINFO, &debug_info);
-    if (status != BRDerr_OK) {
-        LOG("ERROR: BRDctrl_SETDEBUGINFO");
-        return BRDerr_ERROR;
-    }
-    LOG("CHECK_LOG %d", x++);
+    CtrlSetDebugInfo(pDev, pServData, BRDctrl_SETDEBUGINFO, &debug_info);
+
     m_timeout_msec = reader.GetInteger(BARDY_STR(_BRDC("Option")), "TimeoutSec", 5) * 1000;
 
     // настройка источника тактовой частоты для АЦП
@@ -100,11 +88,8 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
     clk_mode.OutB = reader.GetBoolean(BARDY_STR(ini.sectionName), "LMXOutB", true);
     clk_mode.Mult = 1;
     status = CtrlSetClkMode(pDev, pServData, BRDctrl_ADC_SETCLKMODE, &clk_mode);
-    if (status != BRDerr_OK) {
-        LOG("ERROR: BRDctrl_ADC_SETCLKMODE");
+    if (status != BRDerr_OK)
         return BRDerr_ERROR;
-    }
-    LOG("CHECK_LOG %d", x++);
 
     // установка параметров стартовой синхронизации
     auto start_mode = BRD_StartMode {};
@@ -155,8 +140,6 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
         if (status != BRDerr_OK) {
             LOG("ERROR: BRDctrl_DDC_SETFC");
         }
-    }
-    LOG("MARK # 1 -------------------------------------");
 
     // установка режима АЦП
     auto adc_mode = BRD_AdcMode_FM214x3GDA {};
@@ -209,9 +192,7 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
     if (status != BRDerr_OK) {
         LOG("ERROR: BRDctrl_ADC_SETSTDELAY");
     }
-
-    LOG("MARK # 2 -------------------------------------");
-
+   
     auto acq_count = BRD_EnVal {};
     acq_count.enable = reader.GetBoolean(BARDY_STR(ini.sectionName), "AcquiredSampleEnable", false);
     acq_count.value = uint32_t(reader.GetInteger(BARDY_STR(ini.sectionName), "AcquiredSampleCounter", 0));
@@ -242,8 +223,6 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
     if (status != BRDerr_OK) {
         LOG("ERROR: BRDctrl_ADC_SETTITLEDATA");
     }
-
-    LOG("MARK # 3 -------------------------------------");
 
     // Установка NCO и Phase для DDC 0..3
     auto freq = BRD_ValChan {};
@@ -292,8 +271,6 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
             LOG("ERROR: BRDctrl_ADC_SETINPUTFSVOLTAGE");
         }
     }
-
-    LOG("MARK # 4 -------------------------------------");
 
     // Параметр Input Buffer Control для каналов
     auto buf = BRD_ValChan {};
@@ -353,8 +330,6 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
         }
     }
 
-    LOG("MARK # 5 -------------------------------------");
-
     // Калибровочные значения для JESD линков
     auto prbs_type_str = reader.Get(BARDY_STR(ini.sectionName), "PrbsType", "");
     PRBS_TYPE prbs_type = PRBS_TYPE::NONE;
@@ -377,8 +352,6 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
         return BRDerr_ERROR;
     }
 
-    LOG("MARK # 6 -------------------------------------");
-
     // установка стандартной задержки для IDELAYE3 (UltraScale)
     auto std_delay = BRD_StdDelay {};
     for (auto i = 0U; i < 16; i++)
@@ -391,8 +364,7 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
                 return BRDerr_ERROR;
             }
         }
-    LOG("MARK # 7 -------------------------------------");
-    LOG("CHECK_LOG %d", x++);
+
     return BRDerr_OK;
 }
 

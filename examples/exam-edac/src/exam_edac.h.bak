@@ -11,9 +11,9 @@
 #define _EXAM_EDAC_H
 
 #include "brd.h"
-#include	"ctrlstrm.h"
 #include "ctrlcmpsc.h"
 #include "ctrldac.h"
+#include "ctrlstrm.h"
 // #include	"CtrlDac216x400m.h"
 #include "ctrlsdram.h"
 // #include	"ctrlreg.h"
@@ -112,7 +112,6 @@ extern BRD_Handle g_hDev[MAX_DEVICE];
 extern S32 g_nDacNum;
 extern TDacParam g_aDac[MAX_DAC];
 extern S32 g_idx[MAX_DAC];
-
 
 // extern BRD_Handle		g_hCaptSrv[10];
 // extern S32				g_nCaptSrv;
@@ -222,10 +221,8 @@ S32 OldCycleSdramOutput(S32 cycle);
 S32 OldFifoOutputCycleDMA(void);
 bool OldSetParamSDRAM(BRD_Handle hSrv);
 
-
 #endif // _EXAM_EDAC_H
 
 //
 // End of file
 //
-

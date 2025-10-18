@@ -5,23 +5,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 // #include <conio.h>
-#include <time.h>
-#include <inttypes.h>
 #include "gipcy.h"
+#include <inttypes.h>
+#include <time.h>
 
 // TODO: reference additional headers your program requires here
 #include "brd.h"
-#include "icr.h"
 #include "ctrl.h"
-#include "ctrltest.h"
-#include "ctrlstrm.h"
-#include "ctrldac.h"
 #include "ctrladc.h"
+#include "ctrldac.h"
 #include "ctrlddc.h"
+#include "ctrlstrm.h"
+#include "ctrltest.h"
+#include "icr.h"
 // #include "ctrldspnode.h"
-#include "ctrlsdram.h"
 #include "ctrlgc5016.h"
 #include "ctrlreg.h"
+#include "ctrlsdram.h"
 
 BRDCHAR iniFileName[MAX_PATH] = _BRDC("//brd_test.ini");
 BRDCHAR sPldName[MAX_PATH];
@@ -93,7 +93,8 @@ void init_genrand(unsigned long s)
         /* 2002/01/09 modified by Makoto Matsumoto             */
         state[j] &= 0xffffffffUL; /* for >32 bit machines */
     }
-    left = 1; initf = 1;
+    left = 1;
+    initf = 1;
 }
 
 static void next_state(void)
@@ -103,7 +104,8 @@ static void next_state(void)
 
     /* if init_genrand() has not been called, */
     /* a default initial seed is used         */
-    if (initf==0) init_genrand(5489UL);
+    if (initf == 0)
+        init_genrand(5489UL);
 
     left = N;
     next = state;
@@ -122,7 +124,8 @@ unsigned long genrand_int32(void)
 {
     unsigned long y;
 
-    if (--left == 0) next_state();
+    if (--left == 0)
+        next_state();
     y = *next++;
 
     /* Tempering */
@@ -227,13 +230,11 @@ void ReadIniFile(BRDCHAR* iniFileName)
     DdcOn = BRDC_atoi(Buffer);
 
     BRDCHAR ParamName[128];
-	for(int i = 0; i < 8; i++)
-	{
+    for (int i = 0; i < 8; i++) {
         BRDC_sprintf(ParamName, _BRDC("IoDelay%d"), i);
         IPC_getPrivateProfileString(_BRDC("Option"), ParamName, _BRDC("128"), Buffer, sizeof(Buffer), iniFilePath);
         IoDelay[i] = BRDC_atoi(Buffer);
     }
-
 }
 
 int BRDC_main(int argc, BRDCHAR* argv[])
@@ -242,8 +243,7 @@ int BRDC_main(int argc, BRDCHAR* argv[])
 
     IPC_initKeyboard();
 
-	if(argc > 1)
-	{
+    if (argc > 1) {
         BRDC_sprintf(iniFileName, _BRDC("//%s"), argv[1]);
     }
     ReadIniFile(iniFileName);
@@ -268,8 +268,7 @@ int BRDC_main(int argc, BRDCHAR* argv[])
     info.size = sizeof(info);
     BRD_Handle handle[10];
 
-	for(ULONG i = 0; i < lidList.itemReal; i++)
-	{
+    for (ULONG i = 0; i < lidList.itemReal; i++) {
         BRD_getInfo(lidList.pLID[i], &info);
         BRDC_printf(_BRDC("Board: %s, DevID = 0x%x, RevID = 0x%x, Bus = %d, Dev = %d, Slot = %d.\n"),
             info.name, info.boardType >> 16, info.boardType & 0xff, info.bus, info.dev, info.slot);
@@ -280,24 +279,19 @@ int BRDC_main(int argc, BRDCHAR* argv[])
         //		handle[i] = BRD_open(lidList.pLID[i], BRDopen_EXCLUSIVE, &open_mode);
         //		if(handle[i] > 0 && BRDopen_EXCLUSIVE == open_mode)
         handle[i] = BRD_open(lidList.pLID[i], BRDopen_SHARED, &open_mode);
-		if(handle[i] > 0 && BRDopen_SHARED == open_mode)
-		{
+        if (handle[i] > 0 && BRDopen_SHARED == open_mode) {
             BRD_PuList PuList[8];
             U32 ItemReal;
             status = BRD_puList(handle[i], PuList, 8, &ItemReal);
-			if(ItemReal <= 8)
-			{
-				for(U32 j = 0; j < ItemReal; j++)
-				{
+            if (ItemReal <= 8) {
+                for (U32 j = 0; j < ItemReal; j++) {
                     BRDC_printf(_BRDC("PuList_%d: %s, Id = %d, Code = %x, Attr = %x.\n"),
                         j, PuList[j].puDescription, PuList[j].puId, PuList[j].puCode, PuList[j].puAttr);
-					if(PuList[j].puCode == PLD_CFG_TAG && PuList[j].puId == 0x100)
-					{
+                    if (PuList[j].puCode == PLD_CFG_TAG && PuList[j].puId == 0x100) {
                         U32 PldState;
                         status = BRD_puState(handle[i], PuList[j].puId, &PldState);
                         BRDC_printf(_BRDC("BRD_puState: ADM PLD State = %d\n"), PldState);
-						if(PldLoadForce || !PldState)
-						{
+                        if (PldLoadForce || !PldState) {
                             BRDCHAR msg[255];
                             BRDC_sprintf(msg, _BRDC("PLD file name: %s\n"), sPldName);
                             BRDC_printf(_BRDC("%s"), msg);
@@ -321,8 +315,7 @@ int BRDC_main(int argc, BRDCHAR* argv[])
                 }
             }
 
-			if(BRD_errcmp(status, BRDerr_OK))
-			{
+            if (BRD_errcmp(status, BRDerr_OK)) {
                 // SetIoDelay(handle[i]); // программирование линий задержки
 
                 BRD_ServList srvList[20];
@@ -330,8 +323,7 @@ int BRDC_main(int argc, BRDCHAR* argv[])
                 if (ItemReal > 20)
                     ItemReal = 20;
                 {
-					for(U32 j = 0; j < ItemReal; j++)
-					{
+                    for (U32 j = 0; j < ItemReal; j++) {
                         BRDC_printf(_BRDC("srvList_%d: %s, Attr = %X.\n"),
                             j, srvList[j].name, srvList[j].attr);
                     }
@@ -342,26 +334,20 @@ int BRDC_main(int argc, BRDCHAR* argv[])
                     BRD_Handle hDdrIn = NULL;
                     BRD_Handle hDdrOut = NULL;
                     int flag = 0;
-					for (U32 iSrv = 0; iSrv < ItemReal; iSrv++)
-					{
-						if (BRDC_strstr(srvList[iSrv].name, _BRDC("BASESDRAM")))
-						{
-							if (srvList[iSrv].attr & BRDserv_ATTR_DIRECTION_IN)
-							{
+                    for (U32 iSrv = 0; iSrv < ItemReal; iSrv++) {
+                        if (BRDC_strstr(srvList[iSrv].name, _BRDC("BASESDRAM"))) {
+                            if (srvList[iSrv].attr & BRDserv_ATTR_DIRECTION_IN) {
                                 U32 mode = BRDcapt_EXCLUSIVE;
                                 hDdrIn = BRD_capture(handle[i], 0, &mode, srvList[iSrv].name, 10000);
-								if (mode == BRDcapt_EXCLUSIVE)
-								{
+                                if (mode == BRDcapt_EXCLUSIVE) {
                                     BRDC_printf(_BRDC("%s Capture mode: EXCLUSIVE (%X)\n"), srvList[iSrv].name, hDdrIn);
                                     flag++;
                                 }
                             }
-							if (srvList[iSrv].attr & BRDserv_ATTR_DIRECTION_OUT)
-							{
+                            if (srvList[iSrv].attr & BRDserv_ATTR_DIRECTION_OUT) {
                                 U32 mode = BRDcapt_EXCLUSIVE;
                                 hDdrOut = BRD_capture(handle[i], 0, &mode, srvList[iSrv].name, 10000);
-								if (mode == BRDcapt_EXCLUSIVE)
-								{
+                                if (mode == BRDcapt_EXCLUSIVE) {
                                     BRDC_printf(_BRDC("%s Capture mode: EXCLUSIVE (%X)\n"), srvList[iSrv].name, hDdrOut);
                                     flag++;
                                 }
@@ -379,14 +365,11 @@ int BRDC_main(int argc, BRDCHAR* argv[])
                 }
 
                 U32 iAdcSrv = 0;
-				for(U32 iSrv = 0; iSrv < ItemReal; iSrv++)
-				{
+                for (U32 iSrv = 0; iSrv < ItemReal; iSrv++) {
                     BRDCHAR srv_name[32];
                     BRDC_sprintf(srv_name, _BRDC("%s%d"), AdcSrvName, iAdcSrv);
-					if(!BRDC_strcmp(srvList[iSrv].name, srv_name))
-					{
-						if(SaveToFile)
-						{
+                    if (!BRDC_strcmp(srvList[iSrv].name, srv_name)) {
+                        if (SaveToFile) {
                             FILE* fstream = NULL;
                             fstream = BRDC_fopen(_BRDC("0.txt"), _BRDC("w+t"));
                             if (fstream)
@@ -394,29 +377,28 @@ int BRDC_main(int argc, BRDCHAR* argv[])
                         }
                         U32 mode = BRDcapt_EXCLUSIVE;
                         BRD_Handle hADC = BRD_capture(handle[i], 0, &mode, srv_name, 10000);
-						if(mode == BRDcapt_EXCLUSIVE) BRDC_printf(_BRDC("%s Capture mode: EXCLUSIVE (%X)\n"), srv_name, hADC);
-						if(mode == BRDcapt_SPY)	BRDC_printf(_BRDC("%s Capture mode: SPY (%X)\n"), srv_name, hADC);
-						BRD_Handle hTest = BRD_capture(handle[i], 0, &mode, _BRDC("TEST0"), 10000);
-						if(mode == BRDcapt_EXCLUSIVE) BRDC_printf(_BRDC("TEST Capture mode: EXCLUSIVE (%X)\n"), hTest);
+                        if (mode == BRDcapt_EXCLUSIVE)
+                            BRDC_printf(_BRDC("%s Capture mode: EXCLUSIVE (%X)\n"), srv_name, hADC);
                         if (mode == BRDcapt_SPY)
-						{
+                            BRDC_printf(_BRDC("%s Capture mode: SPY (%X)\n"), srv_name, hADC);
+                        BRD_Handle hTest = BRD_capture(handle[i], 0, &mode, _BRDC("TEST0"), 10000);
+                        if (mode == BRDcapt_EXCLUSIVE)
+                            BRDC_printf(_BRDC("TEST Capture mode: EXCLUSIVE (%X)\n"), hTest);
+                        if (mode == BRDcapt_SPY) {
                             BRDC_printf(_BRDC("TEST Capture mode: SPY (%X)\n"), hTest);
                             status = BRD_release(hTest, 0);
                             status = BRD_release(hADC, 0);
                             hADC = 0;
                             hTest = 0;
                         }
-						if(hADC > 0 && hTest > 0)
-						{
-							for(iCycle = 0; iCycle < NumCycles; iCycle++)
-							{
+                        if (hADC > 0 && hTest > 0) {
+                            for (iCycle = 0; iCycle < NumCycles; iCycle++) {
                                 //							status = Testing(handle[i], &srvList[iSrv]);
                                 if (InOutMode)
                                     status = DacTesting(hADC, hTest, &srvList[iSrv]);
                                 else
                                     status = AdcTesting(hADC, hTest, &srvList[iSrv]);
-								if(key_cycle)
-								{
+                                if (key_cycle) {
                                     BRDC_printf(_BRDC("Press any key to continue...\n"));
                                     IPC_getch();
                                 }
@@ -443,8 +425,7 @@ int BRDC_main(int argc, BRDCHAR* argv[])
     BRDC_printf(_BRDC("BRD_cleanup: OK\n"));
     if (SaveToFile && !ErrorMsg)
         BRDC_printf(_BRDC("Goodbye!!!\n"));
-	else
-	{
+    else {
         BRDC_printf(_BRDC("Press any key for leaving program...\n"));
         IPC_getch();
     }
@@ -457,8 +438,7 @@ void DisplayError(S32 status, const BRDCHAR* cmd_str)
 {
     S32 real_status = BRD_errext(status);
     BRDCHAR msg[255];
-	switch(real_status)
-	{
+    switch (real_status) {
     case BRDerr_OK:
         BRDC_sprintf(msg, _BRDC("%s: BRDerr_OK\n"), cmd_str);
         break;
@@ -480,8 +460,7 @@ void SetIoDelay(BRD_Handle handle)
     S32 status;
     U32 mode = BRDcapt_SHARED;
     BRD_Handle hReg = BRD_capture(handle, 0, &mode, _BRDC("REG0"), 10000);
-	if(hReg <= 0)
-	{
+    if (hReg <= 0) {
         BRDC_printf(_BRDC("REG NOT capture (%X)\n"), hReg);
         return;
     }
@@ -496,8 +475,7 @@ void SetIoDelay(BRD_Handle handle)
     // сначала находим тетраду памяти
     regdata.reg = 0x100;
     S32 iTetr = 0;
-	for(iTetr = 0; iTetr < 8; iTetr++)
-	{
+    for (iTetr = 0; iTetr < 8; iTetr++) {
         regdata.tetr = iTetr;
         status = BRD_ctrl(hReg, 0, BRDctrl_REG_READIND, &regdata);
         if (!BRD_errcmp(status, BRDerr_OK))
@@ -508,26 +486,21 @@ void SetIoDelay(BRD_Handle handle)
             regdata.val == 0xB3) // SDRAM на FMC106P (OUTPUT)
             break;
     }
-	if(iTetr == 8)
-	{
+    if (iTetr == 8) {
         BRDC_printf(_BRDC("SetIoDelay: SDRAM (0x6F | 0x77 | 0x8F | 0xB3) tetrad is NOT FOUND!!\n"));
         status = BRD_release(hReg, 0);
         return;
     }
-	for(int iLine = 0; iLine < 8; iLine++)
-	{
-		if(IoDelay[iLine] != 128)
-		{
+    for (int iLine = 0; iLine < 8; iLine++) {
+        if (IoDelay[iLine] != 128) {
             regdata.reg = 0x2F0 + iLine;
             regdata.val = 2; // сброс задержки
             status = BRD_ctrl(hReg, 0, BRDctrl_REG_WRITEIND, &regdata);
             // BRDC_printf(_BRDC("IoDelay: reg=0x%X val=0x%X\n", regdata.reg, regdata.val);
-			if(IoDelay[iLine])
-			{
+            if (IoDelay[iLine]) {
                 regdata.val = (IoDelay[iLine] > 0) ? 1 : 0;
                 int num = abs(IoDelay[iLine]);
-				for(int i = 0; i < num; i++)
-				{
+                for (int i = 0; i < num; i++) {
                     status = BRD_ctrl(hReg, 0, BRDctrl_REG_WRITEIND, &regdata);
                     // BRDC_printf(_BRDC("IoDelay: reg=0x%X val=0x%X\n", regdata.reg, regdata.val);
                 }
@@ -542,8 +515,7 @@ void ReadCalibrReg(BRD_Handle handle)
     S32 status;
     U32 mode = BRDcapt_SHARED;
     BRD_Handle hReg = BRD_capture(handle, 0, &mode, _BRDC("REG0"), 10000);
-	if(hReg <= 0)
-	{
+    if (hReg <= 0) {
         BRDC_printf(_BRDC("REG NOT capture (%X)\n"), hReg);
         return;
     }
@@ -558,8 +530,7 @@ void ReadCalibrReg(BRD_Handle handle)
     // сначала находим тетраду памяти
     regdata.reg = 0x100;
     S32 iTetr = 0;
-	for(iTetr = 0; iTetr < 8; iTetr++)
-	{
+    for (iTetr = 0; iTetr < 8; iTetr++) {
         regdata.tetr = iTetr;
         status = BRD_ctrl(hReg, 0, BRDctrl_REG_READIND, &regdata);
         if (!BRD_errcmp(status, BRDerr_OK))
@@ -570,15 +541,13 @@ void ReadCalibrReg(BRD_Handle handle)
             regdata.val == 0xB3) // SDRAM на FMC106P (OUTPUT)
             break;
     }
-	if(iTetr == 8)
-	{
+    if (iTetr == 8) {
         BRDC_printf(_BRDC("ReadCalibrReg: SDRAM (0x6F | 0x77 | 0x8F | 0xB3) tetrad is NOT FOUND!!\n"));
         status = BRD_release(hReg, 0);
         return;
     }
     BRDC_printf(_BRDC("IODelay registers: "));
-	for(int iLine = 0; iLine < 8; iLine++)
-	{
+    for (int iLine = 0; iLine < 8; iLine++) {
         regdata.reg = 0x2F0 + iLine;
         // regdata.val = 2; // сброс задержки
         status = BRD_ctrl(hReg, 0, BRDctrl_REG_READIND, &regdata);
@@ -590,8 +559,7 @@ void ReadCalibrReg(BRD_Handle handle)
 
 void SetTestBuffer(PVOID pBuf, U32 sizeBuf)
 {
-	switch(TestMode)
-	{
+    switch (TestMode) {
     case 0: //
     {
         BRDC_printf(_BRDC("Counter test\n"));
@@ -601,50 +569,42 @@ void SetTestBuffer(PVOID pBuf, U32 sizeBuf)
         int* buf_tst = (int*)pBuf;
         for (U32 i = 0; i < sizeBuf / sizeof(int); i++)
             buf_tst[i] = (int)i;
-	}
-		break;
+    } break;
     case 5: //
     {
         BRDC_printf(_BRDC("64-bit Counter test\n"));
         int64_t* buf_tst = (int64_t*)pBuf;
         for (U32 i = 0; i < sizeBuf / sizeof(int64_t); i++)
             buf_tst[i] = (int64_t)i;
-	}
-		break;
+    } break;
     case 1: //
     {
         BRDC_printf(_BRDC("Running 0 test\n"));
         int64_t* buf_tst = (int64_t*)pBuf;
         U32 cnt = sizeBuf / sizeof(int64_t) / 64;
         U32 k = 0;
-		for(U32 i = 0; i < cnt; i++)
-		{
+        for (U32 i = 0; i < cnt; i++) {
             int64_t mask = 0xfffffffffffffffe;
-			for(U32 j = 0; j < 64; j++)
-			{
+            for (U32 j = 0; j < 64; j++) {
                 buf_tst[k++] = mask;
                 mask = (mask << 1) + 1;
             }
         }
-	}
-		break;
+    } break;
     case 2: //
     {
         BRDC_printf(_BRDC("Running 1 test\n"));
         int64_t* buf_tst = (int64_t*)pBuf;
         U32 cnt = sizeBuf / sizeof(int64_t) / 64;
         U32 k = 0;
-		for(U32 i = 0; i < cnt; i++)
-		{
+        for (U32 i = 0; i < cnt; i++) {
             int64_t mask = 1;
-			for(U32 j = 0; j < 64; j++)
-			{
+            for (U32 j = 0; j < 64; j++) {
                 buf_tst[k++] = mask;
                 mask = (mask << 1) + 1;
             }
         }
-	}
-		break;
+    } break;
     case 3: //
     {
         BRDC_printf(_BRDC("Random test\n"));
@@ -657,8 +617,7 @@ void SetTestBuffer(PVOID pBuf, U32 sizeBuf)
         UCHAR* buf_tst = (UCHAR*)pBuf;
         for (U32 i = 0; i < sizeBuf; i++)
             buf_tst[i] = (UCHAR)rand();
-	}
-		break;
+    } break;
     case 6: //
     {
         BRDC_printf(_BRDC("Mersenne Twister Random test\n"));
@@ -668,15 +627,13 @@ void SetTestBuffer(PVOID pBuf, U32 sizeBuf)
         USHORT* buf_tst = (USHORT*)pBuf;
         for (U32 i = 0; i < sizeBuf / sizeof(USHORT); i++)
             buf_tst[i] = (USHORT)genrand_int32();
-	}
-		break;
+    } break;
     case 4: //
     {
         BRDC_printf(_BRDC("Patterns test\n"));
         unsigned long long* buf_tst = (unsigned long long*)pBuf;
         U32 cnt = sizeBuf / sizeof(U64);
-		for(U32 i = 0; i < cnt; i++)
-		{
+        for (U32 i = 0; i < cnt; i++) {
             buf_tst[i++] = pattern0;
             buf_tst[i] = pattern1;
         }
@@ -688,24 +645,21 @@ void SetTestBuffer(PVOID pBuf, U32 sizeBuf)
 
 void ContinueTestBuffer(PVOID pBuf, U32 sizeBuf, short index)
 {
-	switch(TestMode)
-	{
+    switch (TestMode) {
     case 0: //
     {
         int* buf_tst = (int*)pBuf;
         int counter = int((U32)index * (sizeBuf / sizeof(int)));
         for (U32 i = 0; i < sizeBuf / sizeof(int); i++)
             buf_tst[i] = counter++;
-	}
-		break;
+    } break;
     case 5: //
     {
         int64_t* buf_tst = (int64_t*)pBuf;
         int64_t counter = int64_t((U32)index * (sizeBuf / sizeof(int64_t)));
         for (U32 i = 0; i < sizeBuf / sizeof(int64_t); i++)
             buf_tst[i] = counter++;
-	}
-		break;
+    } break;
         // бегущими "0" и "1" продолжать заполнять не надо
     case 1: //
     case 2: //
@@ -718,15 +672,13 @@ void ContinueTestBuffer(PVOID pBuf, U32 sizeBuf, short index)
         UCHAR* buf_tst = (UCHAR*)pBuf;
         for (U32 i = 0; i < sizeBuf; i++)
             buf_tst[i] = (UCHAR)rand();
-	}
-		break;
+    } break;
     case 6: //
     {
         USHORT* buf_tst = (USHORT*)pBuf;
         for (U32 i = 0; i < sizeBuf / sizeof(USHORT); i++)
             buf_tst[i] = (USHORT)genrand_int32();
-	}
-		break;
+    } break;
     default:
         break;
     }
@@ -734,24 +686,21 @@ void ContinueTestBuffer(PVOID pBuf, U32 sizeBuf, short index)
 
 void TestBufferForComp(PVOID pBuf, U32 sizeBuf, short index)
 {
-	switch(TestMode)
-	{
+    switch (TestMode) {
     case 0: //
     {
         int* buf_tst = (int*)pBuf;
         int counter = int((U32)index * (sizeBuf / sizeof(int)));
         for (U32 i = 0; i < sizeBuf / sizeof(int); i++)
             buf_tst[i] = counter++;
-	}
-		break;
+    } break;
     case 5: //
     {
         int64_t* buf_tst = (int64_t*)pBuf;
         int64_t counter = int64_t((U32)index * (sizeBuf / sizeof(int64_t)));
         for (U32 i = 0; i < sizeBuf / sizeof(int64_t); i++)
             buf_tst[i] = counter++;
-	}
-		break;
+    } break;
         // бегущими "0" и "1" продолжать заполнять не надо
     case 1: //
     case 2: //
@@ -764,15 +713,13 @@ void TestBufferForComp(PVOID pBuf, U32 sizeBuf, short index)
         UCHAR* buf_tst = (UCHAR*)pBuf;
         for (U32 i = 0; i < sizeBuf; i++)
             buf_tst[i] = (UCHAR)rand();
-	}
-		break;
+    } break;
     case 6: //
     {
         USHORT* buf_tst = (USHORT*)pBuf;
         for (U32 i = 0; i < sizeBuf / sizeof(USHORT); i++)
             buf_tst[i] = (USHORT)genrand_int32();
-	}
-		break;
+    } break;
     default:
         break;
     }
@@ -852,8 +799,7 @@ S32 FifoInput(BRD_Handle hADC, BRD_Handle hTest, void* pBuf)
 
     ULONG tetrad;
 
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETSRCSTREAM, &tetrad);
         break;
@@ -868,8 +814,7 @@ S32 FifoInput(BRD_Handle hADC, BRD_Handle hTest, void* pBuf)
     status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_SETSRC, &tetrad);
 
     BRD_AdcCfg AdcConfig;
-	if(!DdcOn)
-	{
+    if (!DdcOn) {
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCFG, &AdcConfig);
     }
 
@@ -881,8 +826,7 @@ S32 FifoInput(BRD_Handle hADC, BRD_Handle hTest, void* pBuf)
     status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_SETDRQ, &flag);
 
     ULONG tst_mode = 1;
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETTESTMODE, &tst_mode);
         break;
@@ -897,8 +841,7 @@ S32 FifoInput(BRD_Handle hADC, BRD_Handle hTest, void* pBuf)
     IPC_delay(1);
 
     status = BRD_ctrl(hTest, 0, BRDctrl_TEST_FIFORESET, NULL);
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFORESET, NULL);
         break;
@@ -919,8 +862,7 @@ S32 FifoInput(BRD_Handle hADC, BRD_Handle hTest, void* pBuf)
     status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_START, &start_pars);
 
     ULONG enable = 1;
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &enable);
         break;
@@ -936,20 +878,19 @@ S32 FifoInput(BRD_Handle hADC, BRD_Handle hTest, void* pBuf)
     int cnt = 4096 * 256 / bufSize;
     BRD_DataBuf tst_data_buf;
     UCHAR* pCurBuf = (UCHAR*)pBuf;
-	int j = 0; int i = 0;
+    int j = 0;
+    int i = 0;
     do {
         tst_data_buf.pData = pCurBuf;
         tst_data_buf.size = bufSize;
         status = BRD_ctrl(hTest, 0, BRDctrl_TEST_SETDATA, &tst_data_buf);
-		for(i = 0; i < 1000; i++)
-		{
+        for (i = 0; i < 1000; i++) {
             IPC_delay(1);
             status = BRD_ctrl(hTest, 0, BRDctrl_TEST_FIFOSTATUS, &Status);
             if ((Status & 0x8) == 0) // Almost Empty FIFO flag
                 break;
         }
-		if(i >= 1000)
-		{
+        if (i >= 1000) {
             BRDC_printf(_BRDC("\nERROR by BRDctrl_TEST_SETDATA, Status = %X\n"), Status);
             break;
         }
@@ -964,8 +905,7 @@ S32 FifoInput(BRD_Handle hADC, BRD_Handle hTest, void* pBuf)
     // IPC_getch();
     enable = 0;
 
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &enable);
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFOSTATUS, &Status);
@@ -999,8 +939,7 @@ S32 FifoInputDMA(BRD_Handle hADC, BRD_Handle hTest)
     status = BRD_ctrl(hTest, 0, BRDctrl_TEST_GETSRCSTREAM, &tetrad);
     status = BRD_ctrl(hTest, 0, BRDctrl_STREAM_SETSRC, &tetrad);
 
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETSRCSTREAM, &tetrad);
         break;
@@ -1015,8 +954,7 @@ S32 FifoInputDMA(BRD_Handle hADC, BRD_Handle hTest)
     status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_SETSRC, &tetrad);
 
     BRD_AdcCfg AdcConfig;
-	if(!DdcOn)
-	{
+    if (!DdcOn) {
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCFG, &AdcConfig);
     }
 
@@ -1030,8 +968,7 @@ S32 FifoInputDMA(BRD_Handle hADC, BRD_Handle hTest)
     status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_SETDRQ, &flag);
 
     ULONG tst_mode = 1;
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETTESTMODE, &tst_mode);
         break;
@@ -1046,8 +983,7 @@ S32 FifoInputDMA(BRD_Handle hADC, BRD_Handle hTest)
     IPC_delay(1);
 
     status = BRD_ctrl(hTest, 0, BRDctrl_TEST_FIFORESET, NULL);
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFORESET, NULL);
         break;
@@ -1068,8 +1004,7 @@ S32 FifoInputDMA(BRD_Handle hADC, BRD_Handle hTest)
     status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_START, &start_pars);
 
     ULONG enable = 1;
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &enable);
         break;
@@ -1080,7 +1015,6 @@ S32 FifoInputDMA(BRD_Handle hADC, BRD_Handle hTest)
         status = BRD_ctrl(hADC, 0, BRDctrl_DDC_ENABLE, &enable);
         break;
     }
-
 
     start_pars.isCycle = 1;
     status = BRD_ctrl(hTest, 0, BRDctrl_STREAM_CBUF_START, &start_pars);
@@ -1118,8 +1052,7 @@ S32 FifoInputDMA(BRD_Handle hADC, BRD_Handle hTest)
     status = BRD_ctrl(hTest, 0, BRDctrl_STREAM_CBUF_STOP, NULL);
     enable = 0;
 
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &enable);
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFOSTATUS, &Status);
@@ -1165,8 +1098,7 @@ S32 SdramInputDMA(BRD_Handle hADC, BRD_Handle hTest, PVOID pBuf, U32 sizeBuf)
     ULONG msTimeout = 2000; //-1;
 
     ULONG tst_mode = 1;
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETTESTMODE, &tst_mode);
         break;
@@ -1179,8 +1111,7 @@ S32 SdramInputDMA(BRD_Handle hADC, BRD_Handle hTest, PVOID pBuf, U32 sizeBuf)
     }
 
     status = BRD_ctrl(hTest, 0, BRDctrl_TEST_FIFORESET, NULL);
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFORESET, NULL); // сброс FIFO АЦП
         break;
@@ -1196,8 +1127,7 @@ S32 SdramInputDMA(BRD_Handle hADC, BRD_Handle hTest, PVOID pBuf, U32 sizeBuf)
 
     ULONG enable = 1;
     status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ENABLE, &enable); // разрешение записи в SDRAM
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &enable); // разрешение работы АЦП
         break;
@@ -1223,10 +1153,8 @@ S32 SdramInputDMA(BRD_Handle hADC, BRD_Handle hTest, PVOID pBuf, U32 sizeBuf)
         status = BRD_ctrl(hTest, 0, BRDctrl_STREAM_CBUF_START, &start_pars); // стартуем вывод тестовой последовательности
         status = BRD_ctrl(hTest, 0, BRDctrl_STREAM_CBUF_WAITBUF, &msTimeout); // дожидаемся окончания вывода тестовой последовательности
         BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ISACQCOMPLETE, &Status); // проверяем заполнилась ли активная зона памяти
-		if(BRD_errcmp(status, BRDerr_WAIT_TIMEOUT))
-		{	// если вышли по тайм-ауту
-			if(!Status)
-			{
+        if (BRD_errcmp(status, BRDerr_WAIT_TIMEOUT)) { // если вышли по тайм-ауту
+            if (!Status) {
                 DisplayError(status, _BRDC("TIME-OUT"));
                 BRDC_printf(_BRDC("Press any key for continue program...\n"));
                 IPC_getch();
@@ -1234,8 +1162,7 @@ S32 SdramInputDMA(BRD_Handle hADC, BRD_Handle hTest, PVOID pBuf, U32 sizeBuf)
             }
         }
         // status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ISACQCOMPLETE, &Status); // проверяем заполнилась ли активная зона памяти
-		if(!Status)
-		{
+        if (!Status) {
             BRDCHAR Msg[128];
             ULONG address = MemoryAddress + index * (sizeBuf / sizeof(int));
             BRDC_sprintf(Msg, _BRDC("Writing to SDRAM: %0X\r"), address);
@@ -1249,8 +1176,7 @@ S32 SdramInputDMA(BRD_Handle hADC, BRD_Handle hTest, PVOID pBuf, U32 sizeBuf)
     //	BRDC_printf(_BRDC("\n");
 
     enable = 0;
-	switch(DdcOn)
-	{
+    switch (DdcOn) {
     case 0:
         status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &enable); // запрет работы АЦП
         break;
@@ -1272,9 +1198,9 @@ S32 SdramInputDMA(BRD_Handle hADC, BRD_Handle hTest, PVOID pBuf, U32 sizeBuf)
 
             flag = SdramDrqFlag;
             status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_SETDRQ, &flag);
-*/	return status;
+    */
+    return status;
 }
-
 
 void WriteDataFile(PVOID pBuf, ULONG nNumberOfBytes)
 {
@@ -1289,8 +1215,7 @@ void WriteDataFile(PVOID pBuf, ULONG nNumberOfBytes)
     //							NULL);
     // if(hfile == INVALID_HANDLE_VALUE)
     IPC_handle hfile = IPC_openFile(fileName, IPC_CREATE_FILE | IPC_FILE_WRONLY);
-	if(!hfile)
-	{
+    if (!hfile) {
         BRDC_printf(_BRDC("Create file %s error.\n"), fileName);
         return;
     }
@@ -1330,8 +1255,7 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
         ULONG size_tst = 4096 * 256;
 #endif
         BRDctrl_StreamCBufAlloc buf_dscr_tst;
-		if(g_TstDma)
-		{
+        if (g_TstDma) {
             buf_dscr_tst.dir = BRDstrm_DIR_OUT;
             buf_dscr_tst.isCont = 0;
             // buf_dscr_tst.isCont = 0;//1;
@@ -1342,9 +1266,7 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
             status = BRD_ctrl(hTest, 0, BRDctrl_STREAM_CBUF_ALLOC, &buf_dscr_tst);
 
             pBuf_tst = (int*)buf_dscr_tst.ppBlk[0];
-		}
-		else
-		{
+        } else {
             pBuf_tst = new char[size_tst];
         }
         BRDctrl_StreamCBufAlloc buf_dscr_adc;
@@ -1368,8 +1290,7 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
         // SetTestBuffer(buf_dscr_tst.ppBlk[0], buf_dscr_tst.blkSize);
         SetTestBuffer(pBuf_tst, size_tst);
 
-		if(DaqMemMode)
-		{
+        if (DaqMemMode) {
             // проверяем наличие динамической памяти
             BRD_SdramCfgEx SdramConfig;
             SdramConfig.Size = sizeof(BRD_SdramCfgEx);
@@ -1377,34 +1298,25 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
             status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_GETCFGEX, &SdramConfig);
             if (status < 0)
                 PhysMemSize = 0;
-			else
-			{
+            else {
                 if (SdramConfig.MemType == 11 || // DDR3
                     SdramConfig.MemType == 12) // DDR4
                     PhysMemSize = (uint64_t)((
-											(((int64_t)SdramConfig.CapacityMbits * 1024 * 1024) >> 3) *
-											(int64_t)SdramConfig.PrimWidth / SdramConfig.ChipWidth * SdramConfig.ModuleBanks *
-											SdramConfig.ModuleCnt) >> 2); // в 32-битных словах
+                                                 (((int64_t)SdramConfig.CapacityMbits * 1024 * 1024) >> 3) * (int64_t)SdramConfig.PrimWidth / SdramConfig.ChipWidth * SdramConfig.ModuleBanks * SdramConfig.ModuleCnt)
+                        >> 2); // в 32-битных словах
                 else
-					PhysMemSize =	(1 << SdramConfig.RowAddrBits) *
-									(1 << SdramConfig.ColAddrBits) *
-									SdramConfig.ModuleBanks *
-									SdramConfig.ChipBanks *
-									SdramConfig.ModuleCnt * 2; // в 32-битных словах
+                    PhysMemSize = (1 << SdramConfig.RowAddrBits) * (1 << SdramConfig.ColAddrBits) * SdramConfig.ModuleBanks * SdramConfig.ChipBanks * SdramConfig.ModuleCnt * 2; // в 32-битных словах
             }
-			if(!iCycle)
-			{
+            if (!iCycle) {
                 SetIoDelay(hADC & 0xFFFF); // программирование линий задержки
                 ReadCalibrReg(hADC & 0xFFFF);
             }
 
-			if(PhysMemSize)
-			{ // динамическая память присутствует на модуле
+            if (PhysMemSize) { // динамическая память присутствует на модуле
                 BRDC_printf(_BRDC("SDRAM Config: Memory size = %d MBytes\n"), (PhysMemSize / (1024 * 1024)) * 4);
                 ULONG target = 2; // будем осуществлять сбор данных в память
 
-				switch(DdcOn)
-				{
+                switch (DdcOn) {
                 case 0:
                     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETTARGET, &target);
                     break;
@@ -1424,8 +1336,7 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
                 IPC_TIMEVAL start, stop;
 
                 //				if(TestOn != 2 || (TestOn == 2 && !iCycle))
-				if(TestToMem)
-				{
+                if (TestToMem) {
                     // QueryPerformanceCounter (&StartPerformCount);
                     IPC_getTime(&start);
                     SdramInputDMA(hADC, hTest, buf_dscr_tst.ppBlk[0], buf_dscr_tst.blkSize);
@@ -1447,13 +1358,11 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
                 start_pars.isCycle = 0;
                 ULONG msTimeout = -1;
                 status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_RESETFIFO, NULL);
-				for(int iRead = 0; iRead < MemRead; iRead++)
-				{
+                for (int iRead = 0; iRead < MemRead; iRead++) {
                     // LONGLONG startStopTime = 0;
                     double startStopTime = 0.0;
 
-				if(MemReadMode)
-				{
+                    if (MemReadMode) {
                         status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_RESETFIFO, NULL);
                         status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_SETREADADDR, &MemoryAddress); // установить адрес чтения
                     }
@@ -1461,11 +1370,12 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
                     error_num = 0;
                     // int* buf_tst = (int*)buf_dscr_tst.ppBlk[0];
                     int* buf_tst = (int*)pBuf_tst;
-				if(TestMode == 3) srand(Seed);
-				if(TestMode == 6) init_genrand(Seed);
+                    if (TestMode == 3)
+                        srand(Seed);
+                    if (TestMode == 6)
+                        init_genrand(Seed);
                     //				for(int idx = 0; idx < int(bBufSize / buf_dscr_adc.blkSize); idx++)
-				for(int idx = 0; idx < int(ActiveZoneSize / buf_dscr_adc.blkSize); idx++)
-				{
+                    for (int idx = 0; idx < int(ActiveZoneSize / buf_dscr_adc.blkSize); idx++) {
                         ULONG rden = 1;
                         if (MemReadMode) // разрешение чтения в произвольном режиме
                         {
@@ -1491,26 +1401,23 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
                         }
                         //					BRDCHAR Msg[128];
                         //					sprintf(Msg, "Testing to SDRAM: %0X\r", address);
-					if(TestOn)
-					{
+                        if (TestOn) {
                             BRDC_printf(_BRDC("Testing of SDRAM: %0X (reading time is %.2f ms)\r"), address, startStopTime);
-						if(firstTime)
-						{
+                            if (firstTime) {
                                 // WriteDataFile(buf_adc, buf_dscr_adc.blkSize);
                                 firstTime = 0;
                             }
                             // TestBufferForComp(buf_dscr_tst.ppBlk[0], buf_dscr_adc.blkSize, (short)idx);
                             TestBufferForComp(pBuf_tst, buf_dscr_adc.blkSize, (short)idx);
                             U32 cnt = buf_dscr_adc.blkSize / sizeof(int);
-						for(U32 i = 0; i < cnt; i++)
-						{
+                            for (U32 i = 0; i < cnt; i++) {
                                 U32 imask = i % 4;
                                 U32 val_adc = buf_adc[i] & TestMask[imask];
                                 U32 val_tst = buf_tst[i] & TestMask[imask];
                                 // if(buf_adc[i] != buf_tst[i])
-							if(val_adc != val_tst)
-							{
-								error_num++; all_error_num++;
+                                if (val_adc != val_tst) {
+                                    error_num++;
+                                    all_error_num++;
                                     BRDCHAR Message[128];
                                     address = MemoryAddress + cnt * idx + i;
                                     //							BRDC_printf(Message, //"Начальное значение функции генерации псевдослучайных чисел = %04X\n"
@@ -1523,22 +1430,17 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
                                         address, val_tst, val_adc, val_tst ^ val_adc, iRead);
                                     if (ErrorMsg)
                                         BRDC_printf(_BRDC("%s"), Message);
-								if(SaveToFile)
-								{
-									if(ErrorMsg)
-									{
+                                    if (SaveToFile) {
+                                        if (ErrorMsg) {
                                             FILE* fstream = NULL;
                                             fstream = BRDC_fopen(_BRDC("0.txt"), _BRDC("a+t, ccs=UTF-8"));
-										if(fstream)
-										{
+                                            if (fstream) {
                                                 //										int numwritten = fwrite(Message, sizeof(BRDCHAR), lstrlen(Message), fstream);
                                                 fwrite(Message, sizeof(BRDCHAR), BRDC_strlen(Message), fstream);
                                                 fclose(fstream);
                                             }
                                         }
-								}
-								else
-								{
+                                    } else {
                                         BRDC_printf(_BRDC("Press Esc key for breaking program...\n"));
                                         BRDC_printf(_BRDC("Press Enter key for breaking read cycle...\n"));
                                         key_char = IPC_getch();
@@ -1550,8 +1452,7 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
                             }
                             if (key_char == 0x1B || key_char == 0x0D) // Esc или Enter
                                 break;
-					}
-					else
+                        } else
                             BRDC_printf(_BRDC("Reading of SDRAM: %0X\r"), address);
                         if (key_char == 0x1B || key_char == 0x0D) // Esc или Enter
                             break;
@@ -1568,12 +1469,10 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
                     BRDC_sprintf(errMsg, _BRDC("%d reading is complete! Error numbers = %d.         \n"), iRead, error_num);
                     BRDC_printf(_BRDC("%s"), errMsg);
 
-				if(SaveToFile)
-				{
+                    if (SaveToFile) {
                         FILE* fstream = NULL;
                         fstream = BRDC_fopen(_BRDC("0.txt"), _BRDC("a+t, ccs=UTF-8"));
-					if(fstream)
-					{
+                        if (fstream) {
                             //					int numwritten = fwrite(Message, sizeof(BRDCHAR), lstrlen(Message), fstream);
                             fwrite(errMsg, sizeof(BRDCHAR), BRDC_strlen(errMsg), fstream);
                             fclose(fstream);
@@ -1582,15 +1481,11 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
                 }
                 if (!TestOn)
                     BRDC_printf(_BRDC("Read is complete!                                        \n"));
-			}
-			else
-			{
+            } else {
                 flOK = 0;
                 BRDC_printf(_BRDC("No memory. Test don't start.\n"));
             }
-		}
-		else
-		{
+        } else {
             if (g_TstDma)
                 FifoInputDMA(hADC, hTest);
             else
@@ -1598,28 +1493,23 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
             BRDC_printf(_BRDC("Write and read test data is completed.\n"));
             //			short* buf_tst = (short*)buf_dscr_tst.ppBlk[0];
             //		    for(U32 i = 0; i < buf_dscr_adc.blkSize / sizeof(short); i++)
-			if(TestOn)
-			{
+            if (TestOn) {
                 // int* buf_tst = (int*)buf_dscr_tst.ppBlk[0];
                 int* buf_tst = (int*)pBuf_tst;
-				for(U32 i = 0; i < buf_dscr_adc.blkSize / sizeof(int); i++)
-				{
-					if(buf_adc[i] != buf_tst[i])
-					{
-						error_num++; all_error_num++;
+                for (U32 i = 0; i < buf_dscr_adc.blkSize / sizeof(int); i++) {
+                    if (buf_adc[i] != buf_tst[i]) {
+                        error_num++;
+                        all_error_num++;
                         BRDCHAR Message[128];
                         //					sprintf(Message, //"Начальное значение функции генерации псевдослучайных чисел = %04X\n"
                         BRDC_sprintf(Message, _BRDC("Error to offset: %08X, write: %08X, read: %08X, XOR: %08X\n"), i, buf_tst[i], buf_adc[i], buf_tst[i] ^ buf_adc[i]);
                         if (ErrorMsg)
                             BRDC_printf(_BRDC("%s"), Message);
-						if(SaveToFile)
-						{
-							if(ErrorMsg)
-							{
+                        if (SaveToFile) {
+                            if (ErrorMsg) {
                                 FILE* fstream = NULL;
                                 fstream = BRDC_fopen(_BRDC("0.txt"), _BRDC("a+t, ccs=UTF-8"));
-								if(fstream)
-								{
+                                if (fstream) {
                                     // #ifdef _WIN64
                                     //									char errMsg[128];
                                     //									wcstombs(errMsg, Message, 128);
@@ -1630,9 +1520,7 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
                                     fclose(fstream);
                                 }
                             }
-						}
-						else
-						{
+                        } else {
                             BRDC_printf(_BRDC("Press Esc key for breaking program...\r"));
                             int key_char = IPC_getch();
                             if (key_char == 0x1B) // Esc
@@ -1643,18 +1531,15 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
                 }
             }
         }
-		if(flOK && TestOn)
-		{
+        if (flOK && TestOn) {
             BRDCHAR errMsg[80];
             BRDC_sprintf(errMsg, _BRDC("Test is complete! Total errors = %d.\n"), all_error_num);
             //			BRDC_printf(_BRDC("Test is complete! Error numbers = %d.\n", error_num);
             BRDC_printf(_BRDC("%s"), errMsg);
-			if(SaveToFile)
-			{
+            if (SaveToFile) {
                 FILE* fstream = NULL;
                 fstream = BRDC_fopen(_BRDC("0.txt"), _BRDC("a+t, ccs=UTF-8"));
-				if(fstream)
-				{
+                if (fstream) {
                     // #ifdef _WIN64
                     //					wcstombs(errMsg, errMsg, 80);
                     // #endif
@@ -1664,12 +1549,10 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
             }
         }
         //		status = BRD_ctrl(hTest, 0, BRDctrl_STREAM_FREEBUF, &buf_dscr_tst);
-		if(g_TstDma)
-		{
+        if (g_TstDma) {
             status = BRD_ctrl(hTest, 0, BRDctrl_STREAM_CBUF_FREE, &buf_dscr_tst);
             delete[] buf_dscr_tst.ppBlk;
-		}
-		else
+        } else
             delete (char*)pBuf_tst;
         //		WriteDataFile(0, buf_dscr_adc.ppBlk[0], buf_dscr_adc.blkSize);
 
@@ -1679,8 +1562,7 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
 
         ULONG tst_mode = 0;
 
-		switch(DdcOn)
-		{
+        switch (DdcOn) {
         case 0:
             status = BRD_ctrl(hADC, 0, BRDctrl_ADC_SETTESTMODE, &tst_mode);
             break;
@@ -1694,7 +1576,6 @@ S32 AdcTesting(BRD_Handle hADC, BRD_Handle hTest, BRD_ServList* srv)
 
         // status = BRD_release(hTest, 0);
         // status = BRD_release(hADC, 0);
-
     }
     return status;
 }
@@ -1747,14 +1628,11 @@ S32 FifoOutputDMA(BRD_Handle hDAC, BRD_Handle hTest)
     int icnt = 0;
     do {
         status = BRD_ctrl(hDAC, 0, BRDctrl_STREAM_CBUF_WAITBUF, &msTimeout);
-		if(!BRD_errcmp(status, BRDerr_WAIT_TIMEOUT))
-		{	// если вышли не по тайм-ауту
+        if (!BRD_errcmp(status, BRDerr_WAIT_TIMEOUT)) { // если вышли не по тайм-ауту
             if (DebugOn)
                 BRDC_printf(_BRDC("Output testing buffer %d\n"), icnt++);
             status = BRD_ctrl(hDAC, 0, BRDctrl_STREAM_CBUF_START, &start_pars);
-		}
-		else
-		{
+        } else {
             DisplayError(status, _BRDC("TIME-OUT"));
             BRDC_printf(_BRDC("Press any key for continue program...\n"));
             IPC_getch();
@@ -1798,11 +1676,9 @@ S32 SdramOutputDMA(BRD_Handle hDAC, BRD_Handle hTest, PVOID pBuf, U32 sizeBuf)
     {
         status = BRD_ctrl(hDAC, 0, BRDctrl_STREAM_CBUF_START, &start_pars); // стартуем вывод тестовой последовательности
         status = BRD_ctrl(hDAC, 0, BRDctrl_STREAM_CBUF_WAITBUF, &msTimeout); // дожидаемся окончания вывода тестовой последовательности
-		if(BRD_errcmp(status, BRDerr_WAIT_TIMEOUT))
-		{	// если вышли по тайм-ауту
+        if (BRD_errcmp(status, BRDerr_WAIT_TIMEOUT)) { // если вышли по тайм-ауту
             status = BRD_ctrl(hDAC, 0, BRDctrl_SDRAM_ISACQCOMPLETE, &Status); // проверяем заполнилась ли активная зона памяти
-			if(!Status)
-			{
+            if (!Status) {
                 DisplayError(status, _BRDC("TIME-OUT"));
                 BRDC_printf(_BRDC("Press any key for continue program...\n"));
                 IPC_getch();
@@ -1883,8 +1759,7 @@ S32 DacTesting(BRD_Handle hDAC, BRD_Handle hTest, BRD_ServList* srv)
         // заполняем буфер тестовой последовательностью
         SetTestBuffer(buf_dscr_dac.ppBlk[0], buf_dscr_dac.blkSize);
 
-		if(DaqMemMode)
-		{
+        if (DaqMemMode) {
             // проверяем наличие динамической памяти
             BRD_SdramCfgEx SdramConfig;
             SdramConfig.Size = sizeof(BRD_SdramCfgEx);
@@ -1892,28 +1767,20 @@ S32 DacTesting(BRD_Handle hDAC, BRD_Handle hTest, BRD_ServList* srv)
             status = BRD_ctrl(hDAC, 0, BRDctrl_SDRAM_GETCFGEX, &SdramConfig);
             if (status < 0)
                 PhysMemSize = 0;
-			else
-			{
+            else {
                 if (SdramConfig.MemType == 11) // DDR3
                     PhysMemSize = (ULONG)((
-											(((int64_t)SdramConfig.CapacityMbits * 1024 * 1024) >> 3) *
-											(int64_t)SdramConfig.PrimWidth / SdramConfig.ChipWidth * SdramConfig.ModuleBanks *
-											SdramConfig.ModuleCnt) >> 2); // в 32-битных словах
+                                              (((int64_t)SdramConfig.CapacityMbits * 1024 * 1024) >> 3) * (int64_t)SdramConfig.PrimWidth / SdramConfig.ChipWidth * SdramConfig.ModuleBanks * SdramConfig.ModuleCnt)
+                        >> 2); // в 32-битных словах
                 else
-					PhysMemSize =	(1 << SdramConfig.RowAddrBits) *
-									(1 << SdramConfig.ColAddrBits) *
-									SdramConfig.ModuleBanks *
-									SdramConfig.ChipBanks *
-									SdramConfig.ModuleCnt * 2; // в 32-битных словах
+                    PhysMemSize = (1 << SdramConfig.RowAddrBits) * (1 << SdramConfig.ColAddrBits) * SdramConfig.ModuleBanks * SdramConfig.ChipBanks * SdramConfig.ModuleCnt * 2; // в 32-битных словах
             }
-			if(!iCycle)
-			{
+            if (!iCycle) {
                 SetIoDelay(hDAC & 0xFFFF); // программирование линий задержки
                 ReadCalibrReg(hDAC & 0xFFFF);
             }
 
-			if(PhysMemSize)
-			{ // динамическая память присутствует на модуле
+            if (PhysMemSize) { // динамическая память присутствует на модуле
                 ULONG tst_mode = 1;
                 status = BRD_ctrl(hDAC, 0, BRDctrl_DAC_SETTESTMODE, &tst_mode);
                 ULONG source = 2; // будем осуществлять вывод данных из памяти
@@ -1937,19 +1804,19 @@ S32 DacTesting(BRD_Handle hDAC, BRD_Handle hTest, BRD_ServList* srv)
                 BRDctrl_StreamCBufStart start_pars;
                 start_pars.isCycle = 0;
                 ULONG msTimeout = -1;
-				for(int iRead = 0; iRead < MemRead; iRead++)
-				{
+                for (int iRead = 0; iRead < MemRead; iRead++) {
                     status = BRD_ctrl(hDAC, 0, BRDctrl_DAC_FIFORESET, NULL); // сброс FIFO ЦАП
                     status = BRD_ctrl(hTest, 0, BRDctrl_TEST_FIFORESET, NULL);
                     status = BRD_ctrl(hTest, 0, BRDctrl_STREAM_RESETFIFO, NULL);
                     error_num = 0;
                     int* buf_dac = (int*)buf_dscr_dac.ppBlk[0];
-				if(TestMode == 3) srand(Seed);
-				if(TestMode == 6) init_genrand(Seed);
+                    if (TestMode == 3)
+                        srand(Seed);
+                    if (TestMode == 6)
+                        init_genrand(Seed);
                     //				for(int idx = 0; idx < int(bBufSize / buf_dscr_adc.blkSize); idx++)
                     ULONG enable = 1;
-				for(int idx = 0; idx < int(ActiveZoneSize / buf_dscr_tst.blkSize); idx++)
-				{
+                    for (int idx = 0; idx < int(ActiveZoneSize / buf_dscr_tst.blkSize); idx++) {
                         int key_char = 0;
                         status = BRD_ctrl(hTest, 0, BRDctrl_STREAM_CBUF_START, &start_pars);
                         status = BRD_ctrl(hDAC, 0, BRDctrl_DAC_ENABLE, &enable); // разрешение работы ЦАП
@@ -1960,25 +1827,22 @@ S32 DacTesting(BRD_Handle hDAC, BRD_Handle hTest, BRD_ServList* srv)
                         uint64_t address = MemoryAddress + idx * buf_dscr_tst.blkSize / sizeof(int);
                         //					BRDCHAR Msg[128];
                         //					sprintf(Msg, "Testing to SDRAM: %0X\r", address);
-					if(TestOn)
-					{
+                        if (TestOn) {
                             BRDC_printf(_BRDC("Testing of SDRAM: %0X\r"), address);
-						if(firstTime)
-						{
+                            if (firstTime) {
                                 // WriteDataFile(buf_tst, buf_dscr_tst.blkSize);
                                 firstTime = 0;
                             }
                             TestBufferForComp(buf_dscr_dac.ppBlk[0], buf_dscr_tst.blkSize, (short)idx);
                             U32 cnt = buf_dscr_tst.blkSize / sizeof(int);
-						for(U32 i = 0; i < cnt; i++)
-						{
+                            for (U32 i = 0; i < cnt; i++) {
                                 U32 imask = i % 4;
                                 U32 val_dac = buf_dac[i] & TestMask[imask];
                                 U32 val_tst = buf_tst[i] & TestMask[imask];
                                 // if(buf_dac[i] != buf_tst[i])
-							if(val_dac != val_tst)
-							{
-								error_num++; all_error_num++;
+                                if (val_dac != val_tst) {
+                                    error_num++;
+                                    all_error_num++;
                                     BRDCHAR Message[128];
                                     address = MemoryAddress + cnt * idx + i;
                                     //							BRDC_printf(Message, //"Начальное значение функции генерации псевдослучайных чисел = %04X\n"
@@ -1991,22 +1855,17 @@ S32 DacTesting(BRD_Handle hDAC, BRD_Handle hTest, BRD_ServList* srv)
                                         address, val_dac, val_tst, val_tst ^ val_dac, iRead);
                                     if (ErrorMsg)
                                         BRDC_printf(_BRDC("%s"), Message);
-								if(SaveToFile)
-								{
-									if(ErrorMsg)
-									{
+                                    if (SaveToFile) {
+                                        if (ErrorMsg) {
                                             FILE* fstream = NULL;
                                             fstream = BRDC_fopen(_BRDC("0.txt"), _BRDC("a+t, ccs=UTF-8"));
-										if(fstream)
-										{
+                                            if (fstream) {
                                                 //										int numwritten = fwrite(Message, sizeof(BRDCHAR), lstrlen(Message), fstream);
                                                 fwrite(Message, sizeof(BRDCHAR), BRDC_strlen(Message), fstream);
                                                 fclose(fstream);
                                             }
                                         }
-								}
-								else
-								{
+                                    } else {
                                         BRDC_printf(_BRDC("Press Esc key for breaking program...\n"));
                                         key_char = IPC_getch();
                                         if (key_char == 0x1B) // Esc
@@ -2015,8 +1874,7 @@ S32 DacTesting(BRD_Handle hDAC, BRD_Handle hTest, BRD_ServList* srv)
                                     }
                                 }
                             }
-					}
-					else
+                        } else
                             BRDC_printf(_BRDC("Reading of SDRAM: %0X\r"), address);
                         if (key_char == 0x1B) // Esc
                             break;
@@ -2028,12 +1886,10 @@ S32 DacTesting(BRD_Handle hDAC, BRD_Handle hTest, BRD_ServList* srv)
                     BRDCHAR errMsg[80];
                     BRDC_sprintf(errMsg, _BRDC("%d reading is complete! Error numbers = %d.         \n"), iRead, error_num);
                     BRDC_printf(_BRDC("%s"), errMsg);
-				if(SaveToFile)
-				{
+                    if (SaveToFile) {
                         FILE* fstream = NULL;
                         fstream = BRDC_fopen(_BRDC("0.txt"), _BRDC("a+t, ccs=UTF-8"));
-					if(fstream)
-					{
+                        if (fstream) {
                             //					int numwritten = fwrite(Message, sizeof(BRDCHAR), lstrlen(Message), fstream);
                             fwrite(errMsg, sizeof(BRDCHAR), BRDC_strlen(errMsg), fstream);
                             fclose(fstream);
@@ -2042,48 +1898,37 @@ S32 DacTesting(BRD_Handle hDAC, BRD_Handle hTest, BRD_ServList* srv)
                 }
                 if (!TestOn)
                     BRDC_printf(_BRDC("Read is complete!                                        \n"));
-			}
-			else
-			{
+            } else {
                 flOK = 0;
                 BRDC_printf(_BRDC("No memory. Test don't start.\n"));
             }
-		}
-		else
-		{
+        } else {
             FifoOutputDMA(hDAC, hTest);
             BRDC_printf(_BRDC("Write and read test data is completed.\n"));
             //			short* buf_tst = (short*)buf_dscr_tst.ppBlk[0];
             //		    for(U32 i = 0; i < buf_dscr_adc.blkSize / sizeof(short); i++)
-			if(TestOn)
-			{
+            if (TestOn) {
                 int* buf_dac = (int*)buf_dscr_dac.ppBlk[0];
-				for(U32 i = 0; i < buf_dscr_tst.blkSize / sizeof(int); i++)
-				{
-					if(buf_dac[i] != buf_tst[i])
-					{
-						error_num++; all_error_num++;
+                for (U32 i = 0; i < buf_dscr_tst.blkSize / sizeof(int); i++) {
+                    if (buf_dac[i] != buf_tst[i]) {
+                        error_num++;
+                        all_error_num++;
                         BRDCHAR Message[128];
                         //					sprintf(Message, //"Начальное значение функции генерации псевдослучайных чисел = %04X\n"
                         BRDC_sprintf(Message, _BRDC("Error to offset: %08X, write: %08X, read: %08X, XOR: %08X\n"), i, buf_dac[i], buf_tst[i], buf_tst[i] ^ buf_dac[i]);
                         if (ErrorMsg)
                             BRDC_printf(_BRDC("%s"), Message);
-						if(SaveToFile && ErrorMsg)
-						{
-							if(ErrorMsg)
-							{
+                        if (SaveToFile && ErrorMsg) {
+                            if (ErrorMsg) {
                                 FILE* fstream = NULL;
                                 fstream = BRDC_fopen(_BRDC("0.txt"), _BRDC("a+t, ccs=UTF-8"));
-								if(fstream)
-								{
+                                if (fstream) {
                                     //								int numwritten = fwrite(Message, sizeof(BRDCHAR), lstrlen(Message), fstream);
                                     fwrite(Message, sizeof(BRDCHAR), BRDC_strlen(Message), fstream);
                                     fclose(fstream);
                                 }
                             }
-						}
-						else
-						{
+                        } else {
                             BRDC_printf(_BRDC("Press Esc key for breaking program...\r"));
                             int key_char = IPC_getch();
                             if (key_char == 0x1B) // Esc
@@ -2094,18 +1939,15 @@ S32 DacTesting(BRD_Handle hDAC, BRD_Handle hTest, BRD_ServList* srv)
                 }
             }
         }
-		if(flOK && TestOn)
-		{
+        if (flOK && TestOn) {
             BRDCHAR errMsg[80];
             BRDC_sprintf(errMsg, _BRDC("Test is complete! Total errors = %d.\n"), all_error_num);
             //			BRDC_printf(_BRDC("Test is complete! Error numbers = %d.\n", error_num);
             BRDC_printf(_BRDC("%s"), errMsg);
-			if(SaveToFile)
-			{
+            if (SaveToFile) {
                 FILE* fstream = NULL;
                 fstream = BRDC_fopen(_BRDC("0.txt"), _BRDC("a+t, ccs=UTF-8"));
-				if(fstream)
-				{
+                if (fstream) {
                     //					int numwritten = fwrite(Message, sizeof(BRDCHAR), lstrlen(Message), fstream);
                     fwrite(errMsg, sizeof(BRDCHAR), BRDC_strlen(errMsg), fstream);
                     fclose(fstream);
@@ -2148,15 +1990,12 @@ S32 DdrOut(BRD_Handle hDdrOut, PVOID pBuf, U32 sizeBuf)
 
     // дожидаемся окончания записи
     int cnt = int(ActiveZoneSize / sizeBuf) + (int(ActiveZoneSize % sizeBuf) ? 1 : 0);
-	for (int i = 0; i < cnt; i++)
-	{
+    for (int i = 0; i < cnt; i++) {
         status = BRD_ctrl(hDdrOut, 0, BRDctrl_STREAM_CBUF_START, &start_pars); // стартуем вывод тестовой последовательности
         status = BRD_ctrl(hDdrOut, 0, BRDctrl_STREAM_CBUF_WAITBUF, &msTimeout); // дожидаемся окончания вывода тестовой последовательности
-		if (BRD_errcmp(status, BRDerr_WAIT_TIMEOUT))
-		{	// если вышли по тайм-ауту
+        if (BRD_errcmp(status, BRDerr_WAIT_TIMEOUT)) { // если вышли по тайм-ауту
             status = BRD_ctrl(hDdrOut, 0, BRDctrl_SDRAM_ISACQCOMPLETE, &Status); // проверяем заполнилась ли активная зона памяти
-			if (!Status)
-			{
+            if (!Status) {
                 DisplayError(status, _BRDC("TIME-OUT"));
                 BRDC_printf(_BRDC("Press any key for continue program...\n"));
                 IPC_getch();
@@ -2191,20 +2030,14 @@ S32 DdrInOutTesting(BRD_Handle hDdrIn, BRD_Handle hDdrOut)
     status = BRD_ctrl(hDdrOut, 0, BRDctrl_SDRAM_GETCFGEX, &SdramConfig);
     if (status < 0)
         PhysMemSize = 0;
-	else
-	{
+    else {
         if (SdramConfig.MemType == 11 || // DDR3
             SdramConfig.MemType == 12) // DDR4
             PhysMemSize = (ULONG)((
-			(((int64_t)SdramConfig.CapacityMbits * 1024 * 1024) >> 3) *
-				(int64_t)SdramConfig.PrimWidth / SdramConfig.ChipWidth * SdramConfig.ModuleBanks *
-				SdramConfig.ModuleCnt) >> 2); // в 32-битных словах
+                                      (((int64_t)SdramConfig.CapacityMbits * 1024 * 1024) >> 3) * (int64_t)SdramConfig.PrimWidth / SdramConfig.ChipWidth * SdramConfig.ModuleBanks * SdramConfig.ModuleCnt)
+                >> 2); // в 32-битных словах
         else
-			PhysMemSize = (1 << SdramConfig.RowAddrBits) *
-			(1 << SdramConfig.ColAddrBits) *
-			SdramConfig.ModuleBanks *
-			SdramConfig.ChipBanks *
-			SdramConfig.ModuleCnt * 2; // в 32-битных словах
+            PhysMemSize = (1 << SdramConfig.RowAddrBits) * (1 << SdramConfig.ColAddrBits) * SdramConfig.ModuleBanks * SdramConfig.ChipBanks * SdramConfig.ModuleCnt * 2; // в 32-битных словах
     }
     if (!PhysMemSize)
         return -1;
@@ -2259,8 +2092,7 @@ S32 DdrInOutTesting(BRD_Handle hDdrIn, BRD_Handle hDdrOut)
     start_pars.isCycle = 0;
     ULONG msTimeout = 10000;
     status = BRD_ctrl(hDdrIn, 0, BRDctrl_STREAM_RESETFIFO, NULL);
-	for (int iRead = 0; iRead < MemRead; iRead++)
-	{
+    for (int iRead = 0; iRead < MemRead; iRead++) {
         double startStopTime = 0.0;
 
         // if (MemReadMode)
@@ -2271,10 +2103,11 @@ S32 DdrInOutTesting(BRD_Handle hDdrIn, BRD_Handle hDdrOut)
         int key_char = 0;
         error_num = 0;
         int* buf_out = (int*)pBuf_out;
-		if (TestMode == 3) srand(Seed);
-		if (TestMode == 6) init_genrand(Seed);
-		for (int idx = 0; idx < int(ActiveZoneSize / buf_dscr_in.blkSize); idx++)
-		{
+        if (TestMode == 3)
+            srand(Seed);
+        if (TestMode == 6)
+            init_genrand(Seed);
+        for (int idx = 0; idx < int(ActiveZoneSize / buf_dscr_in.blkSize); idx++) {
             ULONG rden = 1;
             // if (MemReadMode) // разрешение чтения в произвольном режиме
             //{
@@ -2300,8 +2133,7 @@ S32 DdrInOutTesting(BRD_Handle hDdrIn, BRD_Handle hDdrOut)
             // }
             //					BRDCHAR Msg[128];
             //					sprintf(Msg, "Testing to SDRAM: %0X\r", address);
-			if (TestOn)
-			{
+            if (TestOn) {
                 BRDC_printf(_BRDC("Testing of SDRAM: %0X (reading time is %.2f ms)\r"), address, startStopTime);
                 // if (firstTime)
                 //{
@@ -2311,15 +2143,14 @@ S32 DdrInOutTesting(BRD_Handle hDdrIn, BRD_Handle hDdrOut)
                 // TestBufferForComp(buf_dscr_tst.ppBlk[0], buf_dscr_adc.blkSize, (short)idx);
                 TestBufferForComp(pBuf_out, buf_dscr_in.blkSize, (short)idx);
                 U32 cnt = buf_dscr_in.blkSize / sizeof(int);
-				for (U32 i = 0; i < cnt; i++)
-				{
+                for (U32 i = 0; i < cnt; i++) {
                     U32 imask = i % 4;
                     U32 val_adc = buf_in[i] & TestMask[imask];
                     U32 val_tst = buf_out[i] & TestMask[imask];
                     // if(buf_adc[i] != buf_tst[i])
-					if (val_adc != val_tst)
-					{
-						error_num++; all_error_num++;
+                    if (val_adc != val_tst) {
+                        error_num++;
+                        all_error_num++;
                         BRDCHAR Message[128];
                         address = MemoryAddress + cnt * idx + i;
                         //							BRDC_printf(Message, //"Начальное значение функции генерации псевдослучайных чисел = %04X\n"
@@ -2332,22 +2163,17 @@ S32 DdrInOutTesting(BRD_Handle hDdrIn, BRD_Handle hDdrOut)
                             address, val_tst, val_adc, val_tst ^ val_adc, iRead);
                         if (ErrorMsg)
                             BRDC_printf(_BRDC("%s"), Message);
-						if (SaveToFile)
-						{
-							if (ErrorMsg)
-							{
+                        if (SaveToFile) {
+                            if (ErrorMsg) {
                                 FILE* fstream = NULL;
                                 fstream = BRDC_fopen(_BRDC("0.txt"), _BRDC("a+t, ccs=UTF-8"));
-								if (fstream)
-								{
+                                if (fstream) {
                                     //										int numwritten = fwrite(Message, sizeof(BRDCHAR), lstrlen(Message), fstream);
                                     fwrite(Message, sizeof(BRDCHAR), BRDC_strlen(Message), fstream);
                                     fclose(fstream);
                                 }
                             }
-						}
-						else
-						{
+                        } else {
                             BRDC_printf(_BRDC("Press Esc key for breaking program...\n"));
                             BRDC_printf(_BRDC("Press Enter key for breaking read cycle...\n"));
                             key_char = IPC_getch();
@@ -2359,8 +2185,7 @@ S32 DdrInOutTesting(BRD_Handle hDdrIn, BRD_Handle hDdrOut)
                 }
                 if (key_char == 0x1B || key_char == 0x0D) // Esc или Enter
                     break;
-			}
-			else
+            } else
                 BRDC_printf(_BRDC("Reading of SDRAM: %0X\r"), address);
             if (key_char == 0x1B || key_char == 0x0D) // Esc или Enter
                 break;
@@ -2377,12 +2202,10 @@ S32 DdrInOutTesting(BRD_Handle hDdrIn, BRD_Handle hDdrOut)
         BRDC_sprintf(errMsg, _BRDC("%d reading is complete! Error numbers = %d.         \n"), iRead, error_num);
         BRDC_printf(_BRDC("%s"), errMsg);
 
-		if (SaveToFile)
-		{
+        if (SaveToFile) {
             FILE* fstream = NULL;
             fstream = BRDC_fopen(_BRDC("0.txt"), _BRDC("a+t, ccs=UTF-8"));
-			if (fstream)
-			{
+            if (fstream) {
                 //					int numwritten = fwrite(Message, sizeof(BRDCHAR), lstrlen(Message), fstream);
                 fwrite(errMsg, sizeof(BRDCHAR), BRDC_strlen(errMsg), fstream);
                 fclose(fstream);

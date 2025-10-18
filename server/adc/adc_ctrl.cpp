@@ -131,30 +131,39 @@ int CheckClock(BRD_Handle hADC, BRDCHAR* AdcSrvName)
     return status;
 }
 
-S32 AdcSettings(BRD_Handle hADC, int lid, int isx, BRDCHAR* srvName, BRDCHAR* iniFileName)
+S32 AdcSettings(int lid)
 {
     S32 status;
     ParamsAdc& p = DevicesLid[lid].paramsAdc;
+    BRD_Handle hADC = DevicesLid[lid].adc.handle();
+
     BRD_AdcCfg adc_cfg;
 
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETCFG, &adc_cfg);
     BRDC_printf(_BRDC("<SRV> AdcSettings: ADC Config: FIFO size = %d kBytes\n"), adc_cfg.FifoSize / 1024);
 
+#ifdef __IPC_LINUX__
+    chdir(p.g_directory);
+    char buffer[PATH_MAX];
+    if (getcwd(buffer, sizeof(buffer)))
+        printf("<SRV >Current dir : %s\n", buffer);
+#endif
+
     // задать параметры из файла
     BRDCHAR iniFilePath[MAX_PATH];
     BRDCHAR iniSectionName[MAX_PATH];
-    BRDC_sprintf(iniSectionName, _BRDC("device%d_%s%d"), 0, srvName, (p.g_subNo < 0) ? isx : 0);
-    S32 err = IPC_getFullPath(iniFileName, iniFilePath);
+    BRDC_sprintf(iniSectionName, _BRDC("device%d_%s%d"), 0, p.g_SrvName, 0);
+    S32 err = IPC_getFullPath(p.g_iniFileNameAdc, iniFilePath);
     if (0 > err) {
-        BRDC_printf(_BRDC("ERROR: Can't find ini-file '%s'\n\n"), iniFileName);
+        BRDC_printf(_BRDC("ERROR: Can't find ini-file '%s'\n\n"), iniFilePath);
         return -1;
     }
 
     printf("<SRV> AdcSettings: iniFileName = '%s'\n    iniFilePath = '%s'\n    iniSectionName = '%s'\n",
-        iniFileName, iniFilePath, iniSectionName);
+        p.g_iniFileNameAdc, iniFilePath, iniSectionName);
 
     BRD_IniFile ini_file;
-    BRDC_strcpy(ini_file.fileName, iniFilePath);
+    BRDC_strcpy(ini_file.fileName, p.g_iniFileNameAdc); // iniFilePath);
     BRDC_strcpy(ini_file.sectionName, iniSectionName);
     // auto adc_start_time = std::chrono::high_resolution_clock::now();
 
@@ -172,7 +181,7 @@ S32 AdcSettings(BRD_Handle hADC, int lid, int isx, BRDCHAR* srvName, BRDCHAR* in
     // получить источник и значение тактовой частоты можно отдельной функцией
     BRD_SyncMode sync_mode;
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETSYNCMODE, &sync_mode);
-    if (BRDC_strstr(srvName, _BRDC("ADC1624X192")) || BRDC_strstr(srvName, _BRDC("ADC1624X128")) || BRDC_strstr(srvName, _BRDC("ADC818X800"))) {
+    if (BRDC_strstr(p.g_SrvName, _BRDC("ADC1624X192")) || BRDC_strstr(p.g_SrvName, _BRDC("ADC1624X128")) || BRDC_strstr(p.g_SrvName, _BRDC("ADC818X800"))) {
         if (BRD_errcmp(status, BRDerr_OK))
             BRDC_printf(_BRDC("BRDctrl_ADC_GETSYNCMODE: source = %d, value = %.2f MHz, rate = %.3f kHz\n"),
                 sync_mode.clkSrc, sync_mode.clkValue / 1000000, sync_mode.rate / 1000);
@@ -338,18 +347,18 @@ S32 AdcSettings(BRD_Handle hADC, int lid, int isx, BRDCHAR* srvName, BRDCHAR* in
         else
             DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_ADC_GETBIAS"));
 
-        if (BRDC_strstr(srvName, _BRDC("ADC212X200M"))
-            || BRDC_strstr(srvName, _BRDC("ADC214X200M"))
-            || BRDC_strstr(srvName, _BRDC("ADC214X400M"))
-            || BRDC_strstr(srvName, _BRDC("ADC10X2G"))
-            || BRDC_strstr(srvName, _BRDC("ADC216X100M"))
-            || BRDC_strstr(srvName, _BRDC("FM814X125M"))) {
+        if (BRDC_strstr(p.g_SrvName, _BRDC("ADC212X200M"))
+            || BRDC_strstr(p.g_SrvName, _BRDC("ADC214X200M"))
+            || BRDC_strstr(p.g_SrvName, _BRDC("ADC214X400M"))
+            || BRDC_strstr(p.g_SrvName, _BRDC("ADC10X2G"))
+            || BRDC_strstr(p.g_SrvName, _BRDC("ADC216X100M"))
+            || BRDC_strstr(p.g_SrvName, _BRDC("FM814X125M"))) {
             status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETINPRESIST, &value_chan);
             if (BRD_errcmp(status, BRDerr_OK)) {
                 if (value_chan.value)
                     BRDC_printf(_BRDC("Input resist is 50 Om\n"));
                 else {
-                    if (BRDC_strstr(srvName, _BRDC("ADC216X100M")))
+                    if (BRDC_strstr(p.g_SrvName, _BRDC("ADC216X100M")))
                         BRDC_printf(_BRDC("Input resist is 1 kOm\n"));
                     else
                         BRDC_printf(_BRDC("Input resist is 1 MOm\n"));
@@ -357,13 +366,13 @@ S32 AdcSettings(BRD_Handle hADC, int lid, int isx, BRDCHAR* srvName, BRDCHAR* in
             } else
                 DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_ADC_GETINPRESIST"));
         }
-        if (BRDC_strstr(srvName, _BRDC("ADC28X1G"))
-            || BRDC_strstr(srvName, _BRDC("ADC212X200M"))
-            || BRDC_strstr(srvName, _BRDC("ADC214X200M"))
-            || BRDC_strstr(srvName, _BRDC("ADC214X400M"))
-            || BRDC_strstr(srvName, _BRDC("ADC10X2G"))
-            || BRDC_strstr(srvName, _BRDC("ADC216X100M"))
-            || BRDC_strstr(srvName, _BRDC("FM814X125M"))) {
+        if (BRDC_strstr(p.g_SrvName, _BRDC("ADC28X1G"))
+            || BRDC_strstr(p.g_SrvName, _BRDC("ADC212X200M"))
+            || BRDC_strstr(p.g_SrvName, _BRDC("ADC214X200M"))
+            || BRDC_strstr(p.g_SrvName, _BRDC("ADC214X400M"))
+            || BRDC_strstr(p.g_SrvName, _BRDC("ADC10X2G"))
+            || BRDC_strstr(p.g_SrvName, _BRDC("ADC216X100M"))
+            || BRDC_strstr(p.g_SrvName, _BRDC("FM814X125M"))) {
             status = BRD_ctrl(hADC, 0, BRDctrl_ADC_GETDCCOUPLING, &value_chan);
             if (BRD_errcmp(status, BRDerr_OK)) {
                 if (value_chan.value)
@@ -425,9 +434,9 @@ S32 AdcSettings(BRD_Handle hADC, int lid, int isx, BRDCHAR* srvName, BRDCHAR* in
     //	printf("Press any key to continue...\n");
     //	_getch();
 
-    CheckClock(hADC, srvName);
+    CheckClock(hADC, p.g_SrvName);
 
-    if (!BRDC_stricmp(srvName, _BRDC("ADC214X200M"))) {
+    if (!BRDC_stricmp(p.g_SrvName, _BRDC("ADC214X200M"))) {
         BRDC_printf(_BRDC("Sleeping 600 ms.\n"));
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
         IPC_delay(200);

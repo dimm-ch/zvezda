@@ -8,15 +8,13 @@
  *
  ****************************************************/
 
-
 #ifndef __BRD_H_
 #define __BRD_H_
 
-
-#include	<stdio.h>
-#include	<stdarg.h>
-#include	"utypes.h"
 #include "brderr.h"
+#include "utypes.h"
+#include <stdarg.h>
+#include <stdio.h>
 
 //
 //==== Types
@@ -34,8 +32,12 @@
 //==== Node IDs
 //
 
-enum { NODEALL = -1, NODENONE = 0, NODE0 = 1, NODE1 = 2, NODE2 = 4, NODE3 = 8 };
-
+enum { NODEALL = -1,
+    NODENONE = 0,
+    NODE0 = 1,
+    NODE1 = 2,
+    NODE2 = 4,
+    NODE3 = 8 };
 
 //
 //=== Timeout
@@ -44,12 +46,10 @@ enum { NODEALL = -1, NODENONE = 0, NODE0 = 1, NODE1 = 2, NODE2 = 4, NODE3 = 8 };
 #define BRDtim_AT_ONCE 0x0
 #define BRDtim_FOREVER 0xFFFFFFFFL
 
-
 //
 //=== BRD_init() flags
 //
-enum
-{
+enum {
     BRDinit_FILE_KNOWN = 0, // Well known INI File
     BRDinit_FILE_ENV = 1, // INI File is difined with Environment
     BRDinit_FILE = 2, // Pointed INI File
@@ -63,8 +63,7 @@ enum
 //
 //=== BRD_shell() Command Codes and Structures
 //
-enum
-{
+enum {
     BRDshl_LID_LIST = 1 // Get the LID List of All Initialized Boards
 };
 
@@ -78,8 +77,7 @@ typedef struct
 //
 //=== BRD_open() flags
 //
-enum
-{
+enum {
     BRDopen_EXCLUSIVE = 0x0, // Board must be exclusive
     BRDopen_SHARED = 0x1, // Board must be shared
     BRDopen_SPY = 0x2, // Board is used for monitoring
@@ -92,8 +90,7 @@ enum
 //=== BRD_displayMode() modes
 //
 
-enum 
-{ 
+enum {
     BRDdm_UNVISIBLE = 0x0, // Display nothing
     BRDdm_VISIBLE = 0xF, // Display all message
     BRDdm_CONSOLE = 0x80, // Display message to console
@@ -170,8 +167,7 @@ typedef struct
 //=== BRD_servList() types
 //
 
-enum
-{
+enum {
     BRDserv_ATTR_STREAMABLE_IN = 0x1,
     BRDserv_ATTR_STREAMABLE_OUT = 0x2,
     BRDserv_ATTR_DIRECTION_IN = 0x4,
@@ -238,12 +234,10 @@ typedef struct
     BRDCHAR errText[1024]; // Error Text
 } BRD_Error, *PBRD_Error;
 
-
 //
 //=== BRD_capture() flags
 //
-enum
-{
+enum {
     BRDcapt_EXCLUSIVE = 0x0, // To Control Service Exclusively
     BRDcapt_SHARED = 0x1, // To Share Service between some Applications
     BRDcapt_SPY = 0x2 // To Observate Service State
@@ -282,7 +276,6 @@ BRD_API BRD_Handle STDCALL BRD_openEx(const BRDCHAR* init, U32 flag, void* ptr);
 BRD_API S32 STDCALL BRD_close(BRD_Handle handle);
 BRD_API S32 STDCALL BRD_getInfo(U32 lid, BRD_Info* pInfo);
 BRD_API S32 STDCALL BRD_getInfoEx(BRD_Handle handle, U32* lid, BRD_Info* pInfo);
-
 
 BRD_API S32 STDCALL BRD_load(BRD_Handle handle, U32 nodeId, const BRDCHAR* fileName, int argc, BRDCHAR* argv[]);
 BRD_API S32 STDCALL BRD_puLoad(BRD_Handle handle, U32 puId, const BRDCHAR* fileName, U32* state);
@@ -341,5 +334,3 @@ BRD_API S32 STDCALL BRD_unlock(BRD_Handle handle, U32 nodeId, const BRDCHAR* res
 //
 //  End of File
 //
-
-
