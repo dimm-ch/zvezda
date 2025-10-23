@@ -140,7 +140,7 @@ auto SrvADC::CtrlReadIniFile(void* pDev, void* pServData, ULONG cmd, void* args)
         if (status != BRDerr_OK) {
             LOG("ERROR: BRDctrl_DDC_SETFC");
         }
-
+    }
     // установка режима АЦП
     auto adc_mode = BRD_AdcMode_FM214x3GDA {};
     if (reader.GetBoolean(BARDY_STR(ini.sectionName), "DDCEnable", false)) {
