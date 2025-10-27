@@ -52,3 +52,8 @@ CMakeUserPresets.json
 _distr
 build_arm32
 install
+
+!.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json

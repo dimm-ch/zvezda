@@ -1,0 +1,74 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Clean build & install dir (armhf-Debug)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "rm -rf '${workspaceFolder}/build_arm32/armhf-Debug' '${workspaceFolder}/install/armhf-Debug'"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Configure (armhf-Debug)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "cmake --preset armhf-Debug"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Build (armhf-Debug)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "cmake --build '${workspaceFolder}/build_arm32/armhf-Debug' -j"
+      ]
+    },
+    {
+      "label": "Rebuild clean (armhf-Debug)",
+      "dependsOn": [
+        "Clean build dir (armhf-Debug)",
+        "Configure (armhf-Debug)",
+        "Build (armhf-Debug)"
+      ]
+    },
+    {
+      "label": "Build (CMake preset)",
+      "type": "shell",
+      "command": "cmake --build ${workspaceFolder}/build_arm32/armhf-Debug/ -j",
+      "problemMatcher": "$gcc"
+    },
+    {
+      "label": "Install (CMake preset)",
+      "type": "shell",
+      "command": "cmake --install ${workspaceFolder}/build_arm32/armhf-Debug/ --prefix ${workspaceFolder}/install/armhf-Debug/",
+      "problemMatcher": []
+    },
+    {
+      "label": "Deploy via rsync",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/bin/ root@192.168.5.75:/root/srv/bin/ && rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/lib/ root@192.168.5.75:/root/srv/lib/"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Start gdbserver on target",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "ssh root@192.168.5.75 \"set -e; killall extsrv 2>/dev/null || true; chmod +x /root/srv/bin/extsrv; exec gdbserver :1234 /root/srv/bin/extsrv\""
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
