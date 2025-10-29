@@ -49,35 +49,44 @@ else()
   add_subdirectory(fmc146v.rc)
 endif()
 
-# Macros to get project directories
-macro(get_directories _result _root)
-    file(GLOB_RECURSE dirs RELATIVE ${_root} LIST_DIRECTORIES ON ${_root}/*)
-    foreach(dir ${dirs})
-        if(IS_DIRECTORY ${dir})
-            list(APPEND ${_result} ${dir})
-        endif()
-    endforeach()
-endmacro()
+# Обойти все обработанные поддиректории, начиная с корня билда,
+# и собрать все таргеты
+function(get_all_targets out_var root_bin_dir)
+    set(_queue "${root_bin_dir}")
+    set(_seen "")
+    set(_all "")
 
-# Macros to get CMake targets from directory
-macro(get_targets_by_directory _result _dir)
-    get_property(_target DIRECTORY ${_dir} PROPERTY BUILDSYSTEM_TARGETS)
-    set(_result ${_target})
-endmacro()
+    while(_queue)
+        list(POP_BACK _queue _dir)
 
-# Macros to get all CMake targets from directory
-macro(get_all_targets _result _root_dir)
-    get_directories(_all_directories ${_root_dir})
-    foreach(_dir ${_all_directories})
-        get_targets_by_directory(_target ${_dir})
-        if(_target)
-            list(APPEND ${_result} ${_target})
+        # пропускаем, если уже были тут
+        list(FIND _seen "${_dir}" _idx)
+        if(_idx GREATER -1)
+            continue()
         endif()
-    endforeach()
-endmacro()
+        list(APPEND _seen "${_dir}")
+
+        # таргеты в этой директории
+        get_property(_tgts DIRECTORY "${_dir}" PROPERTY BUILDSYSTEM_TARGETS)
+        if(_tgts)
+            list(APPEND _all ${_tgts})
+        endif()
+
+        # добавить обработанные поддиректории в очередь
+        get_property(_subs DIRECTORY "${_dir}" PROPERTY SUBDIRECTORIES)
+        if(_subs)
+            list(APPEND _queue ${_subs})
+        endif()
+    endwhile()
+
+    if(_all)
+        list(REMOVE_DUPLICATES _all)
+    endif()
+    set(${out_var} "${_all}" PARENT_SCOPE)
+endfunction()
 
 if (${CPACK_ENABLE})
-    get_all_targets(ALL_TARGETS ${CMAKE_CURRENT_LIST_DIR})
+    get_all_targets(ALL_TARGETS "${CMAKE_BINARY_DIR}")
 
     # Specify some params for target OS
     if(WIN32)

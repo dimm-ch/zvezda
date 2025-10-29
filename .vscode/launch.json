@@ -12,6 +12,7 @@
       "cwd": "${workspaceFolder}",
       "externalConsole": false,
       "stopAtEntry": false,
+      "preLaunchTask": "Build, Deploy & Start",
       "setupCommands": [
         { "text": "-enable-pretty-printing", "description": "Enable GDB pretty printing", "ignoreFailures": true },
         { "text": "set auto-load python-scripts on" },
