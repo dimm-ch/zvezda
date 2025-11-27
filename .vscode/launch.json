@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "ARM gdbserver (attach)",
+      "name": "extsrv gdbserver (attach)",
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/build_arm32/armhf-Debug/bin/extsrv",
@@ -12,7 +12,61 @@
       "cwd": "${workspaceFolder}",
       "externalConsole": false,
       "stopAtEntry": false,
-      "preLaunchTask": "Start gdbserver & Exit",
+      "preLaunchTask": "Build, Deploy & Start",
+      "setupCommands": [
+        { "text": "-enable-pretty-printing", "description": "Enable GDB pretty printing", "ignoreFailures": true },
+        { "text": "set auto-load python-scripts on" },
+        { "text": "set auto-load safe-path /" },
+        { "text": "set print pretty on" },
+        { "text": "set print object on" },
+        { "text": "set charset UTF-8" },
+        { "text": "set sysroot ${workspaceFolder}/../sysroot" },
+        { "text": "set solib-search-path ${workspaceFolder}/../sysroot/lib:${workspaceFolder}/../sysroot/usr/lib" },
+        {
+          "text": "python import sys; sys.path.insert(0, '/home/user/insys-projects/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-linux-gnueabihf/share/gcc-12.2.1/python'); from libstdcxx.v6.printers import register_libstdcxx_printers; register_libstdcxx_printers(None)"
+        },
+        { "text": "set pagination off" }
+      ]
+    },
+    {
+      "name": "zynq_gpio_sync gdbserver (attach)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build_arm32/armhf-Debug/bin/zynq_gpio_sync",
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb-multiarch",
+      "miDebuggerServerAddress": "192.168.5.75:1234",
+      "cwd": "${workspaceFolder}",
+      "externalConsole": false,
+      "stopAtEntry": false,
+      // "preLaunchTask": "Build, Deploy & Start",
+      "setupCommands": [
+        { "text": "-enable-pretty-printing", "description": "Enable GDB pretty printing", "ignoreFailures": true },
+        { "text": "set auto-load python-scripts on" },
+        { "text": "set auto-load safe-path /" },
+        { "text": "set print pretty on" },
+        { "text": "set print object on" },
+        { "text": "set charset UTF-8" },
+        { "text": "set sysroot ${workspaceFolder}/../sysroot" },
+        { "text": "set solib-search-path ${workspaceFolder}/../sysroot/lib:${workspaceFolder}/../sysroot/usr/lib" },
+        {
+          "text": "python import sys; sys.path.insert(0, '/home/user/insys-projects/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-linux-gnueabihf/share/gcc-12.2.1/python'); from libstdcxx.v6.printers import register_libstdcxx_printers; register_libstdcxx_printers(None)"
+        },
+        { "text": "set pagination off" }
+      ]
+    },
+    {
+      "name": "gpio_test gdbserver (attach)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build_arm32/armhf-Debug/bin/gpio-test",
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb-multiarch",
+      "miDebuggerServerAddress": "192.168.5.75:1234",
+      "cwd": "${workspaceFolder}",
+      "externalConsole": false,
+      "stopAtEntry": false,
+      // "preLaunchTask": "Build, Deploy & Start",
       "setupCommands": [
         { "text": "-enable-pretty-printing", "description": "Enable GDB pretty printing", "ignoreFailures": true },
         { "text": "set auto-load python-scripts on" },

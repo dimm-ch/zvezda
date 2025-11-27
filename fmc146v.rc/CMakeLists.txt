@@ -18,5 +18,4 @@ add_subdirectory(monitor-rc)
 add_subdirectory(lvds_test)
 add_subdirectory(icr_serial_fix)
 add_subdirectory(gpio_test)
-
-
+add_subdirectory(zynq_gpio_sync)
