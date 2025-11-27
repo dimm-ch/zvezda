@@ -124,7 +124,9 @@ json CommandProcessor::execute(const json& request)
 
     printf("Receive command com> %s: %s  \n", line.c_str(), param.c_str());
     if (!isCommand(request, response, line, param, paramReg)) {
-        response["error"] = "Unrecognized error!!";
+        if (!response.contains("error")) {
+            response["error"] = "Unrecognized error!!";
+        }
     }
 
     return response;
@@ -205,6 +207,11 @@ bool CommandProcessor::isCommand(const json& request, json& response, std::strin
     }
 
     if (cmd == "init") {
+        if (initBrdLibFlag) {
+            printf("<WRN> Reinitialization attempt detected. Library BARDY is already initialized.\n");
+            response["warning"] = "Reinitialization attempt detected. Library BARDY is already initialized.";
+            return true;
+        }
         std::string fileini = "brd.ini";
         if (request.contains("path")) {
             fileini = request["path"];
@@ -215,12 +222,14 @@ bool CommandProcessor::isCommand(const json& request, json& response, std::strin
             BRDC_printf(_BRDC("<ERR> BARDY Initialization = 0x%X \n"), status);
             return false;
         }
-        else
+        else {
             printf("<SRV> Library BARDY - is initialize, device found : %d \n", x_DevNum);
-        BRD_displayMode(BRDdm_VISIBLE | BRDdm_CONSOLE); // режим вывода информационных сообщений : отображать все уровни на консоле
+            BRD_displayMode(BRDdm_VISIBLE | BRDdm_CONSOLE); // режим вывода информационных сообщений : отображать все уровни на консоле
+            initBrdLibFlag = true;
+        }
 
     }    
-    if (cmd == "initex") {
+    else if (cmd == "initex") {
         std::string fileini = "brd.ini";   
         std::string filelog;     
         bool modeAuto = false;
@@ -242,7 +251,7 @@ bool CommandProcessor::isCommand(const json& request, json& response, std::strin
             return false;
         }
         else
-            printf("<SRV> Library BARDY - is initialize, device found : %d \n", x_DevNum);
+            printf("<SRV> Library BARDY is initialize, device found : %d \n", x_DevNum);
     }
 
     else if (cmd == "open") {
@@ -295,7 +304,13 @@ bool CommandProcessor::isCommand(const json& request, json& response, std::strin
             }
         }
         BRDC_printf("---------------------------------------------------- \n");
-    } else if (cmd == "release" || cmd == "cleanup") {
+    } else if (cmd == "release") {
+        for (auto& dev : DevicesLid) {
+            if (dev.device.isOpen())
+                dev.device.close();
+        }
+
+    } else if (cmd == "cleanup") {
         for (auto& dev : DevicesLid) {
             if (dev.device.isOpen())
                 dev.device.close();
@@ -334,7 +349,7 @@ bool CommandProcessor::isCommand(const json& request, json& response, std::strin
         }
         printf("<SRV> Pause  %d ms \n", time);
         sleep_for_milliseconds(time);
-    } 
+    }
     else if (cmd == "info") {
         BRD_Info info = {sizeof(BRD_Info)};
         S32 err = BRD_getInfo(x_lid, &info);
@@ -358,7 +373,14 @@ bool CommandProcessor::isCommand(const json& request, json& response, std::strin
 
 void CommandProcessor::clearAll()
 {
-    BRD_cleanup();
+    S32 status = BRD_cleanup();
+    if (!BRD_errcmp(status, BRDerr_OK)) {
+        BRDC_printf(_BRDC("<ERR> BARDY CleanUp = 0x%X \n"), status);
+    }
+    else {
+        printf("<SRV> Library BARDY is CleanUp\n");
+        initBrdLibFlag = false;
+    }
 }
 
 ////////////////////////////////////////////////////////////////// FastRegsAccess

@@ -221,7 +221,7 @@ class ServerExecutor {
     using CommandMap = std::map<std::string, CommandExecutor::UniquePtr>;
     CommandMap commandMap {};
     int _server {};
-    size_t _socket {};
+    int _socket = -1;
     std::exception_ptr threadError {};
 
 public:
@@ -272,102 +272,131 @@ public:
     void start()
     {
         std::thread th([this] {
-            // ждём запрос соединения от клиента
-            sockaddr_in client_addr {}; // адрес и порт клиента
-            socklen_t client_addr_len = sizeof(client_addr);
-            while (true) {
+            using clock = std::chrono::steady_clock;
+            
+            while (true) { // ждём запрос соединения от клиента
+                sockaddr_in client_addr {}; // адрес и порт клиента
+                socklen_t client_addr_len = sizeof(client_addr);
+
                 try {
-                m1:
                     std::fprintf(stdout, "\nServer Listening...\n");
                     std::fflush(stdout);
 
-                    _socket = accept(_server, reinterpret_cast<sockaddr*>(&client_addr),
-                        &client_addr_len);
-                    if (_socket == 0) {
+                    _socket = accept(_server, reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len);
+
+                    if (_socket < 0) { // ошибка accept — логируем и переходим к следующей итерации
+                        std::perror("accept");
                         continue;
-                    } else {
-                        // обработка соединения
-                        int result {}; // результат операций с сокетом
-                        int len {}; // фактическое количество принятых байт
-                        std::array<uint8_t, 4096> buffer {}; // буфер приёма данных
+                    }
 
-                        fprintf(stdout, "Connect from %s:%d socket:%zd\n",
+                    std::fprintf(stdout, "Connect from %s:%d socket:%zd\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), static_cast<ssize_t>(_socket));
+                    
+                    timeval timeout { .tv_sec = 2, .tv_usec = 0 };
 
-                            inet_ntoa(client_addr.sin_addr),
-                            ntohs(client_addr.sin_port), _socket);
+                    int result = 0;
+                    result = setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
+                    result |= setsockopt(_socket, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
+                    if (result != 0) {
+                        throw std::runtime_error("ERROR: setsockopt() timeout is not setting");
+                    }
 
-                        // установка тайм-аута 2 секунды на приём и передачу
-                        timeval timeout { .tv_sec = 2, .tv_usec = 0 };
-                        result = setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO,
-                            reinterpret_cast<char*>(&timeout), sizeof(timeout));
-                        result |= setsockopt(_socket, SOL_SOCKET, SO_SNDTIMEO,
-                            reinterpret_cast<char*>(&timeout), sizeof(timeout));
-                        if (result)
-                            throw std::runtime_error(
-                                "ERROR: setsockopt() timeout is not setting");
-                        // получение и отправка данных
-                        while (true) {
-                            buffer.fill('\0');
-                            len = recv(_socket, reinterpret_cast<char*>(buffer.data()),
-                                buffer.size(), 0);
-                            if (len <= 0) {
-                                printf("Packet data lenght = %d, client disconnected ..\n", len);
-                                // shutdown(_socket, SHUT_RDWR);
-                                // close(_socket);
-                                goto m1;
-                                break; // тайм-аут ожидания данных или закрытый сокет
-                            }
+                    // время последнего полученного пакета
+                    auto last_data_time = clock::now();
+
+                    int len {};   // фактическое количество принятых байт
+                    std::array<uint8_t, 4096> buffer {}; // буфер приёма данных
+
+                    // получение и отправка данных
+                    while (true) {
+                        buffer.fill('\0');
+                        len = ::recv(_socket, reinterpret_cast<char*>(buffer.data()), buffer.size(), 0);
+                        if (len > 0) {
+                            // пришли данные
+                            last_data_time = clock::now();
+
                             std::printf("---------------------------------------------------\n");
-                            std::printf("<Recive command>: %s\n", buffer.data());
+                            std::printf("<Receive command>: %.*s\n", len, reinterpret_cast<char*>(buffer.data()));
 
                             json jsonRequestTree {};
-                            // формируем ответ с неизвестной коммандой
                             json jsonResponseTree {};
+
                             try {
+                                // собираем строку из буфера
+                                std::string requestStr(reinterpret_cast<char*>(buffer.data()), static_cast<std::size_t>(len));
                                 // разбираем JSON строку от клиента в дерево запроса
-                                jsonRequestTree = CommandExecutor::fromClient(std::to_string(buffer.data()));
-                            } catch (const json::exception& e) {
+                                jsonRequestTree = CommandExecutor::fromClient(requestStr);
+                            }
+                            catch (const json::exception& e) {
                                 jsonResponseTree["error"] = e.what();
-                                // формируем из дерева запроса строку JSON для клиента
                                 auto jsonStringToClient = CommandExecutor::toClient(jsonResponseTree);
-                                send(_socket,
-                                    reinterpret_cast<const char*>(jsonStringToClient.data()),
-                                    jsonStringToClient.size(), 0);
-                                // std::printf("<Send>: %s\n", jsonStringToClient.c_str());
+                                ::send(_socket, reinterpret_cast<const char*>(jsonStringToClient.data()), jsonStringToClient.size(), 0);
                                 continue;
                             }
 
-                            // получаем команду которая поступила от клиента
+                            // получаем команду, которая поступила от клиента
                             jsonResponseTree["error"] = "unknown parameter";
                             for (const auto& [key, obj] : commandMap) {
                                 if (jsonRequestTree.contains(key)) {
                                     jsonResponseTree = obj->execute(jsonRequestTree);
                                 }
                             }
-                            // формируем из дерева запроса строку JSON для клиента
+
+                            // формируем ответ клиенту
                             auto jsonStringToClient = CommandExecutor::toClient(jsonResponseTree);
-                            send(_socket,
-                                reinterpret_cast<const char*>(jsonStringToClient.data()),
-                                jsonStringToClient.size(), 0);
-                            // std::printf("<Send>: %s\n", jsonStringToClient.c_str());
+                            ::send(_socket, reinterpret_cast<const char*>(jsonStringToClient.data()), jsonStringToClient.size(), 0);
                         }
+                        else if (len == 0) { // клиент корректно закрыл соединение
+                            std::printf("Client closed connection (len = 0)\n");
+                            break;
+                        }
+                        else { // len < 0 — ошибка
+                            if (errno == EAGAIN || errno == EWOULDBLOCK) { // истёк SO_RCVTIMEO — данных не было 2 секунды
+                                auto now  = clock::now();
+                                auto idle = std::chrono::duration_cast<std::chrono::seconds>(now - last_data_time).count();
+
+                                // если с момента последнего успешного приёма прошёл час — рвём соединение
+                                if (idle > 60 * 60) {
+                                    std::printf("Idle timeout > 1 hour, closing connection\n");
+                                    break;
+                                }
+
+                                // иначе просто ждём дальше
+                                continue;
+                            }
+                            else {
+                                // ошибка recv
+                                std::perror("recv");
+                                break;
+                            }
+                        }
+                    } // while (true) при обслуживании одного клиента
+                }
+                catch (ExcCtrl& ec) {
+                    std::fprintf(stdout, "<SRV> Exception - %s\n", ec.desc.c_str());
+                    if (ec.ctrl != END) {
+                        // здесь можно что-то сделать, если нужно
                     }
-                } catch (ExcCtrl ec) {
-                    fprintf(stdout, "<SRV> Exception - %s", ec.desc.c_str());
-                    if (ec.ctrl != END) { };
-                } catch (...) {
+                }
+                catch (const std::exception& e) {
+                    std::fprintf(stdout, "<SRV> std::exception: %s\n", e.what());
                     threadError = std::current_exception();
                 }
-                if (_socket) {
-                    // разрываем соединение и закрываем сокет
-                    fprintf(stdout, "Close connection %s:%d socket:%zd\n",
-                        inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port),
-                        _socket);
-                    shutdown(_socket, SHUT_RDWR);
-                    close(_socket);
+                catch (...) {
+                    std::fprintf(stdout, "<SRV> unknown exception\n");
+                    threadError = std::current_exception();
                 }
-            }
+
+                // разрываем соединение и закрываем сокет, если он был успешно открыт
+                if (_socket >= 0) {
+                    std::fprintf(stdout, "Close connection %s:%d socket:%zd\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), static_cast<ssize_t>(_socket));
+
+                    ::shutdown(_socket, SHUT_RDWR);
+                    ::close(_socket);
+                    _socket = -1;
+                }
+            } // while(true) — ждём новых клиентов
         });
+
         th.detach();
     }
     std::exception_ptr error() { return threadError; }
@@ -402,6 +431,7 @@ public:
 class CommandProcessor final : public CommandExecutor {
     int indexDev;
     commandLineParams paramReg;
+    bool initBrdLibFlag = false;
 
 public:
     static std::string command() { return "com"; }

@@ -302,7 +302,7 @@ typedef struct FU_TriadDev {
             lastError = "device lid#" + std::to_string(lid) + " not opened!";
         else if (mode_ != modeOpened) {
             close();
-            lastError = "device lid#" + std::to_string(lid) + "opened in different mode! Closed!";
+            lastError = "device lid#" + std::to_string(lid) + " opened in different mode! Closed!";
         }
         return handle_;
     }

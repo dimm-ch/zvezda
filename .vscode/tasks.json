@@ -37,7 +37,7 @@
       "command": "bash",
       "args": [
         "-lc",
-        "rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/bin/ root@192.168.5.75:/root/srv/bin/ && rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/lib/ root@192.168.5.75:/root/srv/lib/"
+        "rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/bin/ root@192.168.5.75:/root/srv/exams/ && rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/lib/ root@192.168.5.75:/root/srv/lib/"
       ],
       "problemMatcher": []
     },
@@ -47,7 +47,7 @@
       "command": "bash",
       "args": [
         "-lc",
-        "ssh root@192.168.5.75 \"set -e; export LD_LIBRARY_PATH=/root/srv/bin:$LD_LIBRARY_PATH; killall extsrv 2>/dev/null || true; chmod +x /root/srv/bin/extsrv; exec gdbserver :1234 /root/srv/bin/extsrv\""
+        "ssh root@192.168.5.75 \"set -e; export LD_LIBRARY_PATH=/root/srv/exams:$LD_LIBRARY_PATH; killall extsrv 2>/dev/null || true; chmod +x /root/srv/exams/extsrv; exec gdbserver :1234 /root/srv/exams/extsrv\""
       ],
       "problemMatcher": []
     },
@@ -57,7 +57,7 @@
       "command": "bash",
       "args": [
         "-lc",
-        "ssh root@192.168.5.75 \"set -e; export LD_LIBRARY_PATH=/root/srv/bin:$LD_LIBRARY_PATH; killall extsrv 2>/dev/null || true; chmod +x /root/srv/bin/extsrv; nohup gdbserver :1234 /root/srv/bin/extsrv >/tmp/gdbserver.log 2>&1 & sleep 1\""
+        "ssh root@192.168.5.75 \"set -e; export LD_LIBRARY_PATH=/root/srv/exams:$LD_LIBRARY_PATH; killall extsrv 2>/dev/null || true; chmod +x /root/srv/exams/extsrv; nohup gdbserver :1234 /root/srv/exams/extsrv >/root/srv/log/extsrv.log 2>&1 & sleep 1\""
       ],
       "problemMatcher": []
     },
@@ -82,6 +82,15 @@
     },
     {
       "label": "Build, Deploy & Start",
+      "dependsOn": [
+        "Build & Deploy",
+        "Start gdbserver"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build, Deploy, Start & Exit",
       "dependsOn": [
         "Build & Deploy",
         "Start gdbserver & Exit"
