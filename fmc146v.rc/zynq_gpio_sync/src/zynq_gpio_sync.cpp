@@ -13,15 +13,69 @@ void show_help(const std::string& program) {
     fprintf(stderr, "Options description:\n");
     fprintf(stderr, "-b <lid>: LID of test device\n");
     fprintf(stderr, "-s/--set <0|1>: Set <0|1> GPIO4\n");
+    fprintf(stderr, "-r/--reg <T:R=V>: T - tetrad, R - register, V - value (for write)\n");
     fprintf(stderr, "--blink: Blink mode. Switche <0|1> GPIO4 in a loop\n");
     fprintf(stderr, "-h/--help: Print this message\n");
 }
 
+bool parse_value(const std::string& s, U32& out) {
+    try {
+        size_t pos = 0;
+        int base = 10;
+
+        if (s.size() > 2 && (s[0] == '0') && (s[1] == 'x' || s[1] == 'X'))
+            base = 16;
+
+        out = std::stoul(s, &pos, base);
+        return pos == s.size();       // весь токен должен быть числом
+    } catch (...) {
+        return false;
+    }
+}
+
+bool reg_pars(std::string line) {
+    if (line.empty()) {
+        return false;
+    }
+    
+    auto colon = line.find(':');
+    if (colon == std::string::npos) {
+        return false;
+    }
+
+    auto eq = line.find('=', colon + 1);
+
+    // Тетрада
+    if (!parse_value(line.substr(0, colon), reg_trd)) {
+        return false;
+    }
+    fmc146_trd = reg_trd;
+    // Регистр
+    if (eq == std::string::npos) {
+        if (!parse_value(line.substr(colon + 1), reg_addr)) {
+            return false;
+        }
+        return true;
+    }
+
+    if (!parse_value(line.substr(colon + 1, eq - colon - 1), reg_addr)) {
+        return false;
+    }
+
+    // Значение на запись
+    if (!parse_value(line.substr(eq + 1), reg_val)) {
+        return false;
+    }
+    write_flag = true;
+
+    return true;
+}
+
 void setMode() {
-    // ставим направление GPIO4 = OUT
+    // ставим направление GPIO2, GPIO4 = OUT
     reg = {0};
     reg.byBits.GPIO1_T = 1;
-    reg.byBits.GPIO2_T = 1;
+    reg.byBits.GPIO2_T = 0;
     reg.byBits.GPIO3_T = 1;
     reg.byBits.GPIO4_T = 0;
 
@@ -29,19 +83,20 @@ void setMode() {
     IPC_delay(100);
 
     reg.byBits.GPIO4_O = value_to_set;
+    reg.byBits.GPIO2_O = value_to_set;
 
     fpga->RegPokeInd(fmc146_trd, GPIO_REG, reg.asWhole);
     IPC_delay(100);
 
-    fprintf(stderr, "GPIO4 set to %d\n", value_to_set);
+    fprintf(stderr, "GPIO2 & GPIO4 set to %d\n", value_to_set);
     return;
 }
 
 void blinkMode() {
-    // ставим направление GPIO4 = OUT
+    // ставим направление GPIO2, GPIO4 = OUT
     reg = {0};
     reg.byBits.GPIO1_T = 1;
-    reg.byBits.GPIO2_T = 1;
+    reg.byBits.GPIO2_T = 0;
     reg.byBits.GPIO3_T = 1;
     reg.byBits.GPIO4_T = 0;
 
@@ -54,6 +109,7 @@ void blinkMode() {
     {
         // инвертируем значение
         reg.byBits.GPIO4_O ^= 1;
+        reg.byBits.GPIO2_O ^= 1;
 
         fpga->RegPokeInd(fmc146_trd, GPIO_REG, reg.asWhole);
         IPC_delay(100);
@@ -61,6 +117,29 @@ void blinkMode() {
 
     fprintf(stderr, "\nBlink mode stopped by user\n");
     return;
+}
+
+void regMode() {
+    if (!reg_dir_flag) {
+        if (write_flag) {
+            fpga->RegPokeInd(reg_trd, reg_addr, reg_val);
+            fprintf(stderr, "[ WRITE ] Tetrad %d, Register 0x%x, Value 0x%x\n", reg_trd, reg_addr, reg_val);
+        }
+        else {
+            reg_val = fpga->RegPeekInd(reg_trd, reg_addr);
+            fprintf(stderr, "[ READ ] Tetrad %d, Register 0x%x, Value 0x%x\n", reg_trd, reg_addr, reg_val);
+        }
+    }
+    else {
+        if (write_flag) {
+            fpga->RegPokeDir(reg_trd, reg_addr, reg_val);
+            fprintf(stderr, "[ WRITE ] Tetrad %d, Register 0x%x, Value 0x%x\n", reg_trd, reg_addr, reg_val);
+        }
+        else {
+            reg_val = fpga->RegPeekDir(reg_trd, reg_addr);
+            fprintf(stderr, "[ READ ] Tetrad %d, Register 0x%x, Value 0x%x\n", reg_trd, reg_addr, reg_val);
+        }
+    }
 }
 
 void testMode() {
@@ -148,13 +227,16 @@ bool bardy_setup_device() {
         return false;
     }
 
-    fmc146_trd = -1;
-    if(!fpga->get_trd_number(TETR_ID, fmc146_trd)) {
-        fprintf(stderr, "[ ERROR ] dev%d: TRD ID: 0x%X - not found\n", ulid, TETR_ID);
-        return false;
+    if (fmc146_trd == -1) {
+        if(!fpga->get_trd_number(TETR_ID, fmc146_trd)) {
+            fprintf(stderr, "[ ERROR ] dev%d: TRD ID: 0x%X - not found\n", ulid, TETR_ID);
+            return false;
+        }
+        else {
+            fprintf(stderr, "dev%d: TRD ID: 0x%X - OK, NUMBER: 0x%04X\n", ulid,TETR_ID, fmc146_trd);
+        }
     }
 
-    fprintf(stderr, "dev%d: TRD ID: 0x%X - OK, NUMBER: 0x%04X\n", ulid,TETR_ID, fmc146_trd);
     return true;
 }
 
@@ -174,18 +256,29 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (it->second.mode == Mode::Set){
-        if (argc < 3) {
-            show_help(argv[0]);
-            return 0;
-        }
+    switch (it->second.mode) {
+        case Mode::Set: {
+            if (argc < 3) {
+                show_help(argv[0]);
+                return 0;
+            }
 
-        std::string_view value{argv[2]};
+            std::string_view value{argv[2]};
 
-        if (value != "1" && value != "0") {
-            show_help(argv[0]);
-            return 0;
+            if (value != "1" && value != "0") {
+                show_help(argv[0]);
+                return 0;
+            }
+            break;
         }
+        case Mode::RegDir:
+            reg_dir_flag = true;
+        case Mode::RegInd:
+            if (argc < 3 || !reg_pars(argv[2])) {
+                show_help(argv[0]);
+                return 0;
+            }
+            break;
     }
 
     ulid = get_from_cmdline(argc, argv, "-b", -1);
@@ -204,6 +297,10 @@ int main(int argc, char* argv[]) {
                 break;
             case Mode::Test:
                 testMode();
+                break;
+            case Mode::RegDir:
+            case Mode::RegInd:
+                regMode();
                 break;
         }
     }

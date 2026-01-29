@@ -355,8 +355,8 @@ public:
                                 auto idle = std::chrono::duration_cast<std::chrono::seconds>(now - last_data_time).count();
 
                                 // если с момента последнего успешного приёма прошёл час — рвём соединение
-                                if (idle > 60 * 60) {
-                                    std::printf("Idle timeout > 1 hour, closing connection\n");
+                                if (idle > 30) {
+                                    std::printf("Idle timeout > 30 sec, closing connection\n");
                                     break;
                                 }
 
@@ -424,6 +424,7 @@ public:
     static std::string command() { return "reg"; }
     using CommandExecutor::CommandExecutor;
     json execute(const json& request) final;
+    bool parse_value(const std::string& s, U32& out);
     bool parsingLine(std::string& line, commandLineParams& params);
 };
 
@@ -473,6 +474,7 @@ public:
     void calcSpi(int lid, json& resp);
     size_t findTetrad() { return 7; }
     void nco_main_setup(int lid, std::size_t chan, double freq, double phase);
+    // void nco_main_setup_test(int lid, std::size_t chan, double freq, double phase);
     void nco_channel_setup(int lid, std::size_t chan, double freq, double phase);
     bool parsSpiCommand(const std::string es);
 };

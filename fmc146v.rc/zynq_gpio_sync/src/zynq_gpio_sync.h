@@ -30,7 +30,7 @@
 #define VPX_GA 0x209 //geographics
 #define VPX_DISC 0x20A //discrete signal
 
-typedef union // REG_TST_IN 0x20E
+typedef union // REG_TST_IN 0x20E, 0 - out, 1 - in
 {
     U16 asWhole;
     struct {
@@ -54,6 +54,8 @@ enum class Mode {
     Set,
     Blink,
     Test,
+    RegDir,
+    RegInd,
     Help
 };
 
@@ -67,6 +69,12 @@ std::map<std::string, Arguments> arg_map = {
     { "-s", {Mode::Set, -1} },
     { "--blink", {Mode::Blink, -1} },
     { "--test", {Mode::Test, -1} },
+    { "--reg", {Mode::RegInd, -1} },
+    { "-r", {Mode::RegInd, -1} },
+    { "--regind", {Mode::RegInd, -1} },
+    { "-ri", {Mode::RegInd, -1} },
+    { "--regdir", {Mode::RegDir, -1} },
+    { "-rd", {Mode::RegDir, -1} },
     { "--help", {Mode::Help, -1} },
     { "-h", {Mode::Help, -1} }
 };
@@ -80,5 +88,10 @@ S32 brd_count = 0;
 brd_dev_t fpga = nullptr;
 std::vector<U32> lids;
 S32 fmc146_trd = -1;
+U32 reg_trd = 0;
+U32 reg_addr = 0;
+U32 reg_val = 0;
 REG_GPIO reg = {0};
+bool write_flag = false;
 U32 raw = 0;
+bool reg_dir_flag = false;

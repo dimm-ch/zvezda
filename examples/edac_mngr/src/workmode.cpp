@@ -10,10 +10,12 @@
 #include	<stdio.h>
 #include	<ctype.h>
 #include	<math.h>
+//#include <chrono>
 
 #include	"exam_edac.h"
 #include	"gipcy.h"
 #include	"reg_rw_spd.h"
+//#include "../../../sidedrivers/mfm214x3gda/src/mfm214x3gda.h"
 
 #define		FIFO_WIDTHB		64
 
@@ -605,10 +607,31 @@ S32 WorkMode5( void )
 	FifoOutputCPUStart( 1 );
     BRDC_printf( _BRDC("Press any key to stop ...\n\n"));
 	loop = 0;
+
+	// double p1 = 750000000;
+	// double p2 = 500000000;
+	// double p;
+	// auto now = std::chrono::steady_clock::now();
+    // auto deadline = now + std::chrono::seconds(60);
+	// BRD_Error* pErrInfo = nullptr;
+
     while(!IPC_kbhit())
 	{
         IPC_delay( 200 );
 		DisplayDacTraceText( loop++, 0 );
+		/*now = std::chrono::steady_clock::now();
+		if (now >= deadline) {
+			deadline = now + std::chrono::seconds(5);
+			
+			p = loop % 2 ? p1 : p2;
+			for (auto ch_ = 0u; ch_ < 2; ch_++) {
+				auto nco = BRD_NCO_FM214x3GDA { ch_, p, 0, 0 };
+				S32 S1 = BRD_ctrl(g_aDac[0].handle, NODE0, BRDctrl_DAC_SETMAINNCO, &nco);
+				//S32 S2 = BRD_error(&pErrInfo);
+				//BRDC_printf(_BRDC("BRDctrl_DAC_SETMAINNCO Err1 = 0x%X, S1 = 0x%X, Err2 = 0x%X, S2 = 0x%X, errText %s\n"), S1, BRD_errext(S1), S2, BRD_errext(S2), pErrInfo->errText);
+				BRDC_printf(_BRDC("BRDctrl_DAC_SETMAINNCO ch_ = %d, Err1 = 0x%X, S1 = 0x%X\n"), ch_, S1, BRD_errext(S1));
+			}
+		}*/
 	}
 
 	//

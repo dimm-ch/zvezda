@@ -102,7 +102,7 @@ std::string getStrCaptureModeService(U32 nMode)
 S32 processReg(commandLineParams& params)
 {
     S32 status = 0;
-    params.indirect = (params.reg >= 0x100) ? true : false;
+    //params.indirect = (params.reg >= 0x100) ? true : false;
     if (params.indirect) {
         if (params.write)
             status = regWriteIndir(params.hService, params.tetrad, params.reg, params.value);

@@ -391,7 +391,7 @@ json FastRegsAccess::execute(const json& request)
     json response = request;
     std::string message = "Parameter is missing: ";
     if (!request.contains("reg")) {
-        response["error"] = message + "reg'";
+        response["error"] = message + "reg";
         return response;
     }
 
@@ -406,9 +406,10 @@ json FastRegsAccess::execute(const json& request)
 
     // Определяем LID устройства
     std::string slid;
-    if (request.contains("lid"))
-        slid = request["lid"];
     x_lid = 1;
+    if (request.contains("lid")) {
+        slid = request["lid"];
+    }
     if (!slid.empty()) {
         x_lid = atoi(slid.c_str());
         if (x_lid <= 0 || x_lid >= MAX_LID_DEVICES) {
@@ -417,62 +418,135 @@ json FastRegsAccess::execute(const json& request)
             return response;
         }
     }
-
-    if(!DevicesLid[x_lid].device.isOpen())
+    
+    // Открываем устройство
+    if(!DevicesLid[x_lid].device.isOpen()) {
         DevicesLid[x_lid].device.open(x_lid);
+        if(!DevicesLid[x_lid].device.isOpen()) {
+            BRDC_printf("<ERR> %s\n", DevicesLid[x_lid].device.error());
+            response["error"] = DevicesLid[x_lid].device.error();
+            return response;
+        }
+    }
+
+    // Захватываем сервис доступа к регистрам
     if(!DevicesLid[x_lid].servRegs.isCaptured()) {
-        U32 mode = BRDcapt_EXCLUSIVE;
+        //U32 mode = BRDcapt_EXCLUSIVE;
+        //U32 mode = DevicesLid[x_lid].device.mode();
+        U32 mode = BRDcapt_SHARED;
         DevicesLid[x_lid].servRegs.setMode(mode);
         x_handleDevice = DevicesLid[x_lid].device.handle();
-        DevicesLid[x_lid].servRegs.capture(x_handleDevice, "REG0", 10000); //
+        DevicesLid[x_lid].servRegs.capture(x_handleDevice, "REG0", 10000);
+        if(!DevicesLid[x_lid].servRegs.isCaptured()){
+            BRDC_printf("<ERR> %s\n", DevicesLid[x_lid].device.error());
+            response["error"] = DevicesLid[x_lid].device.error();
+            return response;
+        }
     }
-    if(!DevicesLid[x_lid].servRegs.isCaptured()){
-        BRDC_printf(_BRDC("REG0 NOT capture (%X)\n"), DevicesLid[x_lid].servRegs.handle());
-        response["error"] = "REG0 NOT capture !!";
 
-
-
+    // Пишем/читаем регистр
+    paramReg.hService = DevicesLid[x_lid].servRegs.handle();
+    U32 S = processReg(paramReg);
+    printf("%s: [%s] tetrada = %d, register = 0x%X, value = 0x%X\n",
+            (S > 0) ? "<SRV> OK" : "<ERR> ERROR",
+            paramReg.write ? "Write" : "Read",
+            paramReg.tetrad,
+            paramReg.reg,
+            paramReg.value);
+    if (S <= 0) {
+        response["error"] = "error execution ..";
         return response;
     }
-    paramReg.hService = DevicesLid[x_lid].servRegs.handle();
-    U32 stst = processReg(paramReg);
-    printf("<SRV> %s: %s tetrada=%d register=0x%X value=0x%X\n",
-            (stst > 0) ? "Ok" : "Err", paramReg.write ? "Write" : "Read", paramReg.tetrad,
-            paramReg.reg, paramReg.value);
-    if (!paramReg.write)
-            response["value"] = std::to_string(paramReg.value);
-    if (stst <= 0)
-            response["error"] = "error execution ..";
+
+    if (!paramReg.write) {
+        std::stringstream ss;
+        ss << std::hex << std::uppercase << paramReg.value;
+        response["value"] = "0x" + ss.str();
+    }
+
     return response;
 }
 
-bool FastRegsAccess::parsingLine(std::string& line, commandLineParams& params)
-{
-    if (line.empty())
+bool FastRegsAccess::parse_value(const std::string& s, U32& out) {
+    try {
+        size_t pos = 0;
+        int base = 10;
+
+        if (s.size() > 2 && (s[0] == '0') && (s[1] == 'x' || s[1] == 'X'))
+            base = 16;
+
+        out = std::stoul(s, &pos, base);
+        return pos == s.size(); // весь токен должен быть числом
+    } catch (...) {
         return false;
+    }
+}
+
+bool FastRegsAccess::parsingLine(std::string& line, commandLineParams& params) {
+    if (line.empty()) {
+        return false;
+    }
+    
     bool write = false;
-    std::string s, tetr, reg, val;
-    uint32_t t, r, v;
-    int n = 0;
-    s = line;
-    n = s.find(':');
-    if (n < 0)
+    bool indirect = true;
+    U32 trd = 0;
+    U32 reg = 0;
+    U32 val = 0;
+
+    auto p = line.find(':');
+    if (p == std::string::npos) {
         return false;
-    tetr = s.substr(0, n);
-    s = s.substr(n + 1);
-    n = s.find('=');
-    reg = s.substr(0, n);
-    if (n > 0) {
+    }
+
+    // Тетрада
+    if (!parse_value(line.substr(0, p), trd)) {
+        return false;
+    }
+    
+    //Тип регистра (косвенный или прямой)
+    auto p_tmp = line.find(':', p + 1);
+    if (p_tmp != std::string::npos) {
+        std::string reg_type = line.substr(p + 1, p_tmp - p - 1);
+        if (reg_type == "I" || reg_type == "i") {
+            indirect = true;
+        }
+        else if (reg_type == "D" || reg_type == "d") {
+            indirect = false;
+        }
+        else {
+            return false;
+        }
+
+        p = p_tmp;
+    }
+
+    p_tmp = line.find('=', p + 1);
+
+    // Регистр
+    if (p_tmp == std::string::npos) {
+        if (!parse_value(line.substr(p + 1), reg)) {
+            return false;
+        }
+    }
+    else {
+        if (!parse_value(line.substr(p + 1, p_tmp - p - 1), reg)) {
+            return false;
+        }
+
+        // Значение на запись
+        if (!parse_value(line.substr(p_tmp + 1), val)) {
+            return false;
+        }
 
         write = true;
-        val = s.substr(n + 1);
     }
-    // cout << "REco line =" << line.c_str() << "  tetr=" << tetr.c_str() << "  reg=" << reg.c_str() << "   val=" << val.c_str() << endl;
+
     params.write = write;
-    params.tetrad = strtoull(tetr.c_str(), NULL, 0);
-    params.reg = strtoull(reg.c_str(), NULL, 0);
-    params.value = strtoull(val.c_str(), NULL, 0);
-    // cout << "Convert  tetr=0x" << hex << params.tetrad << "  reg=" << params.reg << "   val=" << params.value << endl;
+    params.tetrad = trd;
+    params.reg = reg;
+    params.value = val;
+    params.indirect = indirect;
+
     return true;
 }
 
