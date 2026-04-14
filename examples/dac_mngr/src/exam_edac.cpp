@@ -16,6 +16,8 @@
 #include	"exam_edac.h"
 #include	"gipcy.h"
 
+#include "tool_client.hpp"
+
 //
 // Globals
 //
@@ -62,6 +64,7 @@ S32			g_nMsTimeout = 5000;
 //=**************************************************************************
 int BRDC_main( int argc, BRDCHAR *argv[] ) try
 {
+	BRDC_printf( _BRDC("\nStart Dac\n\n"));
 	S32			status;
 	S32			devNum;
 
@@ -70,26 +73,55 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
 	ParseCommandLine( argc, argv );
 
 	BRD_displayMode(BRDdm_VISIBLE | BRDdm_CONSOLE); // режим вывода информационных сообщений : отображать все уровни на консоле
-
+	
 	status = BRD_init(_BRDC("brd.ini"), &devNum); // инициализировать библиотеку
 	if(!BRD_errcmp(status, BRDerr_OK))
 	{
 		BRDC_printf( _BRDC("\nERROR: BARDY Initialization = 0x%X, devNum = %d\n\n"), status, devNum );
-		BRDC_printf( _BRDC("Press any key for leaving program...\n"));
+		// BRDC_printf( _BRDC("Press any key for leaving program...\n"));
 
-		IPC_getch();
-		IPC_cleanupKeyboard();
+		// IPC_getch();
+		// IPC_cleanupKeyboard();
 		return -1;
 	}
 
 	if( 0 > ReadIniFileOption() )
 	{
-		IPC_getch();
-		IPC_cleanupKeyboard();
+		// IPC_getch();
+		// IPC_cleanupKeyboard();
 		return -1;
 	}
 
 	CaptureAllDac();
+	
+	auto& cli = ToolClient::inst();
+    if (!cli.connect_and_hello("/tmp/toolhub.sock", "dac" + std::to_string(g_lid)))
+		printf("[DAC] ToolClient::connect_and_hello(): Server conect error!\n");
+	else
+		printf("[DAC] ToolClient::connect_and_hello(): Server conect success!\n");
+
+	auto cmdOpt = cli.poll_command(10000);
+	if (cmdOpt) {
+		const auto& cmd = *cmdOpt;
+		printf("[DAC] ToolClient::poll_command(): cmd %s\n", cmd.cmd.c_str());
+		bool ok;
+
+		if (cmd.cmd == "ping") {
+			ok = cli.send_ok(cmd.id, "ping " + cli.toolName_);
+		}
+		else {
+			ok = cli.send_error(cmd.id, "unknown cmd");
+		}
+
+		if (ok)
+			printf("[DAC] ToolClient::send(): success\n");
+		else
+			printf("[DAC] ToolClient::send(): error\n");
+	}
+	else {
+		printf("[DAC] ToolClient::poll_command(): error\n");
+	}
+
 
 	if(g_nDacNum>0)
 	{
@@ -112,11 +144,11 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
     BRDC_printf( _BRDC("BRD_close: OK\n"));
 	status = BRD_cleanup();
     BRDC_printf( _BRDC("BRD_cleanup: OK\n"));
-    BRDC_printf( _BRDC("Press any key for leaving program...\n"));
+    // BRDC_printf( _BRDC("Press any key for leaving program...\n"));
 
-	if( g_nQuickQuit == 0 )
-		IPC_getch();
-	IPC_cleanupKeyboard();
+	// if( g_nQuickQuit == 0 )
+	// 	IPC_getch();
+	// IPC_cleanupKeyboard();
 
 	return 0;
 
@@ -124,11 +156,11 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
     printf("\n!!! ERROR !!! %s ...\n\n", e.what());
 
 	BRD_cleanup();
-	if( g_nQuickQuit == 0 ) {
-	    BRDC_printf( _BRDC("Press any key for leaving program...\n"));
-		IPC_getch();
-	}
-	IPC_cleanupKeyboard();
+	// if( g_nQuickQuit == 0 ) {
+	//     BRDC_printf( _BRDC("Press any key for leaving program...\n"));
+	// 	IPC_getch();
+	// }
+	// IPC_cleanupKeyboard();
 
 	return -1;
 }
@@ -298,6 +330,7 @@ S32 CaptureAllDac( void )
 			if(hSrv > 0)
 			{
                 BRDC_printf( _BRDC("OK!\n"));
+                BRDC_printf( _BRDC("[DEBUG] g_nDacNum = %d, iSrv = %d, name = %s\n"), g_nDacNum, iSrv, srvList[iSrv].name);
 
 				g_aDac[g_nDacNum].handle = hSrv;
 				BRDC_sprintf( g_aDac[g_nDacNum].sSection, _BRDC("device%d_%s"), iDev, srvList[iSrv].name );

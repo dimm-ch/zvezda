@@ -15,7 +15,9 @@
 #include	"exam_edac.h"
 #include	"gipcy.h"
 #include	"reg_rw_spd.h"
-//#include "../../../sidedrivers/mfm214x3gda/src/mfm214x3gda.h"
+
+#include "../../../sidedrivers/mfm214x3gda/src/mfm214x3gda.h"
+#include "tool_client.hpp"
 
 #define		FIFO_WIDTHB		64
 
@@ -112,10 +114,11 @@ S32 WorkMode0( void )
 	//
 	// Выводить циклически данные в FIFO с помощью стрима
 	//
-    BRDC_printf( _BRDC("Press any key to stop ...\n"));
+    // BRDC_printf( _BRDC("Press any key to stop ...\n"));
 	nblock = 0;
 	PrepareStart( );
-    while(!IPC_kbhit())
+    // while(!IPC_kbhit())
+    while(true)
 	{
 		FifoOutputCPU( );
 		//OldFifoOutputCPU( g_aDac[0].pBuf, g_aDac[0].outBufSizeb );
@@ -133,8 +136,8 @@ S32 WorkMode0( void )
         IPC_virtFree( g_aDac[ii].pBuf );
 
     BRDC_printf( _BRDC("\n"));
-	if( g_nQuickQuit == 0 )
-	    IPC_getch();
+	// if( g_nQuickQuit == 0 )
+	//     IPC_getch();
 	
 	return 0;
 }
@@ -225,10 +228,11 @@ S32 WorkMode1( void )
 	//
 	// Выводить циклически данные в FIFO с помощью стрима
 	//
-    BRDC_printf( _BRDC("Press any key to stop ...\n"));
+    // BRDC_printf( _BRDC("Press any key to stop ...\n"));
 	nblock = 0;
 	PrepareStart( );
-    while(!IPC_kbhit())
+    // while(!IPC_kbhit())
+    while(true)
 	{
 		if( 0 > FifoOutputDMA() )
 			break;
@@ -249,8 +253,8 @@ S32 WorkMode1( void )
 	}
 
     BRDC_printf( _BRDC("\n"));
-	if( g_nQuickQuit == 0 )
-	    IPC_getch();
+	// if( g_nQuickQuit == 0 )
+	//     IPC_getch();
 	
 	return 0;
 }
@@ -342,7 +346,8 @@ S32 WorkMode2( void )
 	if( 0 < SdramWriteDMA() )
 	{
 		PrepareStart( );
-        while(!IPC_kbhit())
+		// while(!IPC_kbhit())
+		while(true)
 		{	
 			if( g_nIsAlwaysWriteSdram )
 			{
@@ -368,8 +373,8 @@ S32 WorkMode2( void )
 	}
 
     BRDC_printf( _BRDC("\n"));
-	if( g_nQuickQuit == 0 )
-	    IPC_getch();
+	// if( g_nQuickQuit == 0 )
+	//     IPC_getch();
 
 	return 0;
 }
@@ -429,10 +434,11 @@ S32 WorkMode3( void )
 	//
 	// Выводить циклически данные в FIFO с помощью стрима
 	//
-    BRDC_printf( _BRDC("Press any key to stop ...\n"));
+    // BRDC_printf( _BRDC("Press any key to stop ...\n"));
 	PrepareStart( );
 	FifoOutputCPUStart( 0 );
-    while(!IPC_kbhit());
+    // while(!IPC_kbhit());
+    while(true);
 
 	//
 	// Остановит все ЦАПы и освободить все буфера
@@ -445,8 +451,8 @@ S32 WorkMode3( void )
 	}
 
     BRDC_printf( _BRDC("\n"));
-	if( g_nQuickQuit == 0 )
-	    IPC_getch();
+	// if( g_nQuickQuit == 0 )
+	//     IPC_getch();
 	
 	return 0;
 }
@@ -523,8 +529,9 @@ S32 WorkMode4( void )
 	{
 		PrepareStart( );
 		SdramCycleOutput(0);
-        BRDC_printf( _BRDC("Press any key to stop!\n"));
-        while(!IPC_kbhit());
+        // BRDC_printf( _BRDC("Press any key to stop!\n"));
+		// while(!IPC_kbhit());
+		while(true);
 	}
 
 	//
@@ -540,8 +547,8 @@ S32 WorkMode4( void )
 	}
 
     BRDC_printf( _BRDC("\n"));
-	if( g_nQuickQuit == 0 )
-	    IPC_getch();
+	// if( g_nQuickQuit == 0 )
+	//     IPC_getch();
 
 	return 0;
 }
@@ -605,33 +612,58 @@ S32 WorkMode5( void )
 	//
 	PrepareStart( );
 	FifoOutputCPUStart( 1 );
-    BRDC_printf( _BRDC("Press any key to stop ...\n\n"));
+    // BRDC_printf( _BRDC("Press any key to stop ...\n\n"));
 	loop = 0;
 
-	// double p1 = 750000000;
-	// double p2 = 500000000;
-	// double p;
-	// auto now = std::chrono::steady_clock::now();
-    // auto deadline = now + std::chrono::seconds(60);
-	// BRD_Error* pErrInfo = nullptr;
+	auto& cli = ToolClient::inst();
 
-    while(!IPC_kbhit())
+    // while(!IPC_kbhit())
+    while(true)
 	{
         IPC_delay( 200 );
 		DisplayDacTraceText( loop++, 0 );
-		/*now = std::chrono::steady_clock::now();
-		if (now >= deadline) {
-			deadline = now + std::chrono::seconds(5);
+    	printf("[WorkMode5] loop %d \n", loop);
+
+		auto cmdOpt = cli.poll_command(50);
+        if (!cmdOpt)
+            continue;
+
+        const auto& cmd = *cmdOpt;
+    	printf("[WorkMode5] ToolClient::poll_command() cmd %s\n", cmd.cmd.c_str());
+
+		bool ok = true;
+        if (cmd.cmd == "nco") {
+			if (!cmd.args.contains("freq") && !cmd.args.contains("ch"))
+				continue;
 			
-			p = loop % 2 ? p1 : p2;
-			for (auto ch_ = 0u; ch_ < 2; ch_++) {
-				auto nco = BRD_NCO_FM214x3GDA { ch_, p, 0, 0 };
-				S32 S1 = BRD_ctrl(g_aDac[0].handle, NODE0, BRDctrl_DAC_SETMAINNCO, &nco);
-				//S32 S2 = BRD_error(&pErrInfo);
-				//BRDC_printf(_BRDC("BRDctrl_DAC_SETMAINNCO Err1 = 0x%X, S1 = 0x%X, Err2 = 0x%X, S2 = 0x%X, errText %s\n"), S1, BRD_errext(S1), S2, BRD_errext(S2), pErrInfo->errText);
-				BRDC_printf(_BRDC("BRDctrl_DAC_SETMAINNCO ch_ = %d, Err1 = 0x%X, S1 = 0x%X\n"), ch_, S1, BRD_errext(S1));
-			}
-		}*/
+			auto nco = BRD_NCO_FM214x3GDA { cmd.args["ch"], cmd.args["freq"], 0, 0 };
+			S32 S1 = BRD_ctrl(g_aDac[0].handle, NODE0, BRDctrl_DAC_SETMAINNCO, &nco);
+			printf("[WorkMode5] BRDctrl_DAC_SETMAINNCO ch = %d, freq = %d, Err1 = 0x%X, S1 = 0x%X\n", cmd.args["ch"], cmd.args["freq"], S1, BRD_errext(S1));
+
+            // for (auto ch_ = 0u; ch_ < 2; ch_++) {
+			// 	auto nco = BRD_NCO_FM214x3GDA { ch_, cmd.args["freq"], 0, 0 };
+			// 	S32 S1 = BRD_ctrl(g_aDac[0].handle, NODE0, BRDctrl_DAC_SETMAINNCO, &nco);
+			// 	printf("[WorkMode5] BRDctrl_DAC_SETMAINNCO ch_ = %d, Err1 = 0x%X, S1 = 0x%X\n", ch_, S1, BRD_errext(S1));
+			// }
+
+    		printf("[WorkMode5] for out\n");
+			std::string req = "freq = ";
+			req += cmd.args["freq"].dump();
+    		printf("%s\n", req.c_str());
+            ok = cli.send_ok(cmd.id, req);
+    		printf("[WorkMode5] send_ok\n");
+        }
+		else if (cmd.cmd == "ping") {
+			ok = cli.send_ok(cmd.id, "ping " + cli.toolName_);
+        }
+		else {
+			ok = cli.send_error(cmd.id, "unknown cmd");
+        }
+
+		if (ok)
+    		printf("[WorkMode5] ToolClient::send() success\n");
+		else
+    		printf("[WorkMode5] ToolClient::send() error\n");
 	}
 
 	//
@@ -649,8 +681,8 @@ S32 WorkMode5( void )
         IPC_virtFree( g_aDac[ii].pBuf );
 
     BRDC_printf( _BRDC("\n"));
-	if( g_nQuickQuit == 0 )
-	    IPC_getch();
+	// if( g_nQuickQuit == 0 )
+	//     IPC_getch();
 	
 	return 0;
 }
@@ -720,7 +752,7 @@ S32 WorkMode6( void )
 	//
 	// Выводить циклически данные в FIFO с помощью стрима
 	//
-    BRDC_printf( _BRDC("Press any key to stop ...\n"));
+    // BRDC_printf( _BRDC("Press any key to stop ...\n"));
 	PrepareStart( );
 	FifoOutputCycleDMA();
 
@@ -818,8 +850,9 @@ S32 WorkMode7( void )
 	{
 		PrepareStart( );
 		SdramCycleOutput(1);
-        BRDC_printf( _BRDC("Press any key to stop!\n\n"));
-        while(!IPC_kbhit())
+        // BRDC_printf( _BRDC("Press any key to stop!\n\n"));
+		// while(!IPC_kbhit())
+		while(true)
 		{
             IPC_delay( 200 );
 			DisplayDacTraceText( loop++, 0 );
@@ -839,8 +872,8 @@ S32 WorkMode7( void )
 	}
 
     BRDC_printf( _BRDC("\n"));
-	if( g_nQuickQuit == 0 )
-	    IPC_getch();
+	// if( g_nQuickQuit == 0 )
+	//     IPC_getch();
 
 	return 0;
 }
@@ -922,7 +955,7 @@ S32 WorkMode8( void )
 	//
 	// Выводить циклически данные в FIFO с помощью стрима
 	//
-    BRDC_printf( _BRDC("Press any key to stop ...\n"));
+    // BRDC_printf( _BRDC("Press any key to stop ...\n"));
 	PrepareStart( );
 	SdramLikeFifoOutputCycleDMA();
 
@@ -1129,7 +1162,8 @@ S32	FifoOutputCycleDMA(void)
 	}
 
 	nblock = 0;
-    while(!IPC_kbhit())
+    // while(!IPC_kbhit())
+    while(true)
 	{
 		msTimeout = 5000;			// ждать окончания передачи блока данных до 2 сек.
 		err = BRD_ctrl( g_aDac[0].handle, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout );
@@ -1145,9 +1179,9 @@ S32	FifoOutputCycleDMA(void)
 		if( statusFIFO & 0x100 )
 		{
             BRDC_printf( _BRDC("\nUnderflow! \n"));
-            BRDC_printf( _BRDC("Press any key to stop!\n"));
+            // BRDC_printf( _BRDC("Press any key to stop!\n"));
 
-            IPC_getch();
+            // IPC_getch();
 			return -1;
 		}
 
@@ -1155,7 +1189,7 @@ S32	FifoOutputCycleDMA(void)
         BRDC_printf( _BRDC("\rBlock %d"),nblock);
 	}
 
-    IPC_getch();
+    // IPC_getch();
 
 	return 0;
 }
@@ -1212,7 +1246,8 @@ S32	SdramLikeFifoOutputCycleDMA(void)
 	}
 
 	nblock = 0;
-    while(!IPC_kbhit())
+    // while(!IPC_kbhit())
+    while(true)
 	{
 		msTimeout = 5000;			// ждать окончания передачи блока данных до 5 сек.
 		err = BRD_ctrl( g_aDac[0].handle, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout );
@@ -1230,9 +1265,9 @@ S32	SdramLikeFifoOutputCycleDMA(void)
 		if( statusFIFO & 0x100 )
 		{
             BRDC_printf( _BRDC("\nUnderflow! \n"));
-            BRDC_printf( _BRDC("Press any key to stop!\n"));
+            // BRDC_printf( _BRDC("Press any key to stop!\n"));
 
-            IPC_getch();
+            // IPC_getch();
 			return -1;
 		}
 
@@ -1240,7 +1275,7 @@ S32	SdramLikeFifoOutputCycleDMA(void)
         BRDC_printf( _BRDC("\rBlock %d"),nblock);
 	}
 
-    IPC_getch();
+    // IPC_getch();
 
 	return 0;
 }
@@ -1380,9 +1415,9 @@ S32 SdramModulWriteDMA( int idxDac )
 			err = BRD_ctrl( g_aDac[idxDac].handle, 0, BRDctrl_STREAM_CBUF_STOP, NULL ); // Стоп ПДП
 			return  -1;
 		}
-        if(IPC_kbhit())
-			if(0x1B == IPC_getch())
-				return -1;
+        // if(IPC_kbhit())
+		// 	if(0x1B == IPC_getch())
+		// 		return -1;
 
         BRDC_printf( _BRDC( "\rwrite = %d"), ii+1 );
 

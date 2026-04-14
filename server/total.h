@@ -409,8 +409,8 @@ extern FuDevs DevicesLid[MAX_LID_DEVICES]; // допускаем до 10 лид 
 extern int x_lid;
 extern BRD_Handle x_handleDevice;
 
-static int version_srv_hi = 3;
-static int version_srv_lo = 942;
+static int version_srv_hi = 4;
+static int version_srv_lo = 260318;
 
 S32 GetInifileString(const BRDCHAR* sSectionName, const BRDCHAR* sParamName, const BRDCHAR* defValue,
     BRDCHAR* strValue, int strSize, const BRDCHAR* sFullName);

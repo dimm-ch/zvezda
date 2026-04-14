@@ -24,6 +24,23 @@
 				"CMAKE_SKIP_RPATH": "OFF",
         		"CMAKE_SKIP_BUILD_RPATH": "OFF"
 			}
+		},
+			{
+			"name": "armhf-Release",
+			"displayName": "ARM (armhf) Release",
+			"generator": "Unix Makefiles",
+			"binaryDir": "${sourceDir}/build_arm32/${presetName}",
+			"cacheVariables": {
+				"CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/arm32-toolchain.cmake",
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_FIND_ROOT_PATH_MODE_PACKAGE": "BOTH",
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+				"CMAKE_BUILD_RPATH_USE_ORIGIN": "ON",
+				"CMAKE_BUILD_RPATH": "$ORIGIN",
+				"CMAKE_INSTALL_RPATH": "$ORIGIN",
+				"CMAKE_SKIP_RPATH": "OFF",
+				"CMAKE_SKIP_BUILD_RPATH": "OFF"
+			}
 		}
 	],
 	"buildPresets": [
@@ -33,6 +50,13 @@
 			"configurePreset": "armhf-Debug",
 			"verbose": false,
 			"cleanFirst": false
+		},
+		{
+		"name": "armhf-Release",
+		"displayName": "ARM (armhf) Release (Build)",
+		"configurePreset": "armhf-Release",
+		"verbose": false,
+		"cleanFirst": false
 		}
 	]
 }

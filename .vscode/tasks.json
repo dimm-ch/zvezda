@@ -2,7 +2,47 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Clean Dir",
+      "label": "[Release] Configure",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "cmake --preset armhf-Release"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "[Release] Build",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "cmake --build --preset armhf-Release"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "[Release] Deploy",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Release/bin/ root@192.168.5.75:/root/srv_rel/exams/ && rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Release/lib/ root@192.168.5.75:/root/srv_rel/lib/"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "[Release] Build Release & Deploy",
+      "dependsOn": [
+        "[Release] Configure",
+        "[Release] Build",
+        "[Release] Deploy"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "[Debug] Clean Dir",
       "type": "shell",
       "command": "bash",
       "args": [
@@ -12,7 +52,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Configure",
+      "label": "[Debug] Configure",
       "type": "shell",
       "command": "bash",
       "args": [
@@ -22,7 +62,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Build",
+      "label": "[Debug] Build",
       "type": "shell",
       "command": "bash",
       "args": [
@@ -32,7 +72,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Deploy",
+      "label": "[Debug] Deploy",
       "type": "shell",
       "command": "bash",
       "args": [
@@ -42,7 +82,17 @@
       "problemMatcher": []
     },
     {
-      "label": "Start gdbserver",
+      "label": "[Debug] Deploy test dir",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/bin/ root@192.168.5.75:/root/srv_tests/exams/ && rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/lib/ root@192.168.5.75:/root/srv_tests/lib/"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "[Debug] Start gdbserver",
       "type": "shell",
       "command": "bash",
       "args": [
@@ -52,7 +102,17 @@
       "problemMatcher": []
     },
     {
-      "label": "Start gdbserver & Exit",
+      "label": "[Debug] Start gdbserver test dir",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "ssh root@192.168.5.75 \"set -e; export LD_LIBRARY_PATH=/root/srv_tests/exams:$LD_LIBRARY_PATH; killall extsrv 2>/dev/null || true; chmod +x /root/srv_tests/exams/extsrv; exec gdbserver :1234 /root/srv_tests/exams/extsrv\""
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "[Debug] Start gdbserver & Exit",
       "type": "shell",
       "command": "bash",
       "args": [
@@ -62,17 +122,36 @@
       "problemMatcher": []
     },
     {
-      "label": "Build & Deploy",
+      "label": "[Debug] Configure & Build",
       "dependsOn": [
-        "Configure",
-        "Build",
-        "Deploy"
+        "[Debug] Configure",
+        "[Debug] Build"
       ],
       "dependsOrder": "sequence",
       "problemMatcher": []
     },
     {
-      "label": "Clean Rebuild & Deploy",
+      "label": "[Debug] Build & Deploy",
+      "dependsOn": [
+        "[Debug] Configure",
+        "[Debug] Build",
+        "[Debug] Deploy"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "[Debug] Build & Deploy test dir",
+      "dependsOn": [
+        "[Debug] Configure",
+        "[Debug] Build",
+        "[Debug] Deploy test dir"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "[Debug] Clean Rebuild & Deploy",
       "dependsOn": [
         "Clean Dir",
         "Build & Deploy"
@@ -81,7 +160,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Build, Deploy & Start",
+      "label": "[Debug] Build, Deploy & Start",
       "dependsOn": [
         "Build & Deploy",
         "Start gdbserver"
@@ -90,7 +169,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Build, Deploy, Start & Exit",
+      "label": "[Debug] Build, Deploy, Start & Exit",
       "dependsOn": [
         "Build & Deploy",
         "Start gdbserver & Exit"

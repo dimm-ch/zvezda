@@ -18,11 +18,19 @@ set(PROJECT_INCLUDE_DIRS 	${PROJECT_SOURCE_DIR}/
 				${PROJECT_SOURCE_DIR}/dac/
 				${PROJECT_SOURCE_DIR}/sync/
 				${PROJECT_SOURCE_DIR}/adc/
+				${PROJECT_SOURCE_DIR}/cmd/
 				${PROJECT_SOURCE_DIR}/../work2/common/
 				)
 
 set(PROJECT_SOURCES ${PROJECT_SOURCE_DIR}/server.cpp
-					${PROJECT_SOURCE_DIR}/total.cpp 
+					${PROJECT_SOURCE_DIR}/srv_exec.cpp
+					${PROJECT_SOURCE_DIR}/tool_hub.cpp
+					${PROJECT_SOURCE_DIR}/total.cpp
+					${PROJECT_SOURCE_DIR}/cmd/exec_cmd.cpp
+					${PROJECT_SOURCE_DIR}/cmd/adc_cmd.cpp
+					${PROJECT_SOURCE_DIR}/cmd/dac_cmd.cpp
+					${PROJECT_SOURCE_DIR}/cmd/sync_cmd.cpp
+					${PROJECT_SOURCE_DIR}/cmd/proc_cmd.cpp
 					${PROJECT_SOURCE_DIR}/../work2/common/dev_util.cpp
 					${PROJECT_SOURCE_DIR}/dac/exam_edac.cpp
 					${PROJECT_SOURCE_DIR}/dac/workmode.cpp

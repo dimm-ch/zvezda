@@ -1454,15 +1454,15 @@ int SimpleProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_StreamCB
 			DisplayError(status, __FUNCTION__, _BRDC("TIME-OUT"));
 			break;
 		}
-		if(!idx && IPC_kbhit())
-		{
-			int ch = IPC_getch(); // получает клавишу
-			if(0x1B == ch) // если Esc
-			{
-				g_flbreak = 1;
-				break;
-			}
-		}
+		// if(!idx && IPC_kbhit())
+		// {
+		// 	int ch = IPC_getch(); // получает клавишу
+		// 	if(0x1B == ch) // если Esc
+		// 	{
+		// 		g_flbreak = 1;
+		// 		break;
+		// 	}
+		// }
 		IPC_writeFile(hfile, buf_dscr->ppBlk[curbuf], buf_dscr->blkSize);
 		curbuf ^= 1;
         if(cnt+1 != (int)buf_dscr->pStub->totalCounter)
@@ -1533,15 +1533,15 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_Stream
 		}
 		else
 			twice = 1;
-		if(!idx && IPC_kbhit())
-		{
-			int ch = IPC_getch(); // получает клавишу
-			if(0x1B == ch) // если Esc
-			{
-				g_flbreak = 1;
-				break;
-			}
-		}
+		// if(!idx && IPC_kbhit())
+		// {
+		// 	int ch = IPC_getch(); // получает клавишу
+		// 	if(0x1B == ch) // если Esc
+		// 	{
+		// 		g_flbreak = 1;
+		// 		break;
+		// 	}
+		// }
 		cur_buf = write_cnt % buf_dscr->blkNum;
 		for(int j = 0; j < delta_cnt; j++)
 		{

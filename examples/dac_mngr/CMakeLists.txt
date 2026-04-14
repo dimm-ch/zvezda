@@ -5,7 +5,7 @@
 #
 
 cmake_minimum_required(VERSION 3.19)
-project(edac_mngr)
+project(dac_mngr)
 
 set(PROJECT_COMPILE_FEATURES cxx_std_11)
 if(CMAKE_CXX_COMPILER_ID MATCHES "^(Clang|GNU)$")
@@ -19,6 +19,7 @@ set(PROJECT_INCLUDES ${PROJECT_SOURCE_DIR}/src/exam_edac.h)
 set(PROJECT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/exam_edac.cpp
     ${PROJECT_SOURCE_DIR}/src/workmode.cpp
+    ${PROJECT_SOURCE_DIR}/src/tool_client.cpp
 )
 
 if(WIN32)

@@ -65,7 +65,7 @@ int BRDC_main(int argc, char* argv[])
     std::signal(SIGABRT, abortHandler);
     return exceptCatcher([&] {
         // инициализация работы с клавиатурой
-        CKeyboard keyboard {};
+        // CKeyboard keyboard {};
         // разбор параметров командной строки
         CExamFmc146vSyncOptions examOptions(argc, argv);
         if (examOptions.version().has_value()) {
@@ -206,14 +206,14 @@ int BRDC_main(int argc, char* argv[])
             // проверяем был ли запрос на обновление параметров
             if (requestUpdate) {
                 requestUpdate = false;
-                color {
-                    "\nPress key:\n"
-                    "   'Esc' to cancel\n"
-                    "   'S' to synchronization\n"
-                    "   'U' to updating parameters\n"
-                    "   'Space' to updating parameters and synchronization\n\n"
-                }
-                    .print_yellow();
+                // color {
+                //     "\nPress key:\n"
+                //     "   'Esc' to cancel\n"
+                //     "   'S' to synchronization\n"
+                //     "   'U' to updating parameters\n"
+                //     "   'Space' to updating parameters and synchronization\n\n"
+                // }
+                //     .print_yellow();
                 // невозможно прочитать конфигурационный файл
                 ERROR_ASSERT((settingsFile.Parse() == 0), "Can't read settings file!");
                 // разделитель
@@ -369,20 +369,23 @@ int BRDC_main(int argc, char* argv[])
                                 fmc146vSync->LMX2594.set_frequency(lmx2594_output_frequency {
                                     lmx2594_output::outa, refFREQ, double(oscFREQA) });
                             } catch (const std::exception& e) {
+                                // ERROR_MESSAGE("\n%s\n", e.what());
+                                // fmc146vSync->LMX2594.update_lock_detect_mux(chappi::lmx2594_lock_detect_mux::lock_detect);
+                                // color { "\nPress 'Space' to updating parameters and synchronization\n\n" }.print_yellow();
+                                // do {
+                                //     if (keyboard.isKeyPressed() && keyboard.getKeyCode() == CKeyboard::KeyCode_Space) {
+                                //         requestUpdate = true;
+                                //         break;
+                                //     }
+                                //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                                // } while (true);
+                                // fmc146vSync->LMX2594.update_lock_detect_mux(chappi::lmx2594_lock_detect_mux::lock_detect);
+                                // if (requestUpdate) {
+                                //     continue;
+                                // }
                                 ERROR_MESSAGE("\n%s\n", e.what());
                                 fmc146vSync->LMX2594.update_lock_detect_mux(chappi::lmx2594_lock_detect_mux::lock_detect);
-                                color { "\nPress 'Space' to updating parameters and synchronization\n\n" }.print_yellow();
-                                do {
-                                    if (keyboard.isKeyPressed() && keyboard.getKeyCode() == CKeyboard::KeyCode_Space) {
-                                        requestUpdate = true;
-                                        break;
-                                    }
-                                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                                } while (true);
-                                fmc146vSync->LMX2594.update_lock_detect_mux(chappi::lmx2594_lock_detect_mux::lock_detect);
-                                if (requestUpdate) {
-                                    continue;
-                                }
+                                continue;
                             }
                             // FIXME: <<<
                             fmc146vSync->LMX2594.update_lock_detect_mux(

@@ -158,13 +158,13 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
 	if(!BRD_errcmp(status, BRDerr_OK))
 	{
         BRDC_printf(_BRDC("ERROR: BARDY Initialization = 0x%X\n"), status);
-        BRDC_printf(_BRDC("Press any key for leaving program...\n"));
-#if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-        IPC_getch();
-        IPC_cleanupKeyboard();
-#else
-        _getch();
-#endif
+//         BRDC_printf(_BRDC("Press any key for leaving program...\n"));
+// #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
+//         IPC_getch();
+//         IPC_cleanupKeyboard();
+// #else
+//         _getch();
+// #endif
         return -1;
     }
 
@@ -389,31 +389,31 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
     // BRDC_printf(_BRDC(" DURATION IS %ldd \n"), duration);
     status = BRD_cleanup();
     BRDC_printf(_BRDC("BRD_cleanup: OK\n"));
-	if (!g_quick_quit)
-	{
-        BRDC_printf(_BRDC("Press any key for leaving program...\n"));
-#if defined(__IPC_WIN__)
-        IPC_getch();
-#endif
-#if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-        IPC_cleanupKeyboard();
-#else
-        _getch();
-#endif
-    } else {
-        IPC_cleanupKeyboard();
-    }
+// 	if (!g_quick_quit)
+// 	{
+//         BRDC_printf(_BRDC("Press any key for leaving program...\n"));
+// #if defined(__IPC_WIN__)
+//         IPC_getch();
+// #endif
+// #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
+//         IPC_cleanupKeyboard();
+// #else
+//         _getch();
+// #endif
+//     } else {
+//         IPC_cleanupKeyboard();
+//     }
     return 0;
 
 } catch (const std::exception& e) {
     printf("\n!!! ERROR !!! %s ...\n\n", e.what());
 
     BRD_cleanup();
-    if (g_quick_quit == 0) {
-        BRDC_printf(_BRDC("Press any key for leaving program...\n"));
-        IPC_getch();
-    }
-    IPC_cleanupKeyboard();
+    // if (g_quick_quit == 0) {
+    //     BRDC_printf(_BRDC("Press any key for leaving program...\n"));
+    //     IPC_getch();
+    // }
+    // IPC_cleanupKeyboard();
 
     return -1;
 }
@@ -964,18 +964,18 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
 					else
 					{
                         status = StartDaqIntoSdramDMA(hADC, idx); // стартует сбор данных в память с использованием прерывания по окончанию сбора
-                        while (!CheckDaqIntoSdramDMA()) // проверяет завершение сбора данных
-                        {
-                            if (_kbhit()) // проверяет была ли нажата клавиша
-                            {
-                                int ch = _getch(); // получает клавишу
-                                if (0x1B == ch) // если Esc
-                                {
-                                    BreakDaqIntoSdramDMA(); // // прерывает сбор данных
-                                    loop = -1;
-                                }
-                            }
-                        }
+                        // while (!CheckDaqIntoSdramDMA()) // проверяет завершение сбора данных
+                        // {
+                        //     if (_kbhit()) // проверяет была ли нажата клавиша
+                        //     {
+                        //         int ch = _getch(); // получает клавишу
+                        //         if (0x1B == ch) // если Esc
+                        //         {
+                        //             BreakDaqIntoSdramDMA(); // // прерывает сбор данных
+                        //             loop = -1;
+                        //         }
+                        //     }
+                        // }
                         status = EndDaqIntoSdramDMA(); // закрывает открытые описатели (Handles)
                     }
 #endif
@@ -994,11 +994,11 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
                 // WriteDataFile(hADC, idx, g_buf_dscr.ppBlk[0], bBufSize);
                 // WriteDataFile0(idx, buf_dscr.ppBlk[0], bBufSize);
             }
-			if (g_Pause)
-			{
-                BRDC_printf(_BRDC("\nPress any key for next start...\n"));
-                IPC_getch();
-            }
+			// if (g_Pause)
+			// {
+            //     BRDC_printf(_BRDC("\nPress any key for next start...\n"));
+            //     IPC_getch();
+            // }
             if (loop == -1)
                 break;
 			if(g_IsWriteFile || g_fileMap)
@@ -1021,24 +1021,24 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
 				do
 				{
                     rd_fl = ReadFlagSinc(0);
-#if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-					if(IPC_kbhit())
-					{
-                        int ch = IPC_getch();
-#else
-					if(_kbhit())
-					{
-                        int ch = _getch();
-#endif
-                        if (0x1B == ch)
-                            loop = 0;
-						if(0x20 == ch)
-						{
-                            status = AdcSettings(hADC, 0, g_AdcSrvNum, g_SrvName, g_iniFileName); // установить параметры АЦП
-                            status = BRD_ctrl(hADC, 0, BRDctrl_ADC_PREPARESTART, NULL);
-                            newParam_fl = 0xffffffff;
-                        }
-                    }
+// #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
+// 					if(IPC_kbhit())
+// 					{
+//                         int ch = IPC_getch();
+// #else
+// 					if(_kbhit())
+// 					{
+//                         int ch = _getch();
+// #endif
+//                         if (0x1B == ch)
+//                             loop = 0;
+// 						if(0x20 == ch)
+// 						{
+//                             status = AdcSettings(hADC, 0, g_AdcSrvNum, g_SrvName, g_iniFileName); // установить параметры АЦП
+//                             status = BRD_ctrl(hADC, 0, BRDctrl_ADC_PREPARESTART, NULL);
+//                             newParam_fl = 0xffffffff;
+//                         }
+//                     }
 #if defined(__IPC_LINUX__)
                     if ((rd_fl == 0) || g_StopFlag)
 #else
@@ -1061,14 +1061,14 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
 			else
 			{
                 loop++;
-#if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-                if (IPC_kbhit())
-                    if (0x1B == IPC_getch())
-#else
-                if (_kbhit())
-                    if (0x1B == _getch())
-#endif
-                        loop = 0;
+// #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
+//                 if (IPC_kbhit())
+//                     if (0x1B == IPC_getch())
+// #else
+//                 if (_kbhit())
+//                     if (0x1B == _getch())
+// #endif
+//                         loop = 0;
             }
             if (g_Cycle > 1 && (ULONG)loop == g_Cycle)
                 break;

@@ -189,23 +189,23 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
 			g_pFlags[2] = buf_dscr.blkSize;
 		}
 
-#if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
-		if(!idx && IPC_kbhit())
-		{
-			int ch = IPC_getch(); // получает клавишу
-			if(0x1B == ch) // если Esc
-			{
-				g_flbreak = 1;
-				break;
-			}
-		}
-#else
-		if(!idx && GetAsyncKeyState(VK_ESCAPE))
-		{
-			g_flbreak = 1;
-			_getch();
-		}
-#endif
+// #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
+// 		if(!idx && IPC_kbhit())
+// 		{
+// 			int ch = IPC_getch(); // получает клавишу
+// 			if(0x1B == ch) // если Esc
+// 			{
+// 				g_flbreak = 1;
+// 				break;
+// 			}
+// 		}
+// #else
+// 		if(!idx && GetAsyncKeyState(VK_ESCAPE))
+// 		{
+// 			g_flbreak = 1;
+// 			_getch();
+// 		}
+// #endif
 		cnt = buf_dscr.pStub->totalCounter;
 		if(cnt%16 == 0)
 		{
