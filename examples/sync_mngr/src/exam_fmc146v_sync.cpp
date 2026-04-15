@@ -422,8 +422,24 @@ int BRDC_main(int argc, char* argv[])
                     if (regFMODE->Bits.LTC6953_CE) {
                         fmc146vSync->LTC6953.reset();
                         fmc146vSync->LTC6953.chip_enable(true);
-                        auto vcoIsValid = fmc146vSync->LTC6953.is_vco_valid();
-                        ERROR_ASSERT((vcoIsValid == true), "VCO error!");
+
+                        bool vcoIsValid = false;
+                        printf("[SYNC] VCO check ");
+                        for (int i = 0; i < 10; ++i) {
+                            vcoIsValid = fmc146vSync->LTC6953.is_vco_valid();
+                            printf("%d ", i);
+                            if (vcoIsValid) {
+                                printf("- Success!", i);
+                                break;
+                            }
+                            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                        }
+                        printf("\n");
+
+                        ERROR_ASSERT(vcoIsValid, "VCO error!");
+
+                        // auto vcoIsValid = fmc146vSync->LTC6953.is_vco_valid();
+                        // ERROR_ASSERT((vcoIsValid == true), "VCO error!");
                         if (vcoIsValid) {
                             color::printf("\t{+white}CLK DIST {+green} \tVCO OK{}\n");
                         }
