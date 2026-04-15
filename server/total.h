@@ -410,7 +410,7 @@ extern int x_lid;
 extern BRD_Handle x_handleDevice;
 
 static int version_srv_hi = 4;
-static int version_srv_lo = 260318;
+static int version_srv_lo = 260414;
 
 S32 GetInifileString(const BRDCHAR* sSectionName, const BRDCHAR* sParamName, const BRDCHAR* defValue,
     BRDCHAR* strValue, int strSize, const BRDCHAR* sFullName);
