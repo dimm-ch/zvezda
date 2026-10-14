@@ -8,6 +8,7 @@
 #include <thread>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -21,6 +22,14 @@
 
 ServerExecutor::ServerExecutor(std::string ip, uint16_t port) {
     _server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (_server < 0)
+        throw std::runtime_error("ERROR: server socket creation failed");
+    const int flags = fcntl(_server, F_GETFD);
+    if (flags < 0 || fcntl(_server, F_SETFD, flags | FD_CLOEXEC) < 0) {
+        close(_server);
+        _server = -1;
+        throw std::runtime_error("ERROR: server socket CLOEXEC failed");
+    }
 
     sockaddr_in server_addr {};
     server_addr.sin_family = AF_INET; // UDP, TCP, etc.
@@ -33,25 +42,43 @@ ServerExecutor::ServerExecutor(std::string ip, uint16_t port) {
     // my
     std::fprintf(stdout, "ServerExecutor: ip=%s ip_in=0x%X \n", ip.c_str(), server_addr.sin_addr.s_addr);
     if (bind(_server, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) == -1) {
-        if (bind(_server, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) == -1)
-            throw std::runtime_error("ERROR: bind function failed");
+        close(_server);
+        _server = -1;
+        throw std::runtime_error("ERROR: bind function failed");
     }
-    if (listen(_server, SOMAXCONN) == -1)
+    if (listen(_server, SOMAXCONN) == -1) {
+        close(_server);
+        _server = -1;
         throw std::runtime_error("ERROR: listen function failed");
+    }
 }
 
 ServerExecutor::~ServerExecutor() noexcept {
-    if (_server) {
+    stop();
+    if (_server >= 0) {
         close(_server);
-        commandMap.clear();
+        _server = -1;
     }
+    commandMap.clear();
+}
+
+void ServerExecutor::stop() {
+    stopping_ = true;
+    {
+        const std::lock_guard<std::mutex> lock(socketMutex_);
+        if (_server >= 0) ::shutdown(_server, SHUT_RDWR);
+        if (_socket >= 0) ::shutdown(_socket, SHUT_RDWR);
+    }
+    
+    if (worker_.joinable()) worker_.join();
 }
 
 void ServerExecutor::start() {
-    std::thread th([this] {
+    if (worker_.joinable() || stopping_) return;
+    worker_ = std::thread([this] {
         using clock = std::chrono::steady_clock;
         
-        while (true) { // ждём запрос соединения от клиента
+        while (!stopping_) { // ждём запрос соединения от клиента
             sockaddr_in client_addr {}; // адрес и порт клиента
             socklen_t client_addr_len = sizeof(client_addr);
 
@@ -59,12 +86,22 @@ void ServerExecutor::start() {
                 std::fprintf(stdout, "\nServer Listening...\n");
                 std::fflush(stdout);
 
-                _socket = accept(_server, reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len);
+                const int accepted = accept(_server, reinterpret_cast<sockaddr*>(&client_addr), &client_addr_len);
+                {
+                    const std::lock_guard<std::mutex> lock(socketMutex_);
+                    _socket = accepted;
+                    if (stopping_ && _socket >= 0) ::shutdown(_socket, SHUT_RDWR);
+                }
 
                 if (_socket < 0) { // ошибка accept — логируем и переходим к следующей итерации
+                    if (stopping_) break;
                     std::perror("accept");
                     continue;
                 }
+
+                const int flags = fcntl(_socket, F_GETFD);
+                if (flags < 0 || fcntl(_socket, F_SETFD, flags | FD_CLOEXEC) < 0)
+                    throw std::runtime_error("ERROR: client socket CLOEXEC failed");
 
                 std::fprintf(stdout, "Connect from %s:%d socket:%zd\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), static_cast<ssize_t>(_socket));
                 
@@ -84,7 +121,7 @@ void ServerExecutor::start() {
                 std::array<uint8_t, 4096> buffer {}; // буфер приёма данных
 
                 // получение и отправка данных
-                while (true) {
+                while (!stopping_) {
                     buffer.fill('\0');
                     len = ::recv(_socket, reinterpret_cast<char*>(buffer.data()), buffer.size(), 0);
                     if (len > 0) {
@@ -108,13 +145,14 @@ void ServerExecutor::start() {
                             jsonResponseTree["error"] = e.what();
                             //auto jsonStringToClient = CommandExecutor::toClient(jsonResponseTree);
                             auto jsonStringToClient = jsonResponseTree.dump();
-                            ::send(_socket, reinterpret_cast<const char*>(jsonStringToClient.data()), jsonStringToClient.size(), 0);
+                            ::send(_socket, reinterpret_cast<const char*>(jsonStringToClient.data()), jsonStringToClient.size(), MSG_NOSIGNAL);
                             continue;
                         }
 
                         // получаем команду, которая поступила от клиента
                         jsonResponseTree["error"] = "unknown parameter";
                         for (const auto& [key, obj] : commandMap) {
+                            if (stopping_) break;
                             if (jsonRequestTree.contains(key)) {
                                 jsonResponseTree = obj->execute(jsonRequestTree);
                             }
@@ -123,7 +161,7 @@ void ServerExecutor::start() {
                         // формируем ответ клиенту
                         //auto jsonStringToClient = CommandExecutor::toClient(jsonResponseTree);
                         auto jsonStringToClient = jsonResponseTree.dump();
-                        ::send(_socket, reinterpret_cast<const char*>(jsonStringToClient.data()), jsonStringToClient.size(), 0);
+                        ::send(_socket, reinterpret_cast<const char*>(jsonStringToClient.data()), jsonStringToClient.size(), MSG_NOSIGNAL);
                     }
                     else if (len == 0) { // клиент корректно закрыл соединение
                         std::printf("Client closed connection (len = 0)\n");
@@ -159,14 +197,17 @@ void ServerExecutor::start() {
             }
             catch (const std::exception& e) {
                 std::fprintf(stdout, "<SRV> std::exception: %s\n", e.what());
+                const std::lock_guard<std::mutex> lock(errorMutex_);
                 threadError = std::current_exception();
             }
             catch (...) {
                 std::fprintf(stdout, "<SRV> unknown exception\n");
+                const std::lock_guard<std::mutex> lock(errorMutex_);
                 threadError = std::current_exception();
             }
 
             // разрываем соединение и закрываем сокет, если он был успешно открыт
+            const std::lock_guard<std::mutex> lock(socketMutex_);
             if (_socket >= 0) {
                 std::fprintf(stdout, "Close connection %s:%d socket:%zd\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), static_cast<ssize_t>(_socket));
 
@@ -177,9 +218,9 @@ void ServerExecutor::start() {
         } // while(true) — ждём новых клиентов
     });
 
-    th.detach();
 }
 
 std::exception_ptr ServerExecutor::error() {
+    const std::lock_guard<std::mutex> lock(errorMutex_);
     return threadError;
 }

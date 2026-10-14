@@ -3,7 +3,9 @@
 #include "server.hpp"
 
 const std::unordered_map<std::string, FmcSync::cmd_handler> FmcSync::cmd_map {
-    {"start", &FmcSync::start}
+    {"start", &FmcSync::start},
+    {"stop", &FmcSync::stop},
+    {"restart", &FmcSync::restart}
 };
 
 FmcSync::FmcSync() {
@@ -18,6 +20,13 @@ std::string FmcSync::command() {
 }
 
 bool FmcSync::check_lid(json& response) {
+    if (lid == 0) lid = 1;
+    if (lid != 1 && lid != 2) {
+        response["error"] = "Bad LID!";
+        return false;
+    }
+    
+    toolName = baseName;
     return true;
 }
 

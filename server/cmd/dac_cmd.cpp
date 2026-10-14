@@ -4,6 +4,8 @@
 
 const std::unordered_map<std::string, DacControl::cmd_handler> DacControl::cmd_map {
     {"start", &DacControl::start},
+    {"stop", &DacControl::stop},
+    {"restart", &DacControl::restart},
     {"nco", &DacControl::nco},
     {"ping", &DacControl::ping}
 };

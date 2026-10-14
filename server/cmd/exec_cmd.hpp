@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
 #include "json.hpp"
 
@@ -9,6 +10,7 @@ using json = nlohmann::json;
 class CommandExecutor {
 public:
     using UniquePtr = std::unique_ptr<CommandExecutor>;
+    virtual ~CommandExecutor() = default;
 
     json execute(const json& request);
 
@@ -19,6 +21,8 @@ protected:
     virtual std::string get_ini(const std::string& ini);
 
     bool start(const json& request, json& response);
+    bool stop(const json& request, json& response);
+    bool restart(const json& request, json& response);
 
     int lid;
     std::string toolName;

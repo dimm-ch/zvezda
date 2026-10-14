@@ -3,7 +3,9 @@
 #include "server.hpp"
 
 const std::unordered_map<std::string, AdcControl::cmd_handler> AdcControl::cmd_map {
-    {"start", &AdcControl::start}
+    {"start", &AdcControl::start},
+    {"stop", &AdcControl::stop},
+    {"restart", &AdcControl::restart}
 };
 
 AdcControl::AdcControl() {

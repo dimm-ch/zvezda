@@ -62,7 +62,7 @@ extern FuDevs DevicesLid[MAX_LID_DEVICES];
 extern int x_lid;
 extern BRD_Handle x_handleDevice;
 
-static bool is_cancel { false };
+static volatile std::sig_atomic_t is_cancel { 0 };
 static bool PrintDebugFlag { true };
 
 enum CmdExcCtrl {

@@ -45,13 +45,62 @@ bool CommandExecutor::start(const json& request, json& response) {
     
     std::string ini = get_ini(request.value("ini", ""));
 
-    bool ok = ToolHub::inst().start_tool(toolName, exeTool, ini, path, startTimeoutToolMs);
+    std::string error;
+    bool ok = ToolHub::inst().start_tool(toolName, exeTool, ini, path, startTimeoutToolMs, &error);
     if (!ok) {
-        response["error"] = "Tool start timeout or failed: " + exeTool;
-        BRDC_printf("%s start() Tool start timeout or failed: %s\n", printDebugName.c_str(), exeTool.c_str());
+        response["error"] = error;
+        BRDC_printf("%s start(): %s\n", printDebugName.c_str(), error.c_str());
         return false;
     }
     
     std::this_thread::sleep_for(std::chrono::seconds(waitTimeoutToolS));
+    response["tool"] = toolName;
+    if (!ToolHub::inst().check_tool_process(toolName, error)) {
+        response["error"] = error;
+        return false;
+    }
+    return true;
+}
+
+static json stop_response(const ToolHub::StopResult& stopped) {
+    json response = {
+        {"result", stopped.success ? "Success" : "Error"},
+        {"forced", stopped.forced},
+        {"already_stopped", stopped.alreadyStopped}
+    };
+    if (stopped.exitCode) response["exit_code"] = *stopped.exitCode;
+    if (stopped.termSignal) response["signal"] = *stopped.termSignal;
+    if (!stopped.error.empty()) response["error"] = stopped.error;
+    return response;
+}
+
+bool CommandExecutor::stop(const json& request, json& response) {
+    if (!check_lid(response)) return false;
+    const auto stopped = ToolHub::inst().stop_tool(toolName);
+    response = stop_response(stopped);
+    response["tool"] = toolName;
+    return stopped.success;
+}
+
+bool CommandExecutor::restart(const json& request, json& response) {
+    if (!check_lid(response)) return false;
+    if (request.contains("ini")) {
+        response["error"] = "Restart reuses saved launch parameters; use stop/start to change ini";
+        return false;
+    }
+    const auto restarted = ToolHub::inst().restart_tool(toolName);
+    response["tool"] = toolName;
+    if (restarted.stopAttempted)
+        response["stop"] = stop_response(restarted.stop);
+    if (!restarted.success) {
+        response["error"] = restarted.error;
+        return false;
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(waitTimeoutToolS));
+    std::string error;
+    if (!ToolHub::inst().check_tool_process(toolName, error)) {
+        response["error"] = error;
+        return false;
+    }
     return true;
 }

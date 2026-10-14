@@ -25,6 +25,10 @@ BRD_Handle x_handleDevice = 0;
 
 int main() try {
     auto signal_handler = [](int signal) {
+        if (signal == SIGINT || signal == SIGTERM) {
+            is_cancel = 1;
+            return;
+        }
         is_cancel = true;
         std::string signal_str {};
         switch (signal) {
@@ -99,8 +103,7 @@ int main() try {
 
     serverExecutor.start();
     std::fprintf(stdout, "Server start with - %s\n", ifname.c_str());
-    // так как поток обработки команд запускается в режиме detach
-    // стоим и ждем пока не поступит сигнал прерывания работы
+    // Ожидаем завершения; утилитами управляет только поток обработки команд.
     int i = 0;
     while (!is_cancel) {
         std::this_thread::sleep_for(100ms);
@@ -112,6 +115,8 @@ int main() try {
         }
         i++;
     }
+    serverExecutor.stop();
+    ToolHub::inst().shutdown();
     return EXIT_SUCCESS;
 }
 catch (const std::exception& e) {
