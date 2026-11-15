@@ -23,6 +23,7 @@ set(PROJECT_INCLUDE_DIRS 	${PROJECT_SOURCE_DIR}/
 				)
 
 set(PROJECT_SOURCES ${PROJECT_SOURCE_DIR}/server.cpp
+					${PROJECT_SOURCE_DIR}/bardy_session.cpp
 					${PROJECT_SOURCE_DIR}/srv_exec.cpp
 					${PROJECT_SOURCE_DIR}/tool_hub.cpp
 					${PROJECT_SOURCE_DIR}/total.cpp

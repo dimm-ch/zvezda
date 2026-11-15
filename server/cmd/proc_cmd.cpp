@@ -1,11 +1,13 @@
 #include "proc_cmd.hpp"
 #include "tool_hub.hpp"
 #include "server.hpp"
+#include "bardy_session.hpp"
 
 const std::unordered_map<std::string, CommandProcessor::cmd_handler> CommandProcessor::cmd_map {
     {"info", &CommandProcessor::info},
     {"version", &CommandProcessor::version},
-    {"close", &CommandProcessor::close},
+    {"start", &CommandProcessor::start},
+    {"stop", &CommandProcessor::stop},
     {"pause", &CommandProcessor::pause},
     {"reg", &CommandProcessor::reg}
 };
@@ -145,32 +147,14 @@ static bool get_bool(const json& request, const char* key, bool& outValue)
 CommandProcessor::CommandProcessor() {
     baseName = "srv";
     printDebugName = "[CommandProcessor]";
-    init();
 }
 
 std::string CommandProcessor::command() {
     return "srv";
 }
 
-bool  CommandProcessor::init() {
-    if (initBrdLibFlag) {
-        printf("%s Reinitialization attempt detected. Library BARDY is already initialized.\n", printDebugName.c_str());
-        return true;
-    }
-
-    std::string fileini = (getExePath().parent_path().parent_path() / "brd/brd.ini").lexically_normal().string();
-
-    // инициализировать библиотеку
-    S32 status = BRD_init(fileini.c_str(), &x_DevNum);
-    if (!BRD_errcmp(status, BRDerr_OK)) {
-        printf(_BRDC("<ERR> BARDY Initialization = 0x%X \n"), status);
-        return false;
-    }
-    else {
-        printf("<SRV> Library BARDY - is initialize, device found : %d \n", x_DevNum);
-        BRD_displayMode(BRDdm_VISIBLE | BRDdm_CONSOLE); // режим вывода информационных сообщений : отображать все уровни на консоле
-        initBrdLibFlag = true;
-    }
+bool CommandProcessor::start(const json &request, json &response) {
+    return BardySession::inst().open(response);
 }
 
 bool CommandProcessor::dispatch(const json &request, json &response) {
@@ -188,24 +172,24 @@ bool CommandProcessor::dispatch(const json &request, json &response) {
 }
 
 bool CommandProcessor::info(const json &request, json &response) {
-    BRD_Version ver;
-    BRD_version(x_handleDevice, &ver);
+    response["status"] = BardySession::inst().state_name();
+    response["devices"] = x_DevNum;
+    response["open_lids"] = json::array();
     printf("--------------------- INFO ------------------------- \n");
-    printf("-- Version: Shell v.%d.%d, Driver v.%d.%d --\n", ver.brdMajor, ver.brdMinor, ver.drvMajor, ver.drvMinor);
+    printf("Server status: %s\n", BardySession::inst().state_name());
     for (size_t i = 0; i < MAX_LID_DEVICES; i++) {
         if (DevicesLid[i].device.isOpen()) {
-            U32 v = 0;
-            printf("* LID=%d open in %s mode (handle=%X), ver.%d \n", i,
-                getStrOpenModeDevice(DevicesLid[i].device.mode()).c_str(), DevicesLid[i].device.handle(), v);
-            
+            response["open_lids"].push_back(i);
+            printf("* LID=%zu open in %s mode\n", i,
+                getStrOpenModeDevice(DevicesLid[i].device.mode()).c_str());
         }
     }
     printf("---------------------------------------------------- \n");
     return true;
 }
 
-bool CommandProcessor::close(const json &request, json &response) {
-    return false;
+bool CommandProcessor::stop(const json &request, json &response) {
+    return BardySession::inst().close(response);
 }
 
 bool CommandProcessor::version(const json &request, json &response) {
@@ -223,6 +207,7 @@ bool CommandProcessor::pause(const json &request, json &response) {
 }
 
 bool CommandProcessor::reg(const json &request, json &response) {
+    if (!BardySession::inst().require_open(response)) return false;
     if (!check_lid(response)) {
         return false;
     }

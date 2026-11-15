@@ -235,6 +235,19 @@ bool ToolHub::check_tool_process(const std::string& toolName, std::string& error
     return false;
 }
 
+ToolHub::ProcessActivity ToolHub::inspect_processes() {
+    ProcessActivity activity;
+    for (auto& [name, c] : conns_) {
+        const auto state = poll_process(c);
+        if (state == ProcessState::Running)
+            activity.running.push_back(name);
+        else if (state == ProcessState::Error)
+            activity.errors.emplace(name, c.processError);
+    }
+    std::sort(activity.running.begin(), activity.running.end());
+    return activity;
+}
+
 void ToolHub::close_socket(Conn& c) {
     if (c.fd >= 0)
         ::close(c.fd);

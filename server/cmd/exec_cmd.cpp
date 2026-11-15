@@ -1,6 +1,7 @@
 #include "exec_cmd.hpp"
 #include "tool_hub.hpp"
 #include "server.hpp"
+#include "bardy_session.hpp"
 
 bool CommandExecutor::check_lid(json& response) {
     if ((lid < 1 || lid > 2)) {
@@ -23,6 +24,12 @@ json CommandExecutor::execute(const json& request) {
         response["error"] = "Parameter is missing: " + baseName;
         return response;
     }
+
+    // All utility operations except stop require a session started by srv:start.
+    // This includes restart and DAC commands such as nco, not just start.
+    if (baseName != "srv" && request[baseName] != "stop"
+        && !BardySession::inst().require_open(response))
+        return response;
 
     if (dispatch(request, response))
         response["result"] = "Success";

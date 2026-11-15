@@ -18,7 +18,7 @@
 #include "srv_exec.hpp"
 #include "total.h"
 
-S32 x_DevNum = -1;
+S32 x_DevNum = 0; // No BARDY session until srv:start.
 FuDevs DevicesLid[MAX_LID_DEVICES];
 int x_lid = 1;
 BRD_Handle x_handleDevice = 0;

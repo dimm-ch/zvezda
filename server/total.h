@@ -231,6 +231,20 @@ typedef struct FU_TriadSrv {
         return true;
     }
 
+    // Checked lifecycle path: unlike the legacy release(), preserve the
+    // captured handle after failure so srv:stop can report and retry it.
+    bool release_checked(S32& status)
+    {
+        status = BRDerr_OK;
+        if (!ok) return true;
+        status = BRD_release(handle_, 0);
+        if (!BRD_errcmp(status, BRDerr_OK)) return false;
+        handle_ = 0;
+        ok = false;
+        strcpy(servName.name, "");
+        return true;
+    }
+
     std::string name() { return servName.name; };
 
     U32 mode() { return mode_; }
@@ -325,6 +339,17 @@ typedef struct FU_TriadDev {
         handle_ = 0;
         ok = false;
         return (e != 0);
+    }
+
+    bool close_checked(S32& status)
+    {
+        status = BRDerr_OK;
+        if (!ok) return true;
+        status = BRD_close(handle_);
+        if (!BRD_errcmp(status, BRDerr_OK)) return false;
+        handle_ = 0;
+        ok = false;
+        return true;
     }
 
     U32 mode() { return mode_; }

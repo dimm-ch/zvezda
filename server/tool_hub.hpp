@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -33,6 +34,10 @@ public:
         StopResult stop;
         std::string error;
     };
+    struct ProcessActivity {
+        std::vector<std::string> running;
+        std::map<std::string, std::string> errors;
+    };
     static constexpr int StopTimeoutMs = 15000;
     static constexpr int KillTimeoutMs = 2000;
 
@@ -40,6 +45,7 @@ public:
     StopResult stop_tool(const std::string& toolName, int stopTimeoutMs = StopTimeoutMs, int killTimeoutMs = KillTimeoutMs);
     RestartResult restart_tool(const std::string& toolName);
     bool check_tool_process(const std::string& toolName, std::string& error);
+    ProcessActivity inspect_processes();
     bool is_connected(const std::string& toolName) const;
     std::optional<uint64_t> send(const std::string& toolName, const std::string& cmd, const nlohmann::json& args);
     std::optional<nlohmann::json> wait(const std::string& toolName, uint64_t id, int timeoutMs);
