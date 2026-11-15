@@ -72,7 +72,7 @@
       "problemMatcher": []
     },
     {
-      "label": "[Debug] Deploy",
+      "label": "[Debug] Deploy srv",
       "type": "shell",
       "command": "bash",
       "args": [
@@ -82,12 +82,22 @@
       "problemMatcher": []
     },
     {
-      "label": "[Debug] Deploy test dir",
+      "label": "[Debug] Deploy srv_tests",
       "type": "shell",
       "command": "bash",
       "args": [
         "-lc",
         "rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/bin/ root@192.168.5.75:/root/srv_tests/exams/ && rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/lib/ root@192.168.5.75:/root/srv_tests/lib/"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "[Debug] Deploy srv_debug",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/bin/ root@192.168.5.75:/root/srv_debug/exams/ && rsync -avz --delete ${workspaceFolder}/build_arm32/armhf-Debug/lib/ root@192.168.5.75:/root/srv_debug/lib/"
       ],
       "problemMatcher": []
     },
@@ -102,7 +112,7 @@
       "problemMatcher": []
     },
     {
-      "label": "[Debug] Start gdbserver test dir",
+      "label": "[Debug] Start gdbserver srv_tests",
       "type": "shell",
       "command": "bash",
       "args": [
@@ -131,7 +141,17 @@
       "problemMatcher": []
     },
     {
-      "label": "[Debug] Build & Deploy",
+      "label": "[Debug] Clear, Configure & Build",
+      "dependsOn": [
+        "[Debug] Clean Dir",
+        "[Debug] Configure",
+        "[Debug] Build"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "[Debug] Configure, Build & Deploy srv",
       "dependsOn": [
         "[Debug] Configure",
         "[Debug] Build",
@@ -141,38 +161,11 @@
       "problemMatcher": []
     },
     {
-      "label": "[Debug] Build & Deploy test dir",
+      "label": "[Debug] Build & Deploy srv_tests",
       "dependsOn": [
         "[Debug] Configure",
         "[Debug] Build",
         "[Debug] Deploy test dir"
-      ],
-      "dependsOrder": "sequence",
-      "problemMatcher": []
-    },
-    {
-      "label": "[Debug] Clean Rebuild & Deploy",
-      "dependsOn": [
-        "Clean Dir",
-        "Build & Deploy"
-      ],
-      "dependsOrder": "sequence",
-      "problemMatcher": []
-    },
-    {
-      "label": "[Debug] Build, Deploy & Start",
-      "dependsOn": [
-        "Build & Deploy",
-        "Start gdbserver"
-      ],
-      "dependsOrder": "sequence",
-      "problemMatcher": []
-    },
-    {
-      "label": "[Debug] Build, Deploy, Start & Exit",
-      "dependsOn": [
-        "Build & Deploy",
-        "Start gdbserver & Exit"
       ],
       "dependsOrder": "sequence",
       "problemMatcher": []

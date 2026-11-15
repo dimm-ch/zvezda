@@ -227,7 +227,7 @@ bool CommandProcessor::reg(const json &request, json &response) {
         return false;
     }
 
-    commandLineParams paramReg;
+    commandLineParams paramReg{};
 
     if (!get_int(request, "t", paramReg.tetrad) || paramReg.tetrad < 0) {
         response["error"] = "parametr error: t";
@@ -242,18 +242,31 @@ bool CommandProcessor::reg(const json &request, json &response) {
     }
 
     if (request.contains("dir")){
-        if (!get_bool(request, "dir", paramReg.indirect)) {
-            response["error"] = "parametr error: dir";
-            printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
-            return false;
+        const auto& dir = request.at("dir");
+        const std::string mode = dir.is_string() ? dir.get<std::string>() : "";
+        if (mode == "D" || mode == "d") {
+            paramReg.regType = RegisterType::Direct;
+        }
+        else if (mode == "I" || mode == "i") {
+            paramReg.regType = RegisterType::Indirect;
+        }
+        else if (mode == "I2" || mode == "i2") {
+            paramReg.regType = RegisterType::Indirect2;
+        }
+        else {
+            bool indirect;
+            if (!get_bool(request, "dir", indirect)) {
+                response["error"] = "parametr error: dir";
+                printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+                return false;
+            }
+            paramReg.regType = indirect ? RegisterType::Indirect : RegisterType::Direct;
         }
     }
-    else
-        paramReg.indirect = true;
 
     if (request.contains("val")){
         if (!get_uint(request, "val", paramReg.value)) {
-            response["error"] = "parametr error: dir";
+            response["error"] = "parametr error: val";
             printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
             return false;
         }
@@ -287,14 +300,17 @@ bool CommandProcessor::reg(const json &request, json &response) {
 
     // Пишем/читаем регистр
     paramReg.hService = DevicesLid[lid].servRegs.handle();
-    U32 S = processReg(paramReg);
-    printf("%s: [%s] tetrada = %d, register = 0x%X, value = 0x%X\n",
-            (S > 0) ? "<SRV> OK" : "<ERR> ERROR",
+    S32 status = processReg(paramReg);
+    const bool success = BRD_errcmp(status, BRDerr_OK);
+    printf("%s: [%s] mode = %s, tetrada = %d, register = 0x%X, value = 0x%X\n",
+            success ? "<SRV> OK" : "<ERR> ERROR",
             paramReg.write ? "Write" : "Read",
+            paramReg.regType == RegisterType::Indirect2 ? "I2" :
+                (paramReg.regType == RegisterType::Indirect ? "I" : "D"),
             paramReg.tetrad,
             paramReg.reg,
             paramReg.value);
-    if (S <= 0) {
+    if (!success) {
         response["error"] = "error execution";
         printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
         return false;

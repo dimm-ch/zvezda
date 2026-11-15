@@ -12,6 +12,13 @@ const U32 DU_DATA = 1; // (0x02) Data register
 const U32 DU_CMDADR = 2; // (0x04) Address command register
 const U32 DU_CMDDATA = 3; // (0x06) Data command register
 
+// TODO: условные номера косвенных регистров первого уровня.
+// Заменить после согласования карты регистров с разработчиком ПЛИС.
+// Принятая схема: USER_ADDR выбирает адрес, USER_DATA читает/пишет данные;
+// отдельных команд запуска и ожидания готовности второго уровня нет.
+const U32 USER_ADDR = 0x300;
+const U32 USER_DATA = 0x301;
+
 S32 regWriteIndir(BRD_Handle hSrv, S32 trdNo, S32 rgnum, U32 val)
 {
     BRD_Reg reg;
@@ -33,6 +40,24 @@ U32 regReadIndir(BRD_Handle hSrv, S32 trdNo, S32 rgnum, S32& status)
 
     status = BRD_ctrl(hSrv, NODE0, BRDctrl_REG_READIND, &reg);
     return (reg.val & 0xFFFF);
+}
+
+S32 regWriteIndir2(BRD_Handle hSrv, S32 trdNo, S32 rgnum, U32 val)
+{
+    S32 status = regWriteIndir(hSrv, trdNo, USER_ADDR, rgnum);
+    if (!BRD_errcmp(status, BRDerr_OK))
+        return status;
+
+    return regWriteIndir(hSrv, trdNo, USER_DATA, val);
+}
+
+U32 regReadIndir2(BRD_Handle hSrv, S32 trdNo, S32 rgnum, S32& status)
+{
+    status = regWriteIndir(hSrv, trdNo, USER_ADDR, rgnum);
+    if (!BRD_errcmp(status, BRDerr_OK))
+        return 0;
+
+    return regReadIndir(hSrv, trdNo, USER_DATA, status);
 }
 
 S32 regWriteDir(BRD_Handle hSrv, S32 trdNo, S32 rgnum, U32 val)
@@ -101,18 +126,28 @@ std::string getStrCaptureModeService(U32 nMode)
 
 S32 processReg(commandLineParams& params)
 {
-    S32 status = 0;
-    //params.indirect = (params.reg >= 0x100) ? true : false;
-    if (params.indirect) {
-        if (params.write)
-            status = regWriteIndir(params.hService, params.tetrad, params.reg, params.value);
-        else
-            params.value = regReadIndir(params.hService, params.tetrad, params.reg, status);
-    } else {
+    S32 status = BRDerr_OK;
+    switch (params.regType) {
+    case RegisterType::Direct:
         if (params.write)
             status = regWriteDir(params.hService, params.tetrad, params.reg, params.value);
         else
             params.value = regReadDir(params.hService, params.tetrad, params.reg, status);
+        break;
+    case RegisterType::Indirect:
+        if (params.write)
+            status = regWriteIndir(params.hService, params.tetrad, params.reg, params.value);
+        else
+            params.value = regReadIndir(params.hService, params.tetrad, params.reg, status);
+        break;
+    case RegisterType::Indirect2:
+        if (params.write)
+            status = regWriteIndir2(params.hService, params.tetrad, params.reg, params.value);
+        else
+            params.value = regReadIndir2(params.hService, params.tetrad, params.reg, status);
+        break;
+    default:
+        return BRDerr_BAD_PARAMETER;
     }
     return status;
 }

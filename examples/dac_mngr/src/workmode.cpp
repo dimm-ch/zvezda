@@ -18,6 +18,7 @@
 
 #include "../../../sidedrivers/mfm214x3gda/src/mfm214x3gda.h"
 #include "tool_client.hpp"
+#include "../../tool_stream_wait.hpp"
 
 #define		FIFO_WIDTHB		64
 
@@ -118,7 +119,7 @@ S32 WorkMode0( void )
 	nblock = 0;
 	PrepareStart( );
     // while(!IPC_kbhit())
-    while(true)
+    while (!tool_stop::requested())
 	{
 		FifoOutputCPU( );
 		//OldFifoOutputCPU( g_aDac[0].pBuf, g_aDac[0].outBufSizeb );
@@ -232,7 +233,7 @@ S32 WorkMode1( void )
 	nblock = 0;
 	PrepareStart( );
     // while(!IPC_kbhit())
-    while(true)
+    while (!tool_stop::requested())
 	{
 		if( 0 > FifoOutputDMA() )
 			break;
@@ -248,7 +249,8 @@ S32 WorkMode1( void )
 	//
 	for( ii=0; ii<g_nDacNum; ii++ )
 	{
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc) );
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc), "DMA-buffer-free");
 		delete[] g_aDac[ii].rBufAlloc.ppBlk;
 	}
 
@@ -347,7 +349,7 @@ S32 WorkMode2( void )
 	{
 		PrepareStart( );
 		// while(!IPC_kbhit())
-		while(true)
+		while (!tool_stop::requested())
 		{	
 			if( g_nIsAlwaysWriteSdram )
 			{
@@ -368,7 +370,8 @@ S32 WorkMode2( void )
 	//
 	for( ii=0; ii<g_nDacNum; ii++ )
 	{
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc) );
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc), "DMA-buffer-free");
 		delete[] g_aDac[ii].rBufAlloc.ppBlk;
 	}
 
@@ -438,7 +441,7 @@ S32 WorkMode3( void )
 	PrepareStart( );
 	FifoOutputCPUStart( 0 );
     // while(!IPC_kbhit());
-    while(true);
+    while (!tool_stop::requested()) { IPC_delay(50); }
 
 	//
 	// Остановит все ЦАПы и освободить все буфера
@@ -446,7 +449,7 @@ S32 WorkMode3( void )
 	for( ii=0; ii<g_nDacNum; ii++ )
 	{
 		isEnable = 0;
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_DAC_ENABLE, &isEnable, "DAC-enable-control"); // запрет работы ЦАП
         IPC_virtFree( g_aDac[ii].pBuf );
 	}
 
@@ -531,7 +534,7 @@ S32 WorkMode4( void )
 		SdramCycleOutput(0);
         // BRDC_printf( _BRDC("Press any key to stop!\n"));
 		// while(!IPC_kbhit());
-		while(true);
+		while (!tool_stop::requested()) { IPC_delay(50); }
 	}
 
 	//
@@ -540,9 +543,10 @@ S32 WorkMode4( void )
 	for( ii=0; ii<g_nDacNum; ii++ )
 	{
 		isEnable = 0;
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_ENABLE,  &isEnable); // запрещение вывода	
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_SDRAM_ENABLE,  &isEnable); // Запретить чтение из SDRAM	
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc) );
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_DAC_ENABLE, &isEnable, "DAC-enable-control"); // запрещение вывода
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_SDRAM_ENABLE, &isEnable, "SDRAM-enable-control"); // Запретить чтение из SDRAM
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc), "DMA-buffer-free");
 		delete[] g_aDac[ii].rBufAlloc.ppBlk;
 	}
 
@@ -618,11 +622,11 @@ S32 WorkMode5( void )
 	auto& cli = ToolClient::inst();
 
     // while(!IPC_kbhit())
-    while(true)
+    while (!tool_stop::requested())
 	{
         IPC_delay( 200 );
 		DisplayDacTraceText( loop++, 0 );
-    	printf("[WorkMode5] loop %d \n", loop);
+    	//printf("[WorkMode5] loop %d \n", loop);
 
 		auto cmdOpt = cli.poll_command(50);
         if (!cmdOpt)
@@ -671,7 +675,7 @@ S32 WorkMode5( void )
 	//
 	isEnable = 0;
 	for( ii=0; ii<g_nDacNum; ii++ )
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_DAC_ENABLE, &isEnable, "DAC-enable-control"); // запрет работы ЦАП
 
 
 	//
@@ -762,8 +766,9 @@ S32 WorkMode6( void )
 	for( ii=0; ii<g_nDacNum; ii++ )
 	{
 		isEnable = 0;
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_ENABLE,  &isEnable); // запрещение вывода	
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc) );
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_DAC_ENABLE, &isEnable, "DAC-enable-control"); // запрещение вывода
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc), "DMA-buffer-free");
 		delete[] g_aDac[ii].rBufAlloc.ppBlk;
 	}
 
@@ -852,7 +857,7 @@ S32 WorkMode7( void )
 		SdramCycleOutput(1);
         // BRDC_printf( _BRDC("Press any key to stop!\n\n"));
 		// while(!IPC_kbhit())
-		while(true)
+		while (!tool_stop::requested())
 		{
             IPC_delay( 200 );
 			DisplayDacTraceText( loop++, 0 );
@@ -865,9 +870,10 @@ S32 WorkMode7( void )
 	for( ii=0; ii<g_nDacNum; ii++ )
 	{
 		isEnable = 0;
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_ENABLE,  &isEnable); // запрещение вывода	
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_SDRAM_ENABLE,  &isEnable); // Запретить чтение из SDRAM	
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc) );
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_DAC_ENABLE, &isEnable, "DAC-enable-control"); // запрещение вывода
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_SDRAM_ENABLE, &isEnable, "SDRAM-enable-control"); // Запретить чтение из SDRAM
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc), "DMA-buffer-free");
 		delete[] g_aDac[ii].rBufAlloc.ppBlk;
 	}
 
@@ -965,9 +971,10 @@ S32 WorkMode8( void )
 	for( ii=0; ii<g_nDacNum; ii++ )
 	{
 		isEnable = 0;
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_ENABLE,  &isEnable); // запрещение вывода	
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_SDRAM_ENABLE,  &isEnable); // Запретить чтение из SDRAM	
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc) );
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_DAC_ENABLE, &isEnable, "DAC-enable-control"); // запрещение вывода
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_SDRAM_ENABLE, &isEnable, "SDRAM-enable-control"); // Запретить чтение из SDRAM
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_STREAM_CBUF_FREE, &(g_aDac[ii].rBufAlloc), "DMA-buffer-free");
 		delete[] g_aDac[ii].rBufAlloc.ppBlk;
 	}
 
@@ -994,7 +1001,7 @@ S32	FifoOutputCPU( )
 	for( ii=0; ii<g_nDacNum; ii++ )
 	{
 		statusFIFO = 0x4;
-	    while( (statusFIFO & 0x4) == 0x4 )	// ждать окончания выдачи блока из FIFO  
+	    while( (statusFIFO & 0x4) == 0x4 && !tool_stop::requested() )	// ждать окончания выдачи блока из FIFO
 			 err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO); 
 	}
 
@@ -1003,7 +1010,7 @@ S32	FifoOutputCPU( )
 	//
 	isEnable = 0;
 	for( ii=0; ii<g_nDacNum; ii++ )
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_DAC_ENABLE, &isEnable, "DAC-enable-control"); // запрет работы ЦАП
 
 	return 0;
 }
@@ -1072,11 +1079,11 @@ S32	FifoOutputDMA(void)
 		err = BRD_ctrl( g_aDac[idx].handle, 0, BRDctrl_STREAM_CBUF_START, &rCBufStart) ; // старт ПДП
 
 		msTimeout = 1000;			// ждать окончания передачи блока данных до 1 сек.
-		err = BRD_ctrl( g_aDac[idx].handle, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout );
+		err = tool_stop::wait_stream(g_aDac[idx].handle, BRDctrl_STREAM_CBUF_WAITBLOCK, msTimeout);
 		if( BRD_errcmp(err, BRDerr_WAIT_TIMEOUT) )
 		{	// вышли по тайм-ауту
 			BRDC_printf(_BRDC("\nTIME-OUT DMA! \n"));
-			err = BRD_ctrl( g_aDac[idx].handle, 0, BRDctrl_STREAM_CBUF_STOP, NULL ); // стоп ПДП
+			err = tool_stop::cleanup_control(g_aDac[idx].handle, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop"); // стоп ПДП
 			return -1;
 		}
 
@@ -1094,7 +1101,7 @@ S32	FifoOutputDMA(void)
 		statusFIFO = 0x4;
 
 		//while( (statusFIFO & 0x4) == 0x4 )	// ждать окончания выдачи блока из FIFO  
-		for(int jj = 0; jj < (1+g_nMsTimeout/50); jj++)
+		for(int jj = 0; jj < (1+g_nMsTimeout/50) && !tool_stop::requested(); jj++)
 		{
 			err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO); 
 			if((statusFIFO & 0x4) != 0x4 )
@@ -1111,7 +1118,7 @@ S32	FifoOutputDMA(void)
 	//
 	isEnable = 0;
 	for( ii=0; ii<g_nDacNum; ii++ )
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_ENABLE, &isEnable); // запрет работы ЦАП
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_DAC_ENABLE, &isEnable, "DAC-enable-control"); // запрет работы ЦАП
 
 
 	return 0;
@@ -1163,10 +1170,10 @@ S32	FifoOutputCycleDMA(void)
 
 	nblock = 0;
     // while(!IPC_kbhit())
-    while(true)
+    while (!tool_stop::requested())
 	{
 		msTimeout = 5000;			// ждать окончания передачи блока данных до 2 сек.
-		err = BRD_ctrl( g_aDac[0].handle, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout );
+		err = tool_stop::wait_stream(g_aDac[0].handle, BRDctrl_STREAM_CBUF_WAITBLOCK, msTimeout);
 		if( BRD_errcmp(err, BRDerr_WAIT_TIMEOUT) )
 		{	// вышли по тайм-ауту
             BRDC_printf( _BRDC("\nTIME-OUT! \n"));
@@ -1247,10 +1254,10 @@ S32	SdramLikeFifoOutputCycleDMA(void)
 
 	nblock = 0;
     // while(!IPC_kbhit())
-    while(true)
+    while (!tool_stop::requested())
 	{
 		msTimeout = 5000;			// ждать окончания передачи блока данных до 5 сек.
-		err = BRD_ctrl( g_aDac[0].handle, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout );
+		err = tool_stop::wait_stream(g_aDac[0].handle, BRDctrl_STREAM_CBUF_WAITBLOCK, msTimeout);
 		if( BRD_errcmp(err, BRDerr_WAIT_TIMEOUT) )
 		{	// вышли по тайм-ауту
             BRDC_printf( _BRDC("\nTIME-OUT! \n"));
@@ -1386,10 +1393,10 @@ S32 SdramModulWriteDMA( int idxDac )
 	err = BRD_ctrl(g_aDac[idxDac].handle, 0, BRDctrl_STREAM_RESETFIFO, NULL); // сброс FIFO Stream
 
 	nwrite = (int)(g_aDac[idxDac].outBufSizeb/g_nSdramWriteBufSize);
-    BRDC_printf( _BRDC("To Stop press ESC...\n"));
+    BRDC_printf( _BRDC("To Stop send SIGINT or SIGTERM...\n"));
     BRDC_printf( _BRDC("nwrite= %d\n"),nwrite);
 	
-	for( ii=0; ii<nwrite; ii++ )
+	for( ii=0; ii<nwrite && !tool_stop::requested(); ii++ )
 	{
 		S32		samplesPerBuf;
 
@@ -1408,11 +1415,11 @@ S32 SdramModulWriteDMA( int idxDac )
 		// Ждать окончания вывода
 		//
 		msTimeout = 20000; 
-		err = BRD_ctrl( g_aDac[idxDac].handle, 0, BRDctrl_STREAM_CBUF_WAITBUF, &msTimeout) ;
+		err = tool_stop::wait_stream(g_aDac[idxDac].handle, BRDctrl_STREAM_CBUF_WAITBUF, msTimeout) ;
 		if(BRD_errcmp(err, BRDerr_WAIT_TIMEOUT))
 		{	
             BRDC_printf( _BRDC("TIME-OUT! \n"));
-			err = BRD_ctrl( g_aDac[idxDac].handle, 0, BRDctrl_STREAM_CBUF_STOP, NULL ); // Стоп ПДП
+			err = tool_stop::cleanup_control(g_aDac[idxDac].handle, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop"); // Стоп ПДП
 			return  -1;
 		}
         // if(IPC_kbhit())
@@ -1467,7 +1474,7 @@ S32 SdramOutToDAC(void)
 	for( ii=0; ii<g_nDacNum; ii++ )
 	{
 		nStatus = 0;
-		for(int jj = 0; jj < (1+g_nMsTimeout/50); jj++)
+		for(int jj = 0; jj < (1+g_nMsTimeout/50) && !tool_stop::requested(); jj++)
 		{
 			err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_SDRAM_ISACQCOMPLETE, &nStatus );
 			if( nStatus )
@@ -1483,7 +1490,7 @@ S32 SdramOutToDAC(void)
 		// Запретить чтение из SDRAM
 		//
 		isEnable = 0;
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_SDRAM_ENABLE, &isEnable );
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_SDRAM_ENABLE, &isEnable, "SDRAM-enable-control");
 	}
 
 	//
@@ -1494,7 +1501,7 @@ S32 SdramOutToDAC(void)
 		statusFIFO=0x4;
 
 		//while((statusFIFO & (1<<2))==(1<<2))
-		for(int jj = 0; jj < (1+g_nMsTimeout/50); jj++)
+		for(int jj = 0; jj < (1+g_nMsTimeout/50) && !tool_stop::requested(); jj++)
 		{
 			err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_FIFOSTATUS, &statusFIFO); 
 			if((statusFIFO & 0x4) != 0x4 )
@@ -1508,7 +1515,7 @@ S32 SdramOutToDAC(void)
 		// Стоп  ЦАП
 		//
 		isEnable = 0;
-		err = BRD_ctrl( g_aDac[ii].handle, 0, BRDctrl_DAC_ENABLE, &isEnable );
+		err = tool_stop::cleanup_control(g_aDac[ii].handle, BRDctrl_DAC_ENABLE, &isEnable, "DAC-enable-control");
 	}
 	return 1;
 }

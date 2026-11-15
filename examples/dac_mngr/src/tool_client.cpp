@@ -1,4 +1,5 @@
 #include "tool_client.hpp"
+#include "../../tool_stop.hpp"
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -89,9 +90,10 @@ bool ToolClient::send_json_line(const json& j)
     size_t left = s.size();
 
     while (left > 0) {
+        if (tool_stop::requested()) return false;
         ssize_t n = ::send(fd_, p, left, MSG_NOSIGNAL);
         if (n < 0) {
-            if (errno == EINTR)
+            if (errno == EINTR && !tool_stop::requested())
                 continue;
             return false;
         }
@@ -114,14 +116,14 @@ std::optional<json> ToolClient::recv_json_line(int timeoutMs)
         int pr;
         do {
             pr = ::poll(&pfd, 1, ms);
-        } while (pr < 0 && errno == EINTR);
+        } while (pr < 0 && errno == EINTR && !tool_stop::requested());
 
         if (pr <= 0)
             return false; // timeout or error
         return (pfd.revents & POLLIN) != 0;
     };
 
-    while (true) {
+    while (!tool_stop::requested()) {
         auto pos = readBuf_.find('\n');
         if (pos != std::string::npos) {
             std::string line = readBuf_.substr(0, pos);
@@ -143,7 +145,7 @@ std::optional<json> ToolClient::recv_json_line(int timeoutMs)
         ssize_t n;
         do {
             n = ::recv(fd_, tmp, sizeof(tmp), 0);
-        } while (n < 0 && errno == EINTR);
+        } while (n < 0 && errno == EINTR && !tool_stop::requested());
 
         if (n == 0) {
             // сервер закрыл соединение
@@ -166,6 +168,7 @@ std::optional<json> ToolClient::recv_json_line(int timeoutMs)
                 return std::nullopt;
         }
     }
+    return std::nullopt;
 }
 
 std::optional<ToolClient::Command> ToolClient::poll_command(int timeoutMs)

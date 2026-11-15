@@ -16,6 +16,7 @@
 #include	<chrono>
 
 #include "adc_ctrl.h"
+#include "../../tool_stop.hpp"
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
  #include	<string.h>
@@ -117,28 +118,17 @@ U32 mode = BRDcapt_EXCLUSIVE;
 S32 RegProg(BRD_Handle hAdc, int idx, int isx);
 int g_regdbg;
 
-#if defined(__IPC_LINUX__)
-static int g_StopFlag = 0;
-void stop_exam(int sig)
-{
-    fprintf(stderr, "\n");
-    fprintf(stderr, "SIGNAL = %d\n", sig);
-    g_StopFlag = 1;
-}
-#endif
 
 //=************************* main *************************
 //=********************************************************
 int BRDC_main( int argc, BRDCHAR *argv[] ) try
 {
     S32 status;
+    tool_stop::install("ADC");
 
     auto adc_start_time = std::chrono::high_resolution_clock::now();
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
     IPC_initKeyboard();
-#endif
-#if defined(__IPC_LINUX__)
-    signal(SIGINT, stop_exam);
 #endif
     // Parse Command Line
     ParseCommandLine(argc, argv);
@@ -165,7 +155,7 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
 // #else
 //         _getch();
 // #endif
-        return -1;
+        return tool_stop::finish(-1);
     }
 
     // получить список LID (каждая запись соответствует устройству)
@@ -349,7 +339,8 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
         // status = BRD_cleanup();
     }
     {
-        if (mode != BRDcapt_SPY)
+        tool_stop::begin("acquisition");
+        if (mode != BRDcapt_SPY && !tool_stop::requested())
 			if(BRD_errcmp(status, BRDerr_OK))
 			{
 				if(g_DirWriteFile)
@@ -368,15 +359,18 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
                 }
             }
     }
-    BRDC_printf(_BRDC("RELEASING!\n"));
+    tool_stop::end("acquisition");
+    tool_stop::begin("BRD_release");
     status = BRD_release(g_hSRV, 0);
+    tool_stop::end("BRD_release", status);
 
     //	for(ULONG iDev = 0; iDev < lidList.itemReal; iDev++)
     //	{
 		if(handle[iDev])
 		{
+        tool_stop::begin("BRD_close");
         status = BRD_close(handle[iDev]); // закрыть устройство
-        BRDC_printf(_BRDC("BRD_close: OK\n"));
+        tool_stop::end("BRD_close", status);
     }
     //	}
 
@@ -387,8 +381,14 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
     BRDC_printf(_BRDC("TIME=%lld \n"), duration);
     // std::cout << "DURATION IS -> " << duration << std::endl;
     // BRDC_printf(_BRDC(" DURATION IS %ldd \n"), duration);
+    tool_stop::begin("BRD_cleanup");
     status = BRD_cleanup();
-    BRDC_printf(_BRDC("BRD_cleanup: OK\n"));
+    tool_stop::end("BRD_cleanup", status);
+#if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
+    tool_stop::begin("keyboard-cleanup");
+    IPC_cleanupKeyboard();
+    tool_stop::end("keyboard-cleanup");
+#endif
 // 	if (!g_quick_quit)
 // 	{
 //         BRDC_printf(_BRDC("Press any key for leaving program...\n"));
@@ -403,19 +403,30 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
 //     } else {
 //         IPC_cleanupKeyboard();
 //     }
-    return 0;
+    return tool_stop::finish(0);
 
 } catch (const std::exception& e) {
     printf("\n!!! ERROR !!! %s ...\n\n", e.what());
 
-    BRD_cleanup();
+    tool_stop::begin("exception-cleanup");
+    if (tool_stop::requested() && g_hSRV > 0) {
+        tool_stop::begin("BRD_release");
+        const S32 releaseStatus = BRD_release(g_hSRV, 0);
+        tool_stop::end("BRD_release", releaseStatus);
+    }
+    tool_stop::begin("BRD_cleanup");
+    const S32 cleanupStatus = BRD_cleanup();
+    tool_stop::end("BRD_cleanup", cleanupStatus);
+#if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
+    IPC_cleanupKeyboard();
+#endif
     // if (g_quick_quit == 0) {
     //     BRDC_printf(_BRDC("Press any key for leaving program...\n"));
     //     IPC_getch();
     // }
     // IPC_cleanupKeyboard();
 
-    return -1;
+    return tool_stop::finish(-1);
 }
 
 // разобрать командную строку
@@ -668,6 +679,7 @@ S32 SetParamSrv(BRD_Handle handle, BRD_ServList* srv, int idx)
             SetSwitch(handle);
         // g_hSRV[g_nSrv++] = hADC;
         g_hSRV = hADC;
+        if (tool_stop::requested()) return BRDerr_OK;
 
         // int numChan = AdcSettings(hADC, 0, g_SrvName, g_iniFileName); // установить параметры АЦП
         // g_numChan = AdcSettings(hADC, (g_lid != -1) ? g_lid : 0, g_AdcSrvNum, g_SrvName, g_iniFileName); // установить параметры АЦП
@@ -807,6 +819,7 @@ S32 GetPostrigData(BRD_Handle hADC)
 S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long bMemBufSize)
 {
     S32 status;
+    if (tool_stop::requested()) return BRDerr_OK;
     int idx = 0;
 
     status = BRD_ctrl(hADC, 0, BRDctrl_ADC_PREPARESTART, NULL);
@@ -901,7 +914,7 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
             }
         }
 
-			if(g_IsWriteFile || g_fileMap)
+				if((g_IsWriteFile || g_fileMap) && !tool_stop::requested())
 			{
             int rd_fl = ReadFlagSinc(0);
             if (rd_fl == 1)
@@ -921,7 +934,7 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
         //_getch();
         int loop = 0;
         // int newParam_fl = 0xffffffff;
-		do
+        while (!tool_stop::requested())
 		{
             // printf("Send Loop: [0x%08lX]\r", loop );
             // BRDC_printf(_BRDC("Send Loop: [%08d]\r"), loop );
@@ -1001,7 +1014,7 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
             // }
             if (loop == -1)
                 break;
-			if(g_IsWriteFile || g_fileMap)
+				if((g_IsWriteFile || g_fileMap) && !tool_stop::requested())
 			{
                 int rd_fl = ReadFlagSinc(0);
                 // BRDC_printf(_BRDC("rd_fl = %d\n"), rd_fl);
@@ -1040,7 +1053,7 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
 //                         }
 //                     }
 #if defined(__IPC_LINUX__)
-                    if ((rd_fl == 0) || g_StopFlag)
+                    if ((rd_fl == 0) || tool_stop::requested())
 #else
                     if (rd_fl == 0)
 #endif
@@ -1073,10 +1086,10 @@ S32 GetAdcData(BRD_Handle hADC, unsigned long long bBufSize, unsigned long long 
             if (g_Cycle > 1 && (ULONG)loop == g_Cycle)
                 break;
 #if defined(__IPC_LINUX__)
-            if (g_StopFlag)
+            if (tool_stop::requested())
                 break;
 #endif
-        } while (loop);
+        }
     }
     if (g_DmaOn)
         status = FreeDaqBuf(hADC, g_bBlkNum);
@@ -1095,7 +1108,7 @@ S32 DataFromMemWriteFile(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBufSi
 #endif
 
     S32 status = BRDerr_OK;
-    if (!g_IsWriteFile)
+    if (!g_IsWriteFile || tool_stop::requested())
         return 1;
     if (!g_Cycle)
         BRDC_printf(_BRDC("Writing file...\n"));
@@ -1118,18 +1131,21 @@ S32 DataFromMemWriteFile(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBufSi
     int bResult = TRUE;
 
     int nCnt = int(bMemBufSize / bBufSize);
-	for(int iCnt = 0; iCnt < nCnt; iCnt++)
+	for(int iCnt = 0; iCnt < nCnt && !tool_stop::requested(); iCnt++)
 	{
         status = DataFromMem(hADC, *pBuf, (ULONG)bBufSize, DmaOn);
-        if (!BRD_errcmp(status, BRDerr_OK))
+        if (tool_stop::requested() || !BRD_errcmp(status, BRDerr_OK)) {
+            IPC_closeFile(hfile);
             return status;
+        }
         bResult = IPC_writeFile(hfile, *pBuf, (ULONG)bBufSize);
     }
     ULONG ostSize = ULONG(bMemBufSize % bBufSize);
-	if(ostSize)
+	if(ostSize && !tool_stop::requested())
 	{
         status = DataFromMem(hADC, *pBuf, (ULONG)bBufSize, DmaOn);
-        bResult = IPC_writeFile(hfile, *pBuf, ostSize);
+        if (!tool_stop::requested() && BRD_errcmp(status, BRDerr_OK))
+            bResult = IPC_writeFile(hfile, *pBuf, ostSize);
     }
 
     if (g_IsWriteFile == 1)
@@ -1147,6 +1163,7 @@ S32 DataFromMemWriteFile(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBufSi
 void WriteDataFile(BRD_Handle hADC, int idx, PVOID* pBuf, unsigned long long nNumberOfBytes)
 {
     S32 status = BRDerr_OK;
+    if (tool_stop::requested()) return;
 
 #ifdef __linux__
 	if(g_fileMap)
@@ -1156,7 +1173,7 @@ void WriteDataFile(BRD_Handle hADC, int idx, PVOID* pBuf, unsigned long long nNu
     }
 #endif
 
-    if (!g_IsWriteFile)
+    if (!g_IsWriteFile || tool_stop::requested())
         return;
     if (!g_Cycle)
         BRDC_printf(_BRDC("Writing file...\n"));
@@ -1498,16 +1515,18 @@ void WriteFlagSinc(int flg, int isNewParam, int idx)
         int val[2];
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
         IPC_handle handle = NULL;
-        while (!handle)
+        while (!handle && !tool_stop::requested())
             handle = IPC_openFile(fileName, IPC_CREATE_FILE | IPC_FILE_WRONLY);
+        if (!handle) return;
         val[0] = flg;
         val[1] = isNewParam;
         IPC_writeFile(handle, val, 8);
         IPC_closeFile(handle);
 #else
         int fs = -1;
-        while (fs == -1)
+        while (fs == -1 && !tool_stop::requested())
             fs = BRDC_sopen(fileName, _O_WRONLY | _O_BINARY | _O_CREAT | _O_TRUNC, _SH_DENYNO, _S_IWRITE);
+        if (fs == -1) return;
         //    errno_t err = _sopen_s( &fs, fileName, _O_WRONLY|_O_BINARY|_O_CREAT, _SH_DENYNO, S_IWRITE );
         val[0] = flg;
         val[1] = isNewParam;
@@ -1529,14 +1548,16 @@ int ReadFlagSinc(int idx)
         BRDC_sprintf(fileName, _BRDC("data_%d.flg"), idx);
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
         IPC_handle handle = NULL;
-        while (!handle)
+        while (!handle && !tool_stop::requested())
             handle = IPC_openFile(fileName, IPC_OPEN_FILE | IPC_FILE_RDONLY);
+        if (!handle) return -1;
         IPC_readFile(handle, &flg, 4);
         IPC_closeFile(handle);
 #else
         int fs = -1;
-        while (fs == -1)
+        while (fs == -1 && !tool_stop::requested())
             fs = BRDC_sopen(fileName, _O_RDONLY | _O_BINARY, _SH_DENYNO, _S_IREAD);
+        if (fs == -1) return -1;
         //    errno_t err = _sopen_s( &fs, fileName, _O_RDONLY|_O_BINARY|_O_CREAT, _SH_DENYNO, S_IREAD );
         _read(fs, &flg, 4);
         _close(fs);

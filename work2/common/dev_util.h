@@ -14,17 +14,26 @@
 #include "utypes_linux.h"
 #endif
 
+enum class RegisterType {
+    Direct,
+    Indirect,
+    Indirect2
+};
+
 typedef struct commandLineParams_ {
     BRD_Handle hService;
     bool write;
     S32 tetrad;
     S32 reg;
     U32 value;
-    bool indirect;
+    RegisterType regType = RegisterType::Indirect;
 } commandLineParams;
 
 S32 regWriteIndir(BRD_Handle hSrv, S32 trdNo, S32 rgnum, U32 val);
 U32 regReadIndir(BRD_Handle hSrv, S32 trdNo, S32 rgnum, S32& status);
+// Косвенный доступ второго уровня через USER_ADDR / USER_DATA.
+S32 regWriteIndir2(BRD_Handle hSrv, S32 trdNo, S32 rgnum, U32 val);
+U32 regReadIndir2(BRD_Handle hSrv, S32 trdNo, S32 rgnum, S32& status);
 S32 regWriteDir(BRD_Handle hSrv, S32 trdNo, S32 rgnum, U32 val);
 U32 regReadDir(BRD_Handle hSrv, S32 trdNo, S32 rgnum, S32& status);
 // SPD

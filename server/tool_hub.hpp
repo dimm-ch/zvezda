@@ -33,7 +33,7 @@ public:
         StopResult stop;
         std::string error;
     };
-    static constexpr int StopTimeoutMs = 5000;
+    static constexpr int StopTimeoutMs = 15000;
     static constexpr int KillTimeoutMs = 2000;
 
     bool start_tool(const std::string& toolName, const std::string& exePath, const std::string& arg, const std::string& workingDir = std::string(), int startupTimeoutMs = -1, std::string* error = nullptr);

@@ -1,5 +1,6 @@
 
 #include	"adc_ctrl.h"
+#include "../../tool_stream_wait.hpp"
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
  #include	"gipcy.h"
@@ -100,7 +101,7 @@ S32 DaqIntoSdram(BRD_Handle hADC)
 	do {
 //		status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_FIFOSTATUS, &Status);
 		status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ISACQCOMPLETE, &Status);
-	} while(!Status);
+	} while(!Status && !tool_stop::requested());
 //	} while(Status & 0x10);
 
 	Enable = 0;
@@ -325,7 +326,7 @@ S32 DaqIntoSdramDMA(BRD_Handle hADC)
 	ULONG cntTimeout = g_MsTimeout / 50;
 	evt_status = BRDerr_WAIT_TIMEOUT;
 	// дожидаемся окончания сбора
-	for(ULONG i = 0; i < cntTimeout; i++)
+	for(ULONG i = 0; i < cntTimeout && !tool_stop::requested(); i++)
 	{
 		//status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_FIFOSTATUS, &Status);
 		status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ISACQCOMPLETE, &Status);
@@ -339,7 +340,7 @@ S32 DaqIntoSdramDMA(BRD_Handle hADC)
 		Sleep(50);
 #endif
 	}
-	if (BRD_errcmp(evt_status, BRDerr_WAIT_TIMEOUT))
+	if (BRD_errcmp(evt_status, BRDerr_WAIT_TIMEOUT) && !tool_stop::requested())
 	{
 		ULONG AdcStatus = 0;
 		ULONG SdramStatus = 0;
@@ -390,6 +391,7 @@ S32 DaqIntoSdramDMA(BRD_Handle hADC)
 S32 DataFromMem(BRD_Handle hADC, PVOID pBuf, ULONG bBufSize, ULONG DmaOn)
 {
 	S32		status;
+	if (tool_stop::requested()) return BRDerr_OK;
 	if(DmaOn)
 	{
 		BRDctrl_StreamCBufStart start_pars;
@@ -400,7 +402,7 @@ S32 DataFromMem(BRD_Handle hADC, PVOID pBuf, ULONG bBufSize, ULONG DmaOn)
 		else
 		{
 			ULONG msTimeout = 5000; // ждать окончания передачи данных до 5 сек.
-			status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_WAITBUF, &msTimeout);
+			status = tool_stop::wait_stream(hADC, BRDctrl_STREAM_CBUF_WAITBUF, msTimeout);
 			if(BRD_errcmp(status, BRDerr_WAIT_TIMEOUT))
 			{	// если вышли по тайм-ауту, то остановимся
 				status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_STOP, NULL);

@@ -33,4 +33,5 @@ else()
     set(PROJECT_SOURCES ${PROJECT_SOURCES} ${BARDY_ROOT}/brdlib/reg_rw_spd.cpp)
 endif()
 
+include(log-level)
 include(executable)

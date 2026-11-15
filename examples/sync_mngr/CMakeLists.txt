@@ -27,4 +27,5 @@ find_package(Boost REQUIRED COMPONENTS program_options)
 set(PROJECT_INCLUDE_DIRS ${PROJECT_INCLUDE_DIRS} ${Boost_INCLUDE_DIR})
 set(PROJECT_LINK_LIBRARIES ${PROJECT_LINK_LIBRARIES} ${Boost_LIBRARIES})
 
+include(log-level)
 include(executable)

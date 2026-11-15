@@ -1,5 +1,6 @@
 
 #include	"adc_ctrl.h"
+#include "../../tool_stream_wait.hpp"
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
  #include	<string.h>
@@ -151,7 +152,7 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
 	if(g_MemAsFifo)
 	{
 		status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_FIFORESET, NULL); // сборс FIFO SDRAM
-		status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_ENABLE, &Enable); // разрешение записи в SDRAM
+		status = tool_stop::cleanup_control(hSrv, BRDctrl_SDRAM_ENABLE, &Enable, "SDRAM-enable-control"); // разрешение записи в SDRAM
 	}
 
 	BRDctrl_StreamCBufStart start_pars;
@@ -164,20 +165,21 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
 	int bHighRes = QueryPerformanceFrequency (&Frequency);
 	QueryPerformanceCounter (&StartPerformCount);
 #endif
-	status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_ENABLE, &Enable); // разрешение работы АЦП
+	status = tool_stop::cleanup_control(hSrv, BRDctrl_ADC_ENABLE, &Enable, "ADC-enable-control"); // разрешение работы АЦП
 
 	//int errCnt = 0;
 	//BRDC_printf(_BRDC("Data writing into file %s...\n"), fileName);
 	int cnt = 0;
 	ULONG msTimeout = 40000; // ждать окончания передачи данных до 40 сек.
-	do
+	while (!tool_stop::requested() && !g_flbreak)
 	{
-		status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout);
+		status = tool_stop::wait_stream(hSrv, BRDctrl_STREAM_CBUF_WAITBLOCK, msTimeout);
+        if (tool_stop::requested()) break;
 		if(BRD_errcmp(status, BRDerr_WAIT_TIMEOUT))
 		{	// если вышли по тайм-ауту, то остановимся
 			status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_FIFOSTATUS, &Status);
 			BRDC_printf(_BRDC("ADC FIFO Status = 0x%04X\n"), Status);
-			status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_STOP, NULL);
+			status = tool_stop::cleanup_control(hSrv, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
 			DisplayError(status, __FUNCTION__, _BRDC("TIME-OUT"));
 			break;
 		}
@@ -222,12 +224,12 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
 		if(Status & 0x80)
 			BRDC_printf(_BRDC("\nERROR (%s): ADC FIFO is overflow (ADC FIFO Status = 0x%04X)\n"), nameBufMap, Status);
 
-	}while(!g_flbreak);
+	}
 
 	Enable = 0;
-	status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_ENABLE, &Enable); // запрет работы АЦП
+	status = tool_stop::cleanup_control(hSrv, BRDctrl_ADC_ENABLE, &Enable, "ADC-enable-control"); // запрет работы АЦП
 	if(g_MemAsFifo)
-		status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_ENABLE, &Enable); // запрет записи в SDRAM
+		status = tool_stop::cleanup_control(hSrv, BRDctrl_SDRAM_ENABLE, &Enable, "SDRAM-enable-control"); // запрет записи в SDRAM
 //	printf("                                             \r");
 //	if(errCnt)
 //		BRDC_printf(_BRDC("ERROR (%s): buffers skiped %d\n"), fileName, errCnt);
@@ -262,7 +264,8 @@ unsigned __stdcall ContDaqFileMapping(void* pParams)
 	CloseHandle(g_hBufFileMap);
 #endif
 
-	status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_FREE, &buf_dscr);
+	status = tool_stop::cleanup_control(hSrv, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
+	status = tool_stop::cleanup_control(hSrv, BRDctrl_STREAM_CBUF_FREE, &buf_dscr, "DMA-buffer-free");
 	delete[] buf_dscr.ppBlk;
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)

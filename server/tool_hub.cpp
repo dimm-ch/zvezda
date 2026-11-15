@@ -2,6 +2,7 @@
 #define _GNU_SOURCE
 #endif
 #include "tool_hub.hpp"
+#include "../log_level.hpp"
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -168,9 +169,20 @@ ToolHub::StopResult ToolHub::stop_tool(const std::string& toolName, int stopTime
         result.error = "Unknown tool; no process was started by this server";
         return result;
     }
+#if LOG_LEVEL >= 1
+    const pid_t pid = it->second.pid;
+    const auto started = HubClock::now();
+    fprintf(stderr, "[ToolHub] stop begin tool=%s pid=%ld grace_ms=%d kill_wait_ms=%d\n",
+        toolName.c_str(), static_cast<long>(pid), stopTimeoutMs, killTimeoutMs);
+#endif
     auto result = stop_process(it->second, stopTimeoutMs, killTimeoutMs);
-    printf("[ToolHub] stop %s: success=%d forced=%d already_stopped=%d\n",
-        toolName.c_str(), result.success, result.forced, result.alreadyStopped);
+#if LOG_LEVEL >= 1
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(HubClock::now() - started).count();
+    fprintf(stderr, "[ToolHub] stop end tool=%s pid=%ld elapsed_ms=%lld success=%d forced=%d already_stopped=%d exit_code=%d term_signal=%d\n",
+        toolName.c_str(), static_cast<long>(pid), static_cast<long long>(elapsed),
+        result.success, result.forced, result.alreadyStopped,
+        result.exitCode.value_or(-1), result.termSignal.value_or(0));
+#endif
     if (!result.success)
         fprintf(stderr, "[ToolHub] stop %s: %s\n", toolName.c_str(), result.error.c_str());
     return result;
@@ -298,12 +310,21 @@ ToolHub::StopResult ToolHub::stop_process(Conn& c, int stopTimeoutMs, int killTi
     }
 
     c.stopping = true;
+#if LOG_LEVEL >= 1
+    const auto stopStarted = HubClock::now();
+    fprintf(stderr, "[ToolHub] sending SIGTERM pid=%ld grace_ms=%d\n", static_cast<long>(c.pid), stopTimeoutMs);
+#endif
     if (::kill(c.pid, SIGTERM) < 0 && errno != ESRCH) {
         result.error = std::string("SIGTERM failed: ") + strerror(errno);
         return result;
     }
     state = wait_process(c, stopTimeoutMs);
     if (state == ProcessState::Timeout) {
+#if LOG_LEVEL >= 1
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(HubClock::now() - stopStarted).count();
+        fprintf(stderr, "[ToolHub] grace expired pid=%ld elapsed_ms=%lld; sending SIGKILL\n",
+            static_cast<long>(c.pid), static_cast<long long>(elapsed));
+#endif
         if (::kill(c.pid, SIGKILL) == 0)
             result.forced = true;
         else if (errno != ESRCH) {

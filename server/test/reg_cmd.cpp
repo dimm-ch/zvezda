@@ -163,7 +163,7 @@ bool FastRegsAccess::parsingLine(std::string& line, commandLineParams& params) {
     params.tetrad = trd;
     params.reg = reg;
     params.value = val;
-    params.indirect = indirect;
+    params.regType = indirect ? RegisterType::Indirect : RegisterType::Direct;
 
     return true;
 }

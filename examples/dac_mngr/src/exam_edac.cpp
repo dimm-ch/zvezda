@@ -17,6 +17,7 @@
 #include	"gipcy.h"
 
 #include "tool_client.hpp"
+#include "../../tool_stop.hpp"
 
 //
 // Globals
@@ -68,6 +69,7 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
 	S32			status;
 	S32			devNum;
 
+	tool_stop::install("DAC");
 	IPC_initKeyboard();
 
 	ParseCommandLine( argc, argv );
@@ -81,88 +83,113 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
 		// BRDC_printf( _BRDC("Press any key for leaving program...\n"));
 
 		// IPC_getch();
-		// IPC_cleanupKeyboard();
-		return -1;
+		tool_stop::begin("BRD_cleanup");
+		status = BRD_cleanup();
+		tool_stop::end("BRD_cleanup", status);
+		IPC_cleanupKeyboard();
+		return tool_stop::finish(-1);
 	}
 
 	if( 0 > ReadIniFileOption() )
 	{
 		// IPC_getch();
-		// IPC_cleanupKeyboard();
-		return -1;
+		tool_stop::begin("BRD_cleanup");
+		status = BRD_cleanup();
+		tool_stop::end("BRD_cleanup", status);
+		IPC_cleanupKeyboard();
+		return tool_stop::finish(-1);
 	}
 
-	CaptureAllDac();
+	if (!tool_stop::requested()) CaptureAllDac();
 	
-	auto& cli = ToolClient::inst();
-    if (!cli.connect_and_hello("/tmp/toolhub.sock", "dac" + std::to_string(g_lid)))
-		printf("[DAC] ToolClient::connect_and_hello(): Server conect error!\n");
-	else
-		printf("[DAC] ToolClient::connect_and_hello(): Server conect success!\n");
+	if (!tool_stop::requested()) {
+		auto& cli = ToolClient::inst();
+	    if (!cli.connect_and_hello("/tmp/toolhub.sock", "dac" + std::to_string(g_lid)))
+			printf("[DAC] ToolClient::connect_and_hello(): Server conect error!\n");
+		else
+			printf("[DAC] ToolClient::connect_and_hello(): Server conect success!\n");
 
-	auto cmdOpt = cli.poll_command(10000);
-	if (cmdOpt) {
-		const auto& cmd = *cmdOpt;
-		printf("[DAC] ToolClient::poll_command(): cmd %s\n", cmd.cmd.c_str());
-		bool ok;
+		auto cmdOpt = cli.poll_command(10000);
+		if (cmdOpt) {
+			const auto& cmd = *cmdOpt;
+			printf("[DAC] ToolClient::poll_command(): cmd %s\n", cmd.cmd.c_str());
+			bool ok;
 
-		if (cmd.cmd == "ping") {
-			ok = cli.send_ok(cmd.id, "ping " + cli.toolName_);
+			if (cmd.cmd == "ping") {
+				ok = cli.send_ok(cmd.id, "ping " + cli.toolName_);
+			}
+			else {
+				ok = cli.send_error(cmd.id, "unknown cmd");
+			}
+
+			if (ok)
+				printf("[DAC] ToolClient::send(): success\n");
+			else
+				printf("[DAC] ToolClient::send(): error\n");
 		}
 		else {
-			ok = cli.send_error(cmd.id, "unknown cmd");
+			printf("[DAC] ToolClient::poll_command(): error\n");
 		}
-
-		if (ok)
-			printf("[DAC] ToolClient::send(): success\n");
-		else
-			printf("[DAC] ToolClient::send(): error\n");
-	}
-	else {
-		printf("[DAC] ToolClient::poll_command(): error\n");
 	}
 
 
-	if(g_nDacNum>0)
+	if(g_nDacNum>0 && !tool_stop::requested())
 	{
 		ReadIniFileDevice();
-		SetAllDac();
-		SetMasterSlave();
+		if (!tool_stop::requested()) SetAllDac();
+		if (!tool_stop::requested()) SetMasterSlave();
 
-		WorkMode();
+		if (!tool_stop::requested()) {
+			tool_stop::begin("WorkMode");
+			const S32 workStatus = WorkMode();
+			tool_stop::end("WorkMode", workStatus);
+		}
 		//if( g_nIsNew )
 		//	WorkMode();
 		//else
 		//	WorkSrv();
 	}
-	else
+	else if (g_nDacNum == 0)
 	{
         BRDC_printf( _BRDC("\n   No Service!\n"));
 	}
-	ReleaseAllDac();
+	if (tool_stop::requested()) tool_stop::log("cleanup-requested", "release-resources", false, 0, 1);
+	tool_stop::begin("ReleaseAllDac");
+	status = ReleaseAllDac();
+	tool_stop::end("ReleaseAllDac", status);
 
-    BRDC_printf( _BRDC("BRD_close: OK\n"));
+	tool_stop::begin("BRD_cleanup");
 	status = BRD_cleanup();
-    BRDC_printf( _BRDC("BRD_cleanup: OK\n"));
+	tool_stop::end("BRD_cleanup", status);
     // BRDC_printf( _BRDC("Press any key for leaving program...\n"));
 
 	// if( g_nQuickQuit == 0 )
 	// 	IPC_getch();
-	// IPC_cleanupKeyboard();
+	tool_stop::begin("keyboard-cleanup");
+	IPC_cleanupKeyboard();
+	tool_stop::end("keyboard-cleanup");
 
-	return 0;
+	return tool_stop::finish(0);
 
 } catch(const std::exception &e) {
     printf("\n!!! ERROR !!! %s ...\n\n", e.what());
 
-	BRD_cleanup();
+	tool_stop::begin("exception-cleanup");
+	if (tool_stop::requested()) {
+		tool_stop::begin("ReleaseAllDac");
+		const S32 releaseStatus = ReleaseAllDac();
+		tool_stop::end("ReleaseAllDac", releaseStatus);
+	}
+	tool_stop::begin("BRD_cleanup");
+	const S32 cleanupStatus = BRD_cleanup();
+	tool_stop::end("BRD_cleanup", cleanupStatus);
 	// if( g_nQuickQuit == 0 ) {
 	//     BRDC_printf( _BRDC("Press any key for leaving program...\n"));
 	// 	IPC_getch();
 	// }
-	// IPC_cleanupKeyboard();
+	IPC_cleanupKeyboard();
 
-	return -1;
+	return tool_stop::finish(-1);
 }
 
 //=******************** ParseCommandLine ******************
@@ -318,6 +345,7 @@ S32 CaptureAllDac( void )
 
 		for( iSrv = 0; iSrv < nItemReal; iSrv++ )
 		{
+			if (tool_stop::requested()) break;
 			if( BRDC_strnicmp(  srvList[iSrv].name, g_sServiceName, len) )
 				continue;
 			if( (srvList[iSrv].name[len] < '0') ||
@@ -356,10 +384,24 @@ S32 ReleaseAllDac( void )
 	S32			ii;
 
 	for( ii = 0; ii < g_nDacNum; ii++ )
+	{
+		if (tool_stop::requested()) {
+			ULONG disabled = 0;
+			tool_stop::begin("DAC-disable");
+			err = BRD_ctrl(g_aDac[ii].handle, 0, BRDctrl_DAC_ENABLE, &disabled);
+			tool_stop::end("DAC-disable", err);
+		}
+		tool_stop::begin("BRD_release");
 		err = BRD_release( g_aDac[ii].handle, 0 );
+		tool_stop::end("BRD_release", err);
+	}
 
 	for( ii = 0; ii < g_nDevNum; ii++ )
+	{
+		tool_stop::begin("BRD_close");
 		err = BRD_close( g_hDev[ii] );
+		tool_stop::end("BRD_close", err);
+	}
 
 	return 0;
 }

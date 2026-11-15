@@ -1,5 +1,6 @@
 
 #include	"adc_ctrl.h"
+#include "../../tool_stream_wait.hpp"
 #include	"mu_ctrl.h"
 #include    <chrono>
 
@@ -744,9 +745,9 @@ S32 DaqIntoFifo(BRD_Handle hADC, PVOID pSig, ULONG bBufSize, int DspMode)
 	if(g_MemAsFifo)
 	{
 		status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_FIFORESET, NULL); // сборс FIFO SDRAM
-		status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ENABLE, &Enable); // разрешение записи в SDRAM
+		status = tool_stop::cleanup_control(hADC, BRDctrl_SDRAM_ENABLE, &Enable, "SDRAM-enable-control"); // разрешение записи в SDRAM
 	}
-	status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &Enable); // разрешение работы АЦП
+	status = tool_stop::cleanup_control(hADC, BRDctrl_ADC_ENABLE, &Enable, "ADC-enable-control"); // разрешение работы АЦП
 
 	// дожидаемся заполнения FIFO
 	do {
@@ -757,14 +758,15 @@ S32 DaqIntoFifo(BRD_Handle hADC, PVOID pSig, ULONG bBufSize, int DspMode)
 				status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_FIFOSTATUS, &Status);
 			else
 				status = BRD_ctrl(hADC, 0, BRDctrl_ADC_FIFOSTATUS, &Status);
-	} while(Status & 0x40);
+	} while((Status & 0x40) && !tool_stop::requested());
 
 	Enable = 0;
-	status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &Enable); // запрет работы АЦП
+	status = tool_stop::cleanup_control(hADC, BRDctrl_ADC_ENABLE, &Enable, "ADC-enable-control"); // запрет работы АЦП
 
 	if(g_MemAsFifo)
-		status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ENABLE, &Enable); // запрет записи в SDRAM
+		status = tool_stop::cleanup_control(hADC, BRDctrl_SDRAM_ENABLE, &Enable, "SDRAM-enable-control"); // запрет записи в SDRAM
 
+	if (tool_stop::requested()) return BRDerr_OK;
 	BRD_DataBuf data_buf;
 	data_buf.pData = pSig;
 	data_buf.size = bBufSize;
@@ -811,7 +813,7 @@ S32 DaqIntoFifoDMA(BRD_Handle hADC)
 	if(g_MemAsFifo)
 	{
 		status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_FIFORESET, NULL); // сброс FIFO SDRAM
-		status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ENABLE, &Enable); // разрешение записи в SDRAM
+		status = tool_stop::cleanup_control(hADC, BRDctrl_SDRAM_ENABLE, &Enable, "SDRAM-enable-control"); // разрешение записи в SDRAM
 	}
 	status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_RESETFIFO, NULL);
 
@@ -831,7 +833,7 @@ S32 DaqIntoFifoDMA(BRD_Handle hADC)
 	struct timeval dt;
 	gettimeofday(&start, 0);
 #endif
-	status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &Enable); // разрешение работы АЦП
+	status = tool_stop::cleanup_control(hADC, BRDctrl_ADC_ENABLE, &Enable, "ADC-enable-control"); // разрешение работы АЦП
 
 	ULONG msTimeout = g_MsTimeout; // ждать окончания сбора данных до g_MsTimeout мсек.
 	//ULONG msTimeout = 20000; // ждать окончания передачи данных до 20 сек.
@@ -858,15 +860,22 @@ S32 DaqIntoFifoDMA(BRD_Handle hADC)
 	//	}
 	//}
 
-	status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_WAITBUF, &msTimeout);
+	status = tool_stop::wait_stream(hADC, BRDctrl_STREAM_CBUF_WAITBUF, msTimeout);
 #ifdef _WIN32
 	QueryPerformanceCounter (&StopPerformCount);
 #else
     gettimeofday(&stop, 0);
 #endif
+    if (tool_stop::requested()) {
+        Enable = 0;
+        tool_stop::cleanup_control(hADC, BRDctrl_ADC_ENABLE, &Enable, "ADC-disable");
+        if (g_MemAsFifo) tool_stop::cleanup_control(hADC, BRDctrl_SDRAM_ENABLE, &Enable, "SDRAM-disable");
+        tool_stop::cleanup_control(hADC, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
+        return BRDerr_OK;
+    }
 	if(BRD_errcmp(status, BRDerr_WAIT_TIMEOUT))
 	{	// если вышли по тайм-ауту, то остановимся
-		status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_STOP, NULL);
+		status = tool_stop::cleanup_control(hADC, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
 		//DisplayError(status, __FUNCTION__, _BRDC("TIME-OUT"));
 		ULONG AdcStatus = 0;
 		ULONG Status = 0;
@@ -910,10 +919,10 @@ S32 DaqIntoFifoDMA(BRD_Handle hADC)
 	QueryPerformanceCounter (&StopPerformCount);
 */
 	Enable = 0;
-	status = BRD_ctrl(hADC, 0, BRDctrl_ADC_ENABLE, &Enable); // запрет работы АЦП
+	status = tool_stop::cleanup_control(hADC, BRDctrl_ADC_ENABLE, &Enable, "ADC-enable-control"); // запрет работы АЦП
 
 	if(g_MemAsFifo)
-		status = BRD_ctrl(hADC, 0, BRDctrl_SDRAM_ENABLE, &Enable); // запрет записи в SDRAM
+		status = tool_stop::cleanup_control(hADC, BRDctrl_SDRAM_ENABLE, &Enable, "SDRAM-enable-control"); // запрет записи в SDRAM
 
 #ifdef _WIN32
 	double msTime = (double)(StopPerformCount.QuadPart - StartPerformCount.QuadPart) / (double)Frequency.QuadPart * 1.E3;
@@ -1089,7 +1098,9 @@ S32 AllocDaqBuf(BRD_Handle hADC, PVOID* &pSig, unsigned long long* pbytesBufSize
 S32 FreeDaqBuf(BRD_Handle hADC, ULONG blkNum)
 {
 	S32		status;
-	status = BRD_ctrl(hADC, 0, BRDctrl_STREAM_CBUF_FREE, NULL);
+	tool_stop::begin("FreeDaqBuf");
+	if (tool_stop::requested()) tool_stop::cleanup_control(hADC, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
+	status = tool_stop::cleanup_control(hADC, BRDctrl_STREAM_CBUF_FREE, NULL, "DMA-buffer-free");
 	if(!BRD_errcmp(status, BRDerr_OK))
 		DisplayError(status, __FUNCTION__, _BRDC("BRDctrl_STREAM_CBUF_FREE"));
 	if(g_buf_dscr.isCont == 2)
@@ -1127,6 +1138,7 @@ S32 FreeDaqBuf(BRD_Handle hADC, ULONG blkNum)
 	}
 	delete[] g_buf_dscr.ppBlk;
 	//delete pSig;
+	tool_stop::end("FreeDaqBuf", status);
 	return status;
 }
 
@@ -1217,19 +1229,20 @@ S32	MapDataFromMemWriteData(BRD_Handle hADC, PVOID* pBuf, unsigned long long bBu
 //    }
 
     int nCnt = int(bMemBufSize / bBufSize);
-    for(int iCnt = 0; iCnt < nCnt; iCnt++)
+    for(int iCnt = 0; iCnt < nCnt && !tool_stop::requested(); iCnt++)
     {
         status = DataFromMem(hADC, *pBuf, (ULONG)bBufSize, DmaOn);
-        if (!BRD_errcmp(status, BRDerr_OK))
+        if (tool_stop::requested() || !BRD_errcmp(status, BRDerr_OK))
             return status;
         memcpy((void*)pDst, *pBuf, (ULONG)bBufSize);
         pDst += bBufSize;
     }
     ULONG ostSize = ULONG(bMemBufSize % bBufSize);
-    if(ostSize)
+    if(ostSize && !tool_stop::requested())
     {
         status = DataFromMem(hADC, *pBuf, (ULONG)bBufSize, DmaOn);
-        memcpy((void*)pDst, *pBuf, ostSize);
+        if (!tool_stop::requested() && BRD_errcmp(status, BRDerr_OK))
+            memcpy((void*)pDst, *pBuf, ostSize);
     }
 
     return status;
@@ -1390,13 +1403,13 @@ unsigned __stdcall DirWriteIntoFile(void* pParams)
 	if(g_MemAsFifo)
 	{
 		status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_FIFORESET, NULL); // сборс FIFO SDRAM
-		status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_ENABLE, &Enable); // разрешение записи в SDRAM
+		status = tool_stop::cleanup_control(hSrv, BRDctrl_SDRAM_ENABLE, &Enable, "SDRAM-enable-control"); // разрешение записи в SDRAM
 	}
 
 	BRDctrl_StreamCBufStart start_pars;
 	start_pars.isCycle = 1; // с зацикливанием
 	status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_START, &start_pars); // старт ПДП
-	status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_ENABLE, &Enable); // разрешение работы АЦП
+	status = tool_stop::cleanup_control(hSrv, BRDctrl_ADC_ENABLE, &Enable, "ADC-enable-control"); // разрешение работы АЦП
 
 	int errCnt = 0;
 	BRDC_printf(_BRDC("Data writing into file %s...\n"), fileName);
@@ -1406,9 +1419,9 @@ unsigned __stdcall DirWriteIntoFile(void* pParams)
 		errCnt = MultiBlkProcWrDir(hSrv, hfile, idx, &buf_dscr);
 
 	Enable = 0;
-	status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_ENABLE, &Enable); // запрет работы АЦП
+	status = tool_stop::cleanup_control(hSrv, BRDctrl_ADC_ENABLE, &Enable, "ADC-enable-control"); // запрет работы АЦП
 	if(g_MemAsFifo)
-		status = BRD_ctrl(hSrv, 0, BRDctrl_SDRAM_ENABLE, &Enable); // запрет записи в SDRAM
+		status = tool_stop::cleanup_control(hSrv, BRDctrl_SDRAM_ENABLE, &Enable, "SDRAM-enable-control"); // запрет записи в SDRAM
 //	printf("                                             \r");
 	if(errCnt)
 		BRDC_printf(_BRDC("ERROR (%s): buffers skiped %d\n"), fileName, errCnt);
@@ -1422,7 +1435,8 @@ unsigned __stdcall DirWriteIntoFile(void* pParams)
 		if(Status & 0x8000)
 			BRDC_printf(_BRDC("ERROR (%s): SDRAM FIFO is overflow\n"), fileName);
 	}
-	status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_FREE, &buf_dscr);
+	status = tool_stop::cleanup_control(hSrv, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
+	status = tool_stop::cleanup_control(hSrv, BRDctrl_STREAM_CBUF_FREE, &buf_dscr, "DMA-buffer-free");
 	delete[] buf_dscr.ppBlk;
 
 #if defined(__IPC_WIN__) || defined(__IPC_LINUX__)
@@ -1443,14 +1457,15 @@ int SimpleProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_StreamCB
 	int cnt = 0;
 	int errcnt = 0;
 	ULONG msTimeout = 40000; // ждать окончания передачи данных до 40 сек.
-	for(ULONG i = 0; i < g_fileBufNum; i++)
+	for(ULONG i = 0; i < g_fileBufNum && !tool_stop::requested(); i++)
 	{
-		status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout);
+		status = tool_stop::wait_stream(hSrv, BRDctrl_STREAM_CBUF_WAITBLOCK, msTimeout);
+        if (tool_stop::requested()) break;
 		if(BRD_errcmp(status, BRDerr_WAIT_TIMEOUT))
 		{	// если вышли по тайм-ауту, то остановимся
 			status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_FIFOSTATUS, &Status);
 			BRDC_printf(_BRDC("ADC FIFO Status = 0x%04X\n"), Status);
-			status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_STOP, NULL);
+			status = tool_stop::cleanup_control(hSrv, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
 			DisplayError(status, __FUNCTION__, _BRDC("TIME-OUT"));
 			break;
 		}
@@ -1490,7 +1505,7 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_Stream
 	int err_cnt = 0;
 	int waitblk_cnt = 0;
 	ULONG msTimeout = 40000; // ждать окончания передачи данных до 20 сек.
-	do
+	while (!tool_stop::requested())
 	{
 		total_cnt = buf_dscr->pStub->totalCounter;
 		delta_cnt = total_cnt - write_cnt;
@@ -1506,23 +1521,25 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_Stream
 		{
 			//printf("Waiting...\n");
 			waitblk_cnt++;
-			status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout);
+			status = tool_stop::wait_stream(hSrv, BRDctrl_STREAM_CBUF_WAITBLOCK, msTimeout);
+            if (tool_stop::requested()) break;
 			if(BRD_errcmp(status, BRDerr_WAIT_TIMEOUT))
 			{	// если вышли по тайм-ауту, то остановимся
 				status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_FIFOSTATUS, &Status);
 				BRDC_printf(_BRDC("ADC FIFO Status = 0x%04X\n"), Status);
-				status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_STOP, NULL);
+				status = tool_stop::cleanup_control(hSrv, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
 				DisplayError(status, __FUNCTION__, _BRDC("TIME-OUT"));
 				break;
 			}
 			if(twice)
 			{
-				status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_WAITBLOCK, &msTimeout);
+				status = tool_stop::wait_stream(hSrv, BRDctrl_STREAM_CBUF_WAITBLOCK, msTimeout);
+                if (tool_stop::requested()) break;
 				if(BRD_errcmp(status, BRDerr_WAIT_TIMEOUT))
 				{	// если вышли по тайм-ауту, то остановимся
 					status = BRD_ctrl(hSrv, 0, BRDctrl_ADC_FIFOSTATUS, &Status);
 					BRDC_printf(_BRDC("ADC FIFO Status = 0x%04X\n"), Status);
-					status = BRD_ctrl(hSrv, 0, BRDctrl_STREAM_CBUF_STOP, NULL);
+					status = tool_stop::cleanup_control(hSrv, BRDctrl_STREAM_CBUF_STOP, NULL, "DMA-stop");
 					DisplayError(status, __FUNCTION__, _BRDC("TIME-OUT"));
 					break;
 				}
@@ -1543,7 +1560,7 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_Stream
 		// 	}
 		// }
 		cur_buf = write_cnt % buf_dscr->blkNum;
-		for(int j = 0; j < delta_cnt; j++)
+		for(int j = 0; j < delta_cnt && !tool_stop::requested(); j++)
 		{
 			//daq_buf = buf_dscr.pStub->lastBlock + 1;
 			//if(daq_buf == buf_dscr.blkNum)
@@ -1584,7 +1601,8 @@ int MultiBlkProcWrDir(BRD_Handle hSrv, IPC_handle hfile, int idx, BRDctrl_Stream
 			//printf("%s: Total buffers = %d, written buffers = %d\r", fileName, total_cnt, write_cnt);
 		//	printf("%s: written buffers = %d\r", fileName, write_cnt);
 		//}
-	}while(write_cnt < g_fileBufNum);
+	    if (write_cnt >= g_fileBufNum) break;
+	}
 	return err_cnt;
 }
 

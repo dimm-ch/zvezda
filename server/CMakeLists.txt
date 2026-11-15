@@ -42,4 +42,5 @@ set(PROJECT_SOURCES ${PROJECT_SOURCE_DIR}/server.cpp
 					${BARDY_ROOT}/brdlib/reg_rw_spd.cpp
 					)
 
+include(log-level)
 include(executable)

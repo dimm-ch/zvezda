@@ -15,6 +15,16 @@
 #include "concol.h"
 #include "ctrlreg.h"
 #include "fmc146v_sync.h"
+#include "../../tool_stop.hpp"
+
+// This utility runs under the server and has no interactive error prompt.
+#define SYNC_CHECK(success, message) \
+    do { \
+        if (!(success)) { \
+            ERROR_MESSAGE("%s", message); \
+            return EXIT_FAILURE; \
+        } \
+    } while (false)
 
 #if __cplusplus < 201402L
 #error \
@@ -57,13 +67,14 @@ int BRDC_main(int argc, char* argv[])
     // устанавливаем обработчик запроса завершения программы
     std::set_terminate(terminateHandler);
     // устанавливаем обработчики аварийного завершения программы
-    std::signal(SIGINT, abortHandler);
     std::signal(SIGILL, abortHandler);
     std::signal(SIGFPE, abortHandler);
     std::signal(SIGSEGV, abortHandler);
-    std::signal(SIGTERM, abortHandler);
     std::signal(SIGABRT, abortHandler);
-    return exceptCatcher([&] {
+    const auto result = exceptCatcher([&] {
+        tool_stop::install("SYNC");
+        tool_stop::begin("service-device-scope");
+        if (tool_stop::requested()) return EXIT_SUCCESS;
         // инициализация работы с клавиатурой
         // CKeyboard keyboard {};
         // разбор параметров командной строки
@@ -88,6 +99,7 @@ int BRDC_main(int argc, char* argv[])
         // инициализируем управляющую бибилиотеку
         auto brdIni = to_brd_string(examOptions.brd_ini());
         CBardy::init(brdIni);
+        if (tool_stop::requested()) return EXIT_SUCCESS;
         // число зарегистрированных устройств
         const auto deviceNums = CBardy::getDeviceNums();
         // получаем информацию об обнаруженных устройствах
@@ -97,6 +109,7 @@ int BRDC_main(int argc, char* argv[])
         color::printf("Devices:\n"_white_bright);
         // поиск нужного устройства в списке устройств
         for (auto& deviceInfo : deviceInfoList) {
+            if (tool_stop::requested()) return EXIT_SUCCESS;
             if (brd_string { deviceInfo.name } == brd_string { _BRDC("FMC146V Zynq") }
                 || brd_string { deviceInfo.name } == brd_string { _BRDC("FMC146VZQ") }) {
                 // получаем управление базовой платой и добавляем в список устройств
@@ -108,11 +121,12 @@ int BRDC_main(int argc, char* argv[])
                 color::printf("\t{+black}[%d] %s{}\n", deviceInfo.lid, std::to_string(deviceInfo.name).c_str());
             }
         }
-        ERROR_ASSERT(deviceList.empty() != true, "No devices found!");
+        SYNC_CHECK(deviceList.empty() != true, "No devices found!");
         // список обнаруженных узлов SYNC платы FMC146V
         std::vector<CFmc146vSync> fmc146vSyncList {};
         // делаем обход всех устройств
         for (const auto& device : deviceList) {
+            if (tool_stop::requested()) return EXIT_SUCCESS;
             // получаем список служб устройства
             const auto serviceInfoList = device->getServiceInfoList();
             // ищем службу REG0
@@ -128,7 +142,7 @@ int BRDC_main(int argc, char* argv[])
                 }
             }
         }
-        ERROR_ASSERT(fmc146vSyncList.empty() != true, "Unit SYNC not found!");
+        SYNC_CHECK(fmc146vSyncList.empty() != true, "Unit SYNC not found!");
         // выводим число обнаруженных узлов SYNC
         color::printf("\n{+white}Found %d SYNC unit(s){}\n", fmc146vSyncList.size());
         // флаг запроса на прерывание работы
@@ -142,8 +156,9 @@ int BRDC_main(int argc, char* argv[])
         auto tmp_outputADEL { ltc6953_output::out2 };
         // FIXME: <<<
         // читаем конфигурационный файл
+        if (tool_stop::requested()) return EXIT_SUCCESS;
         INIReader settingsFile { examOptions.exam_ini() };
-        ERROR_ASSERT((settingsFile.ParseError() == 0), "Can't read settings file!");
+        SYNC_CHECK((settingsFile.ParseError() == 0), "Can't read settings file!");
         // основной цикл
     //    do {
             // проверяем было ли нажатие клавиатуры
@@ -215,11 +230,12 @@ int BRDC_main(int argc, char* argv[])
                 // }
                 //     .print_yellow();
                 // невозможно прочитать конфигурационный файл
-                ERROR_ASSERT((settingsFile.Parse() == 0), "Can't read settings file!");
+                SYNC_CHECK((settingsFile.Parse() == 0), "Can't read settings file!");
                 // разделитель
                 color { std::string(44, '-') + "\n"s }.print_black_bright();
                 // обновляем параметры для всех плат
                 for (auto& fmc146vSync : fmc146vSyncList) {
+                    if (tool_stop::requested()) return EXIT_SUCCESS;
                     // получаем сведения о плате данного узла
                     const auto deviceInfo = fmc146vSync.getDeviceInfo();
                     // выводим LID и имя устройства
@@ -246,7 +262,7 @@ int BRDC_main(int argc, char* argv[])
                     Fmc146v::FMODE_Reg retFMODE {};
                     fmc146vSync.getReg(retFMODE);
                     // проверяем успешность обновления параметра
-                    ERROR_ASSERT((retFMODE.getValue() == regFMODE.getValue()), "Write FMODE register error!");
+                    SYNC_CHECK((retFMODE.getValue() == regFMODE.getValue()), "Write FMODE register error!");
                     color::printf("\t{+white}FMODE \t{+yellow}0x%2.2X \t%s{}\n", retFMODE.getValue(),
                         to_binary_string<uint8_t>(retFMODE.getValue()).c_str());
                     // обновляем регистр DAC
@@ -258,7 +274,7 @@ int BRDC_main(int argc, char* argv[])
                     Fmc146v::DAC_Reg retDAC {};
                     fmc146vSync.getReg(retDAC);
                     // проверяем успешность обновления параметра
-                    ERROR_ASSERT((retDAC.getValue() == regDAC.getValue()), "Write DAC register error!");
+                    SYNC_CHECK((retDAC.getValue() == regDAC.getValue()), "Write DAC register error!");
                     color::printf("\t{+white}DAC PD \t{+yellow}0x%2.2X \t%s{}\n", retDAC->Bits.DAC_PD,
                         to_binary_string<uint8_t, 2>(retDAC->Bits.DAC_PD).c_str());
                     // обновляем регистр MUX
@@ -280,7 +296,7 @@ int BRDC_main(int argc, char* argv[])
                     Fmc146v::MUX_Reg retMUX {};
                     fmc146vSync.getReg(retMUX);
                     // проверяем успешность обновления параметра
-                    ERROR_ASSERT((retMUX.getValue() == regMUX.getValue()), "Write MUX register error!");
+                    SYNC_CHECK((retMUX.getValue() == regMUX.getValue()), "Write MUX register error!");
                     color::printf("\t{+white}MUX \t{+yellow}0x%4.4X \t%s{}\n", retMUX.getValue(),
                         to_binary_string(retMUX.getValue()).c_str());
                     // обновляем регистр FSRC
@@ -298,7 +314,7 @@ int BRDC_main(int argc, char* argv[])
                     Fmc146v::FSRC_Reg retFSRC {};
                     fmc146vSync.getReg(retFSRC);
                     // проверяем успешность обновления параметра
-                    ERROR_ASSERT((retFSRC.getValue() == regFSRC.getValue()), "Write FSRC register error!");
+                    SYNC_CHECK((retFSRC.getValue() == regFSRC.getValue()), "Write FSRC register error!");
                     color::printf("\t{+white}FSRC \t{+yellow}0x%2.2X \t%s{}\n", retFSRC.getValue(),
                         to_binary_string<uint8_t>(retFSRC.getValue()).c_str());
                     // обновляем регистр FSRC3
@@ -316,7 +332,7 @@ int BRDC_main(int argc, char* argv[])
                     Fmc146v::FSRC3_Reg retFSRC3 {};
                     fmc146vSync.getReg(retFSRC3);
                     // проверяем успешность обновления параметра
-                    ERROR_ASSERT((retFSRC3.getValue() == regFSRC3.getValue()), "Write FSRC3 register error!");
+                    SYNC_CHECK((retFSRC3.getValue() == regFSRC3.getValue()), "Write FSRC3 register error!");
                     color::printf("\t{+white}FSRC3 \t{+yellow}0x%2.2X \t%s{}\n", retFSRC3.getValue(),
                         to_binary_string<uint8_t>(retFSRC3.getValue()).c_str());
                     color { "\t"s + std::string(36, '-') + "\n"s }.print_black_bright();
@@ -407,6 +423,7 @@ int BRDC_main(int argc, char* argv[])
                             fmc146vSync->LMX2594.update_lock_detect_mux(chappi::lmx2594_lock_detect_mux::readback);
                             // FIXME: >>>
                             for (size_t try_n=0; try_n<3; ++try_n) {               
+                                if (tool_stop::requested()) return EXIT_SUCCESS;
                                 try {
                                     fmc146vSync->LMX2594.set_frequency(lmx2594_output_frequency {
                                         lmx2594_output::outb, refFREQ, double(oscFREQB) });
@@ -429,6 +446,7 @@ int BRDC_main(int argc, char* argv[])
                         bool vcoIsValid = false;
                         printf("[SYNC] VCO check ");
                         for (int i = 0; i < 10; ++i) {
+                            if (tool_stop::requested()) return EXIT_SUCCESS;
                             vcoIsValid = fmc146vSync->LTC6953.is_vco_valid();
                             printf("%d ", i);
                             if (vcoIsValid) {
@@ -439,7 +457,7 @@ int BRDC_main(int argc, char* argv[])
                         }
                         printf("\n");
 
-                        ERROR_ASSERT(vcoIsValid, "VCO error!");
+                        SYNC_CHECK(vcoIsValid, "VCO error!");
 
                         // auto vcoIsValid = fmc146vSync->LTC6953.is_vco_valid();
                         // ERROR_ASSERT((vcoIsValid == true), "VCO error!");
@@ -465,6 +483,7 @@ int BRDC_main(int argc, char* argv[])
                         color::printf("\t{+white}CLK DIST FILTV \t{+yellow}%d{}\n", slewRate);
                         color::printf("\t{+white}CLK DIST\tADEL\tDDEL\t DIV\tSRQEN\tOINV\tMODE\tPD{}\n");
                         for (int outputCount {}; outputCount < ltc6953_constants::output_max_num; ++outputCount) {
+                            if (tool_stop::requested()) return EXIT_SUCCESS;
                             auto settingOption = "CLK_DIST_ADEL"s + std::to_string(outputCount);
                             uint16_t analogDelay = settingsFile.GetInteger(settingsSection, settingOption, 0);
                             fmc146vSync->LTC6953.set_analog_delay({ ltc6953_output(outputCount), analogDelay });
@@ -524,6 +543,7 @@ int BRDC_main(int argc, char* argv[])
                 requestSyncronize = false;
                 Fmc146v::FMODE_Reg regFMODE {};
                 for (auto& fmc146vSync : fmc146vSyncList) {
+                    if (tool_stop::requested()) return EXIT_SUCCESS;
                     // FIXME: >>>
                     const auto settingsSection { "FMC146VSYNC" }; // FIXME: добавить номер платы
                     auto pulseCount = settingsFile.GetInteger(settingsSection, "CLK_DIST_SYSCT"s, 0);
@@ -571,13 +591,14 @@ int BRDC_main(int argc, char* argv[])
                 // достигли задонного временного интервала
                 nextTime = currentTime + deltaTime;
                 for (auto& fmc146vSync : fmc146vSyncList) {
+                    if (tool_stop::requested()) return EXIT_SUCCESS;
                     // получаем статусный регистр
                     Fmc146v::STATUS_Reg regSTATUS;
                     fmc146vSync.getReg(regSTATUS);
                     // проверяем аварийные флаги
-                    ERROR_ASSERT(regSTATUS->Bits.ALARM == false,
+                    SYNC_CHECK(regSTATUS->Bits.ALARM == false,
                         "Warning! FPGA temp. > 80C");
-                    ERROR_ASSERT(regSTATUS->Bits.OT == false, "Alert! FPGA temp. > 85C");
+                    SYNC_CHECK(regSTATUS->Bits.OT == false, "Alert! FPGA temp. > 85C");
                 }
             }
             // отпускаем поток на заданной время
@@ -588,4 +609,11 @@ int BRDC_main(int argc, char* argv[])
         //awaitExit();
         return EXIT_SUCCESS;
     });
+    // Service and device objects have been destroyed by the lambda return.
+    tool_stop::end("service-device-scope", result);
+    tool_stop::begin("CBardy_cleanup");
+    CBardy::cleanup();
+    // CBardy::cleanup has a void return; this marker does not certify BRD status.
+    tool_stop::log("end", "CBardy_cleanup-void");
+    return tool_stop::finish(result);
 }
