@@ -22,7 +22,6 @@ protected:
 
     bool start(const json& request, json& response);
     bool stop(const json& request, json& response);
-    bool restart(const json& request, json& response);
 
     int lid;
     std::string toolName;

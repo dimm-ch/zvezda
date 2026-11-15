@@ -4,8 +4,7 @@
 
 const std::unordered_map<std::string, FmcSync::cmd_handler> FmcSync::cmd_map {
     {"start", &FmcSync::start},
-    {"stop", &FmcSync::stop},
-    {"restart", &FmcSync::restart}
+    {"stop", &FmcSync::stop}
 };
 
 FmcSync::FmcSync() {

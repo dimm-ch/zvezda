@@ -21,17 +21,12 @@ public:
     bool init();
     void shutdown();
     struct StopResult {
+        // Confirms process exit; a forced exit is reported as a command error.
         bool success = false;
         bool forced = false;
         bool alreadyStopped = false;
         std::optional<int> exitCode;
         std::optional<int> termSignal;
-        std::string error;
-    };
-    struct RestartResult {
-        bool success = false;
-        bool stopAttempted = false;
-        StopResult stop;
         std::string error;
     };
     struct ProcessActivity {
@@ -43,7 +38,6 @@ public:
 
     bool start_tool(const std::string& toolName, const std::string& exePath, const std::string& arg, const std::string& workingDir = std::string(), int startupTimeoutMs = -1, std::string* error = nullptr);
     StopResult stop_tool(const std::string& toolName, int stopTimeoutMs = StopTimeoutMs, int killTimeoutMs = KillTimeoutMs);
-    RestartResult restart_tool(const std::string& toolName);
     bool check_tool_process(const std::string& toolName, std::string& error);
     ProcessActivity inspect_processes();
     bool is_connected(const std::string& toolName) const;

@@ -22,7 +22,6 @@ const char* BardySession::state_name() const {
 
 bool BardySession::require_open(json& response) const {
     if (state_ == State::Open) return true;
-    response["status"] = state_name();
     response["error"] = state_ == State::Closed
         ? "Server is stopped; use srv:start first"
         : "Server cleanup is incomplete; retry srv:stop before srv:start";
@@ -30,11 +29,7 @@ bool BardySession::require_open(json& response) const {
 }
 
 bool BardySession::open(json& response) {
-    response["status"] = state_name();
-    if (state_ == State::Open) {
-        response["already_started"] = true;
-        return true;
-    }
+    if (state_ == State::Open) return true;
     if (state_ == State::Error) return require_open(response);
 
     const auto ini = (getExePath().parent_path().parent_path() / "brd/brd.ini")
@@ -54,13 +49,10 @@ bool BardySession::open(json& response) {
     x_DevNum = devices;
     state_ = State::Open;
     BRD_displayMode(BRDdm_VISIBLE | BRDdm_CONSOLE);
-    response["status"] = state_name();
-    response["already_started"] = false;
     return true;
 }
 
 bool BardySession::close(json& response) {
-    response["status"] = state_name();
     // Reap exited children as well as checking live ones. A remembered tool or
     // a closed hello socket does not establish whether its process has exited.
     const auto activity = ToolHub::inst().inspect_processes();
@@ -84,15 +76,11 @@ bool BardySession::close(json& response) {
         }
         return false;
     }
-    if (state_ == State::Closed) {
-        response["already_stopped"] = true;
-        return true;
-    }
+    if (state_ == State::Closed) return true;
 
     // A partial release must not enable more hardware work or claim closed.
     // Retain failed handles so that a later srv:stop can retry them.
     state_ = State::Error;
-    response["already_stopped"] = false;
     bool resourcesReleased = true;
     for (int lid = 0; lid < MAX_LID_DEVICES; ++lid) {
         auto& device = DevicesLid[lid];
@@ -139,7 +127,6 @@ bool BardySession::close(json& response) {
 #endif
         }
     }
-    response["status"] = state_name();
     if (!resourcesReleased) {
         response["error"] = "Server resources were not fully released; retry srv:stop";
         return false;

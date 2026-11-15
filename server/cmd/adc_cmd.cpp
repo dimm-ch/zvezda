@@ -4,8 +4,7 @@
 
 const std::unordered_map<std::string, AdcControl::cmd_handler> AdcControl::cmd_map {
     {"start", &AdcControl::start},
-    {"stop", &AdcControl::stop},
-    {"restart", &AdcControl::restart}
+    {"stop", &AdcControl::stop}
 };
 
 AdcControl::AdcControl() {

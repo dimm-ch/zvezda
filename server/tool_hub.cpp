@@ -148,7 +148,7 @@ bool ToolHub::start_tool(const std::string& toolName, const std::string& exePath
         if (state == ProcessState::Error)
             return fail(it->second.processError);
         if (state == ProcessState::Running)
-            return fail("Tool is already running; use restart");
+            return fail("Tool is already running; use stop before start");
     }
 
     auto args = getArgs(exePath, arg);
@@ -185,27 +185,6 @@ ToolHub::StopResult ToolHub::stop_tool(const std::string& toolName, int stopTime
 #endif
     if (!result.success)
         fprintf(stderr, "[ToolHub] stop %s: %s\n", toolName.c_str(), result.error.c_str());
-    return result;
-}
-
-ToolHub::RestartResult ToolHub::restart_tool(const std::string& toolName) {
-    RestartResult result;
-    auto it = conns_.find(toolName);
-    if (it == conns_.end()) {
-        result.error = "Unknown tool; use start with launch parameters first";
-        return result;
-    }
-    if (listenFd_ < 0) {
-        result.error = "ToolHub is not initialized";
-        return result;
-    }
-    result.stopAttempted = true;
-    result.stop = stop_tool(toolName);
-    if (!result.stop.success) {
-        result.error = result.stop.error;
-        return result;
-    }
-    result.success = launch_tool(toolName, it->second, result.error);
     return result;
 }
 

@@ -26,7 +26,7 @@ json CommandExecutor::execute(const json& request) {
     }
 
     // All utility operations except stop require a session started by srv:start.
-    // This includes restart and DAC commands such as nco, not just start.
+    // This includes DAC commands such as nco, not just start.
     if (baseName != "srv" && request[baseName] != "stop"
         && !BardySession::inst().require_open(response))
         return response;
@@ -45,6 +45,7 @@ bool CommandExecutor::start(const json& request, json& response) {
     if (!check_lid(response)) {
         return false;
     }
+    response["tool"] = toolName;
 
     std::string dir = std::string(lid == 2 ? "2" : "") + "examples";
     std::string path = (getExePath().parent_path().parent_path() / dir).lexically_normal().string();
@@ -61,7 +62,6 @@ bool CommandExecutor::start(const json& request, json& response) {
     }
     
     std::this_thread::sleep_for(std::chrono::seconds(waitTimeoutToolS));
-    response["tool"] = toolName;
     if (!ToolHub::inst().check_tool_process(toolName, error)) {
         response["error"] = error;
         return false;
@@ -69,44 +69,17 @@ bool CommandExecutor::start(const json& request, json& response) {
     return true;
 }
 
-static json stop_response(const ToolHub::StopResult& stopped) {
-    json response = {
-        {"result", stopped.success ? "Success" : "Error"},
-        {"forced", stopped.forced},
-        {"already_stopped", stopped.alreadyStopped}
-    };
-    if (stopped.exitCode) response["exit_code"] = *stopped.exitCode;
-    if (stopped.termSignal) response["signal"] = *stopped.termSignal;
-    if (!stopped.error.empty()) response["error"] = stopped.error;
-    return response;
-}
-
 bool CommandExecutor::stop(const json& request, json& response) {
     if (!check_lid(response)) return false;
+    response["tool"] = toolName;
     const auto stopped = ToolHub::inst().stop_tool(toolName);
-    response = stop_response(stopped);
-    response["tool"] = toolName;
-    return stopped.success;
-}
-
-bool CommandExecutor::restart(const json& request, json& response) {
-    if (!check_lid(response)) return false;
-    if (request.contains("ini")) {
-        response["error"] = "Restart reuses saved launch parameters; use stop/start to change ini";
+    if (!stopped.success) {
+        response["error"] = stopped.error;
         return false;
     }
-    const auto restarted = ToolHub::inst().restart_tool(toolName);
-    response["tool"] = toolName;
-    if (restarted.stopAttempted)
-        response["stop"] = stop_response(restarted.stop);
-    if (!restarted.success) {
-        response["error"] = restarted.error;
-        return false;
-    }
-    std::this_thread::sleep_for(std::chrono::seconds(waitTimeoutToolS));
-    std::string error;
-    if (!ToolHub::inst().check_tool_process(toolName, error)) {
-        response["error"] = error;
+    // A confirmed exit after SIGKILL does not confirm normal utility cleanup.
+    if (stopped.forced) {
+        response["error"] = "Tool did not stop within the timeout and was forcibly terminated; normal cleanup was not confirmed";
         return false;
     }
     return true;
