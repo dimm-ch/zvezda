@@ -18,6 +18,8 @@
 
 #include "json.hpp"
 
+#include "../log_level.hpp"
+#include "bardy_session.hpp"
 #include "server.hpp"
 
 ServerExecutor::ServerExecutor(std::string ip, uint16_t port) {
@@ -77,6 +79,25 @@ void ServerExecutor::start() {
     if (worker_.joinable() || stopping_) return;
     worker_ = std::thread([this] {
         using clock = std::chrono::steady_clock;
+
+        if (stopping_) return;
+        // Инициализация выполняется в том же потоке, что и аппаратные команды.
+        try {
+            json response;
+            if (!BardySession::inst().open(response)) {
+                const auto error = response.value("error", std::string { "Server initialization failed" });
+                std::fprintf(stderr, "[BardySession] Startup: %s\n", error.c_str());
+            } else if (LOG_LEVEL >= 1) {
+                std::fprintf(stdout, "[BardySession] Startup: BARDY initialized, devices=%d\n",
+                    static_cast<int>(x_DevNum));
+            }
+        }
+        catch (const std::exception& e) {
+            std::fprintf(stderr, "[BardySession] Startup: initialization failed: %s\n", e.what());
+        }
+        catch (...) {
+            std::fprintf(stderr, "[BardySession] Startup: unexpected initialization exception\n");
+        }
         
         while (!stopping_) { // ждём запрос соединения от клиента
             sockaddr_in client_addr {}; // адрес и порт клиента
