@@ -97,7 +97,7 @@ bool ToolHub::setup_listen_socket() {
 
     listenFd_ = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (listenFd_ < 0) {
-        printf("ToolHub::setup_listen_socket(): socket() failed: %s\n", strerror(errno));
+        ZVEZDA_DEBUG_LOG(printf("ToolHub::setup_listen_socket(): socket() failed: %s\n", strerror(errno)));
         return false;
     }
     if (!setCloexec(listenFd_)) {
@@ -111,7 +111,7 @@ bool ToolHub::setup_listen_socket() {
     std::snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", hubSockPath_.c_str());
 
     if (::bind(listenFd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
-        printf("ToolHub::setup_listen_socket(): bind() failed: %s\n", strerror(errno));
+        ZVEZDA_DEBUG_LOG(printf("ToolHub::setup_listen_socket(): bind() failed: %s\n", strerror(errno)));
         ::close(listenFd_);
         listenFd_ = -1;
         return false;
@@ -120,7 +120,7 @@ bool ToolHub::setup_listen_socket() {
     ::chmod(hubSockPath_.c_str(), 0660);
 
     if (::listen(listenFd_, 16) != 0) {
-        printf("ToolHub::setup_listen_socket(): listen() failed: %s\n", strerror(errno));
+        ZVEZDA_DEBUG_LOG(printf("ToolHub::setup_listen_socket(): listen() failed: %s\n", strerror(errno)));
         ::close(listenFd_);
         listenFd_ = -1;
         ::unlink(hubSockPath_.c_str());
@@ -133,7 +133,7 @@ bool ToolHub::start_tool(const std::string& toolName, const std::string& exePath
     std::string failure;
     auto fail = [&](const std::string& message) {
         if (error) *error = message;
-        fprintf(stderr, "[ToolHub] start %s: %s\n", toolName.c_str(), message.c_str());
+        ZVEZDA_DEBUG_LOG(fprintf(stderr, "[ToolHub] start %s: %s\n", toolName.c_str(), message.c_str()));
         return false;
     };
     if (error) error->clear();
@@ -169,14 +169,14 @@ ToolHub::StopResult ToolHub::stop_tool(const std::string& toolName, int stopTime
         result.error = "Unknown tool; no process was started by this server";
         return result;
     }
-#if LOG_LEVEL >= 1
+#if LOG_LEVEL >= 2
     const pid_t pid = it->second.pid;
     const auto started = HubClock::now();
     fprintf(stderr, "[ToolHub] stop begin tool=%s pid=%ld grace_ms=%d kill_wait_ms=%d\n",
         toolName.c_str(), static_cast<long>(pid), stopTimeoutMs, killTimeoutMs);
 #endif
     auto result = stop_process(it->second, stopTimeoutMs, killTimeoutMs);
-#if LOG_LEVEL >= 1
+#if LOG_LEVEL >= 2
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(HubClock::now() - started).count();
     fprintf(stderr, "[ToolHub] stop end tool=%s pid=%ld elapsed_ms=%lld success=%d forced=%d already_stopped=%d exit_code=%d term_signal=%d\n",
         toolName.c_str(), static_cast<long>(pid), static_cast<long long>(elapsed),
@@ -184,7 +184,7 @@ ToolHub::StopResult ToolHub::stop_tool(const std::string& toolName, int stopTime
         result.exitCode.value_or(-1), result.termSignal.value_or(0));
 #endif
     if (!result.success)
-        fprintf(stderr, "[ToolHub] stop %s: %s\n", toolName.c_str(), result.error.c_str());
+        ZVEZDA_DEBUG_LOG(fprintf(stderr, "[ToolHub] stop %s: %s\n", toolName.c_str(), result.error.c_str()));
     return result;
 }
 
@@ -256,7 +256,7 @@ ToolHub::ProcessState ToolHub::poll_process(Conn& c) {
     }
 
     c.processError = std::string("Cannot confirm owned child state: ") + strerror(errno);
-    fprintf(stderr, "[ToolHub] %s\n", c.processError.c_str());
+    ZVEZDA_DEBUG_LOG(fprintf(stderr, "[ToolHub] %s\n", c.processError.c_str()));
     return ProcessState::Error;
 }
 
@@ -302,7 +302,7 @@ ToolHub::StopResult ToolHub::stop_process(Conn& c, int stopTimeoutMs, int killTi
     }
 
     c.stopping = true;
-#if LOG_LEVEL >= 1
+#if LOG_LEVEL >= 2
     const auto stopStarted = HubClock::now();
     fprintf(stderr, "[ToolHub] sending SIGTERM pid=%ld grace_ms=%d\n", static_cast<long>(c.pid), stopTimeoutMs);
 #endif
@@ -312,7 +312,7 @@ ToolHub::StopResult ToolHub::stop_process(Conn& c, int stopTimeoutMs, int killTi
     }
     state = wait_process(c, stopTimeoutMs);
     if (state == ProcessState::Timeout) {
-#if LOG_LEVEL >= 1
+#if LOG_LEVEL >= 2
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(HubClock::now() - stopStarted).count();
         fprintf(stderr, "[ToolHub] grace expired pid=%ld elapsed_ms=%lld; sending SIGKILL\n",
             static_cast<long>(c.pid), static_cast<long long>(elapsed));
@@ -570,13 +570,13 @@ void ToolHub::accept_and_attach_one(int timeoutMs) {
 std::optional<uint64_t> ToolHub::send(const std::string& toolName, const std::string& cmd, const json& args) {
     auto it = conns_.find(toolName);
     if (it == conns_.end()) {
-        printf("[ToolHub] send(): toolName error\n");
+        ZVEZDA_DEBUG_LOG(printf("[ToolHub] send(): toolName error\n"));
         return std::nullopt;
     }
 
     Conn& c = it->second;
     if (poll_process(c) != ProcessState::Running || c.stopping || c.fd < 0) {
-        printf("[ToolHub] send(): fd error\n");
+        ZVEZDA_DEBUG_LOG(printf("[ToolHub] send(): fd error\n"));
         return std::nullopt;
     }
 
@@ -588,7 +588,7 @@ std::optional<uint64_t> ToolHub::send(const std::string& toolName, const std::st
     };
 
     if (!send_json_line(c.fd, req)) {
-        printf("[ToolHub] send(): send_json_line error: %s\n", strerror(errno));
+        ZVEZDA_DEBUG_LOG(printf("[ToolHub] send(): send_json_line error: %s\n", strerror(errno)));
         close_socket(c);
         return std::nullopt;
     }
@@ -599,29 +599,29 @@ std::optional<uint64_t> ToolHub::send(const std::string& toolName, const std::st
 std::optional<json> ToolHub::wait(const std::string& toolName, uint64_t id, int timeoutMs) {
     auto it = conns_.find(toolName);
     if (it == conns_.end()) {
-        printf("[ToolHub] wait(): toolName error\n");
+        ZVEZDA_DEBUG_LOG(printf("[ToolHub] wait(): toolName error\n"));
         return std::nullopt;
     }
 
     Conn& c = it->second;
     if (poll_process(c) != ProcessState::Running || c.stopping || c.fd < 0) {
-        printf("[ToolHub] wait(): fd error\n");
+        ZVEZDA_DEBUG_LOG(printf("[ToolHub] wait(): fd error\n"));
         return std::nullopt;
     }
 
     auto respOpt = recv_json_line(c, timeoutMs);
     if (!respOpt) {
-        printf("[ToolHub] wait(): recv_json_line error: %s\n", strerror(errno));
+        ZVEZDA_DEBUG_LOG(printf("[ToolHub] wait(): recv_json_line error: %s\n", strerror(errno)));
         return std::nullopt;
     }
 
     if ((*respOpt).value("id", 0ull) != id) {
-        printf("[ToolHub] wait(): id error\n");
+        ZVEZDA_DEBUG_LOG(printf("[ToolHub] wait(): id error\n"));
         return std::nullopt;
     }
 
     if (!(*respOpt).contains("result") || !(*respOpt)["result"].is_boolean()) {
-        printf("[ToolHub] wait(): result field error\n");
+        ZVEZDA_DEBUG_LOG(printf("[ToolHub] wait(): result field error\n"));
         return std::nullopt;
     }
 

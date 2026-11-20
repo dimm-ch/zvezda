@@ -2,6 +2,7 @@
 #include "tool_hub.hpp"
 #include "server.hpp"
 #include "bardy_session.hpp"
+#include "../../log_level.hpp"
 
 const std::unordered_map<std::string, CommandProcessor::cmd_handler> CommandProcessor::cmd_map {
     {"info", &CommandProcessor::info},
@@ -216,13 +217,13 @@ bool CommandProcessor::reg(const json &request, json &response) {
 
     if (!get_int(request, "t", paramReg.tetrad) || paramReg.tetrad < 0) {
         response["error"] = "parametr error: t";
-        printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+        ZVEZDA_DEBUG_LOG(printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
         return false;
     }
 
     if (!get_int(request, "r", paramReg.reg) || paramReg.reg < 0) {
         response["error"] = "parametr error: r";
-        printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+        ZVEZDA_DEBUG_LOG(printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
         return false;
     }
 
@@ -242,7 +243,7 @@ bool CommandProcessor::reg(const json &request, json &response) {
             bool indirect;
             if (!get_bool(request, "dir", indirect)) {
                 response["error"] = "parametr error: dir";
-                printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+                ZVEZDA_DEBUG_LOG(printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
                 return false;
             }
             paramReg.regType = indirect ? RegisterType::Indirect : RegisterType::Direct;
@@ -252,7 +253,7 @@ bool CommandProcessor::reg(const json &request, json &response) {
     if (request.contains("val")){
         if (!get_uint(request, "val", paramReg.value)) {
             response["error"] = "parametr error: val";
-            printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+            ZVEZDA_DEBUG_LOG(printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
             return false;
         }
         paramReg.write = true;
@@ -265,7 +266,7 @@ bool CommandProcessor::reg(const json &request, json &response) {
         DevicesLid[lid].device.open(lid);
         if(!DevicesLid[lid].device.isOpen()) {
             response["error"] = DevicesLid[lid].device.error();
-            printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+            ZVEZDA_DEBUG_LOG(printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
             return false;
         }
     }
@@ -278,7 +279,7 @@ bool CommandProcessor::reg(const json &request, json &response) {
         DevicesLid[lid].servRegs.capture(x_handleDevice, "REG0", 10000);
         if(!DevicesLid[lid].servRegs.isCaptured()){
             response["error"] = DevicesLid[lid].device.error();
-            printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+            ZVEZDA_DEBUG_LOG(printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
             return false;
         }
     }
@@ -297,7 +298,7 @@ bool CommandProcessor::reg(const json &request, json &response) {
             paramReg.value);
     if (!success) {
         response["error"] = "error execution";
-        printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+        ZVEZDA_DEBUG_LOG(printf("%s  reg(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
         return false;
     }
 

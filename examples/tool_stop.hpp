@@ -13,8 +13,7 @@
 
 namespace tool_stop {
 
-// ADC already has worker threads. The signal flag must also be safe for them,
-// and must never use a hidden lock from inside a signal handler.
+// Атомарные операции в обработчике сигнала не должны использовать блокировки.
 static_assert(ATOMIC_BOOL_LOCK_FREE == 2, "Tool stop flag must be lock-free");
 static_assert(ATOMIC_INT_LOCK_FREE == 2, "Tool stop signal must be lock-free");
 static_assert(ATOMIC_LONG_LOCK_FREE == 2, "Tool stop timestamp must be lock-free");
@@ -42,18 +41,18 @@ inline std::atomic<bool>& flag() noexcept
 inline void handle_signal(int signal) noexcept
 {
     const int savedErrno = errno;
-    auto& value = state(); // Initialized by install(), before handlers exist.
+    auto& value = state(); // Инициализировано до установки обработчиков сигнала.
     int expected = 0;
     if (value.signal.compare_exchange_strong(expected, signal, std::memory_order_relaxed)) {
 #if defined(__linux__)
-        // POSIX clock_gettime is async-signal-safe. Never print or call BARDY here.
+        // В обработчике сигнала нельзя вызывать BARDY или функции вывода.
         timespec received {};
         if (::clock_gettime(CLOCK_MONOTONIC, &received) == 0) {
             value.seconds.store(static_cast<long>(received.tv_sec), std::memory_order_relaxed);
             value.nanoseconds.store(static_cast<long>(received.tv_nsec), std::memory_order_relaxed);
         }
 #endif
-        // Publish the first signal and its timestamp together to all workers.
+        // Флаг публикуется после записи сигнала и времени для рабочих потоков.
         value.stop.store(true, std::memory_order_release);
     }
     errno = savedErrno;
@@ -82,7 +81,7 @@ inline long long elapsed_ms() noexcept
 
 inline void log(const char* event, const char* phase, bool hasStatus = false, long status = 0, int level = 2) noexcept
 {
-#if LOG_LEVEL > 0
+#if LOG_LEVEL >= 2
     if (LOG_LEVEL < level) return;
     const int savedErrno = errno;
     long pid = 0;
@@ -90,7 +89,7 @@ inline void log(const char* event, const char* phase, bool hasStatus = false, lo
     pid = static_cast<long>(::getpid());
 #endif
     const auto& value = state();
-    // A single stdio call per record keeps worker/main records from interleaving.
+    // Один вызов вывода на запись не даёт смешиваться строкам разных потоков.
     if (hasStatus)
         std::fprintf(stderr, "[tool-stop] tool=%s pid=%ld event=%s phase=%s signal=%d signal_mono_ms=%lld since_signal_ms=%lld status=%ld status_hex=0x%08lX\n",
             value.name, pid, event, phase, value.signal.load(std::memory_order_relaxed),
@@ -127,7 +126,7 @@ inline void begin(const char* phase) noexcept
 inline void end(const char* phase, long status) noexcept
 {
     requested();
-    // Preserve noteworthy statuses in basic mode without interpreting BRD codes here.
+    // Ненулевые статусы сохраняем и на базовом уровне; коды BARDY здесь не разбираем.
     log("end", phase, true, status, status != 0 ? 1 : 2);
 }
 
@@ -140,12 +139,12 @@ inline void end(const char* phase) noexcept
 inline int finish(int exitCode) noexcept
 {
     requested();
-    // Main's explicit cleanup is complete; the server separately confirms process exit.
+    // Выход процесса отдельно подтверждает сервер.
     log("main-finished", "explicit-cleanup-complete", true, exitCode, 1);
     return exitCode;
 }
 
-// Call once, before initialization of hardware or creation of worker threads.
+// Вызвать один раз до инициализации оборудования и создания рабочих потоков.
 inline void install(const char* name)
 {
     auto& value = state();
@@ -162,4 +161,4 @@ inline void install(const char* name)
     log("handlers-installed", "startup", false, 0, 1);
 }
 
-} // namespace tool_stop
+}

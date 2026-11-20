@@ -38,14 +38,14 @@ ToolClient::~ToolClient() {
 }
 
 bool ToolClient::connect_and_hello(const std::string& hubSockPath, const std::string& toolName) {
-    printf("[ToolClient] connect_and_hello()\n");
+    ZVEZDA_DEBUG_LOG(printf("[ToolClient] connect_and_hello()\n"));
     // если уже подключены — считаем успехом
     if (fd_ >= 0)
         return true;
 
     int fd = connect_unix(hubSockPath);
     if (fd < 0) {
-        printf("[ToolClient] connect_and_hello(): connect failed: %s\n", strerror(errno));
+        ZVEZDA_DEBUG_LOG(printf("[ToolClient] connect_and_hello(): connect failed: %s\n", strerror(errno)));
         return false;
     }
 
@@ -56,7 +56,7 @@ bool ToolClient::connect_and_hello(const std::string& hubSockPath, const std::st
     // hello
     json hello = {{"type","hello"}, {"tool", toolName_}};
     if (!send_json_line(hello)) {
-        printf("[ToolClient] connect_and_hello(): send hello failed\n");
+        ZVEZDA_DEBUG_LOG(printf("[ToolClient] connect_and_hello(): send hello failed\n"));
         close();
         return false;
     }
@@ -198,12 +198,12 @@ std::optional<ToolClient::Command> ToolClient::poll_command(int timeoutMs)
 
 bool ToolClient::send_ok(uint64_t id, const std::string& result) {
     json resp = {{"id", id}, {"result", true}, {"value", result }};
-    printf("[ToolClient] send_ok(): %s\n", resp.dump().c_str());
+    ZVEZDA_DEBUG_LOG(printf("[ToolClient] send_ok(): %s\n", resp.dump().c_str()));
     return send_json_line(resp);
 }
 
 bool ToolClient::send_error(uint64_t id, const std::string& err) {
     json resp = {{"id", id}, {"result", false}, {"error", err }};
-    printf("[ToolClient] send_error(): %s\n", resp.dump().c_str());
+    ZVEZDA_DEBUG_LOG(printf("[ToolClient] send_error(): %s\n", resp.dump().c_str()));
     return send_json_line(resp);
 }

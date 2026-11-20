@@ -6,8 +6,6 @@
 
 namespace tool_stop {
 
-// Diagnostic wrapper only: preserve the command, arguments and return status.
-// Normal acquisition/output remains quiet; log cleanup calls after a stop request.
 inline S32 cleanup_control(BRD_Handle handle, U32 command, void* args, const char* phase)
 {
     const bool trace = requested();
@@ -17,9 +15,9 @@ inline S32 cleanup_control(BRD_Handle handle, U32 command, void* args, const cha
     return status;
 }
 
-// Keep the original total timeout, but return to the utility every 100 ms.
-// Cancellation returns WAIT_TIMEOUT; the caller must stop DMA and release its
-// buffers as usual. Intermediate timeouts do not stop or restart the stream.
+// Общий тайм-аут сохраняется; короткие ожидания позволяют проверять запрос остановки.
+// При отмене возвращаем WAIT_TIMEOUT; остановку DMA и освобождение буферов
+// выполняет вызывающий код.
 inline S32 wait_stream(BRD_Handle handle, U32 command, ULONG timeoutMs)
 {
     if (requested()) return BRDerr_WAIT_TIMEOUT;
@@ -39,4 +37,4 @@ inline S32 wait_stream(BRD_Handle handle, U32 command, ULONG timeoutMs)
     return BRDerr_WAIT_TIMEOUT;
 }
 
-} // namespace tool_stop
+}

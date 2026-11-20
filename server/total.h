@@ -231,8 +231,7 @@ typedef struct FU_TriadSrv {
         return true;
     }
 
-    // Checked lifecycle path: unlike the legacy release(), preserve the
-    // captured handle after failure so srv:stop can report and retry it.
+    // При ошибке сохраняем дескриптор службы для повторного srv:stop.
     bool release_checked(S32& status)
     {
         status = BRDerr_OK;
@@ -435,7 +434,7 @@ extern int x_lid;
 extern BRD_Handle x_handleDevice;
 
 static int version_srv_hi = 4;
-static int version_srv_lo = 261023;
+static int version_srv_lo = 261116;
 
 S32 GetInifileString(const BRDCHAR* sSectionName, const BRDCHAR* sParamName, const BRDCHAR* defValue,
     BRDCHAR* strValue, int strSize, const BRDCHAR* sFullName);

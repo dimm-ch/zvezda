@@ -626,14 +626,13 @@ S32 WorkMode5( void )
 	{
         IPC_delay( 200 );
 		DisplayDacTraceText( loop++, 0 );
-    	//printf("[WorkMode5] loop %d \n", loop);
 
 		auto cmdOpt = cli.poll_command(50);
         if (!cmdOpt)
             continue;
 
         const auto& cmd = *cmdOpt;
-    	printf("[WorkMode5] ToolClient::poll_command() cmd %s\n", cmd.cmd.c_str());
+		ZVEZDA_DEBUG_LOG(printf("[WorkMode5] ToolClient::poll_command() cmd %s\n", cmd.cmd.c_str()));
 
 		bool ok = true;
         if (cmd.cmd == "nco") {
@@ -642,7 +641,7 @@ S32 WorkMode5( void )
 			
 			auto nco = BRD_NCO_FM214x3GDA { cmd.args["ch"], cmd.args["freq"], 0, 0 };
 			S32 S1 = BRD_ctrl(g_aDac[0].handle, NODE0, BRDctrl_DAC_SETMAINNCO, &nco);
-			printf("[WorkMode5] BRDctrl_DAC_SETMAINNCO ch = %d, freq = %d, Err1 = 0x%X, S1 = 0x%X\n", cmd.args["ch"], cmd.args["freq"], S1, BRD_errext(S1));
+			ZVEZDA_DEBUG_LOG(printf("[WorkMode5] BRDctrl_DAC_SETMAINNCO ch = %d, freq = %d, Err1 = 0x%X, S1 = 0x%X\n", cmd.args["ch"], cmd.args["freq"], S1, BRD_errext(S1)));
 
             // for (auto ch_ = 0u; ch_ < 2; ch_++) {
 			// 	auto nco = BRD_NCO_FM214x3GDA { ch_, cmd.args["freq"], 0, 0 };
@@ -650,12 +649,12 @@ S32 WorkMode5( void )
 			// 	printf("[WorkMode5] BRDctrl_DAC_SETMAINNCO ch_ = %d, Err1 = 0x%X, S1 = 0x%X\n", ch_, S1, BRD_errext(S1));
 			// }
 
-    		printf("[WorkMode5] for out\n");
+			ZVEZDA_DEBUG_LOG(printf("[WorkMode5] for out\n"));
 			std::string req = "freq = ";
 			req += cmd.args["freq"].dump();
-    		printf("%s\n", req.c_str());
+			ZVEZDA_DEBUG_LOG(printf("%s\n", req.c_str()));
             ok = cli.send_ok(cmd.id, req);
-    		printf("[WorkMode5] send_ok\n");
+			ZVEZDA_DEBUG_LOG(printf("[WorkMode5] send_ok\n"));
         }
 		else if (cmd.cmd == "ping") {
 			ok = cli.send_ok(cmd.id, "ping " + cli.toolName_);
@@ -665,9 +664,9 @@ S32 WorkMode5( void )
         }
 
 		if (ok)
-    		printf("[WorkMode5] ToolClient::send() success\n");
+			ZVEZDA_DEBUG_LOG(printf("[WorkMode5] ToolClient::send() success\n"));
 		else
-    		printf("[WorkMode5] ToolClient::send() error\n");
+			ZVEZDA_DEBUG_LOG(printf("[WorkMode5] ToolClient::send() error\n"));
 	}
 
 	//

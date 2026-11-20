@@ -2,10 +2,11 @@
 #include "tool_hub.hpp"
 #include "server.hpp"
 #include "bardy_session.hpp"
+#include "../../log_level.hpp"
 
 bool CommandExecutor::check_lid(json& response) {
     if ((lid < 1 || lid > 2)) {
-        printf("<ERR> Bad LID number!\n");
+        ZVEZDA_DEBUG_LOG(printf("<ERR> Bad LID number!\n"));
         response["error"] = "Bad LID!";
         return false;
     }
@@ -25,8 +26,6 @@ json CommandExecutor::execute(const json& request) {
         return response;
     }
 
-    // All utility operations except stop require a session started by srv:start.
-    // This includes DAC commands such as nco, not just start.
     if (baseName != "srv" && request[baseName] != "stop"
         && !BardySession::inst().require_open(response))
         return response;
@@ -57,7 +56,7 @@ bool CommandExecutor::start(const json& request, json& response) {
     bool ok = ToolHub::inst().start_tool(toolName, exeTool, ini, path, startTimeoutToolMs, &error);
     if (!ok) {
         response["error"] = error;
-        BRDC_printf("%s start(): %s\n", printDebugName.c_str(), error.c_str());
+        ZVEZDA_DEBUG_LOG(BRDC_printf("%s start(): %s\n", printDebugName.c_str(), error.c_str()));
         return false;
     }
     
@@ -77,7 +76,7 @@ bool CommandExecutor::stop(const json& request, json& response) {
         response["error"] = stopped.error;
         return false;
     }
-    // A confirmed exit after SIGKILL does not confirm normal utility cleanup.
+    // Выход после SIGKILL не подтверждает штатное освобождение ресурсов.
     if (stopped.forced) {
         response["error"] = "Tool did not stop within the timeout and was forcibly terminated; normal cleanup was not confirmed";
         return false;

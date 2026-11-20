@@ -105,14 +105,14 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
 	if (!tool_stop::requested()) {
 		auto& cli = ToolClient::inst();
 	    if (!cli.connect_and_hello("/tmp/toolhub.sock", "dac" + std::to_string(g_lid)))
-			printf("[DAC] ToolClient::connect_and_hello(): Server conect error!\n");
+			ZVEZDA_DEBUG_LOG(printf("[DAC] ToolClient::connect_and_hello(): Server conect error!\n"));
 		else
-			printf("[DAC] ToolClient::connect_and_hello(): Server conect success!\n");
+			ZVEZDA_DEBUG_LOG(printf("[DAC] ToolClient::connect_and_hello(): Server conect success!\n"));
 
 		auto cmdOpt = cli.poll_command(10000);
 		if (cmdOpt) {
 			const auto& cmd = *cmdOpt;
-			printf("[DAC] ToolClient::poll_command(): cmd %s\n", cmd.cmd.c_str());
+			ZVEZDA_DEBUG_LOG(printf("[DAC] ToolClient::poll_command(): cmd %s\n", cmd.cmd.c_str()));
 			bool ok;
 
 			if (cmd.cmd == "ping") {
@@ -123,12 +123,12 @@ int BRDC_main( int argc, BRDCHAR *argv[] ) try
 			}
 
 			if (ok)
-				printf("[DAC] ToolClient::send(): success\n");
+				ZVEZDA_DEBUG_LOG(printf("[DAC] ToolClient::send(): success\n"));
 			else
-				printf("[DAC] ToolClient::send(): error\n");
+				ZVEZDA_DEBUG_LOG(printf("[DAC] ToolClient::send(): error\n"));
 		}
 		else {
-			printf("[DAC] ToolClient::poll_command(): error\n");
+			ZVEZDA_DEBUG_LOG(printf("[DAC] ToolClient::poll_command(): error\n"));
 		}
 	}
 

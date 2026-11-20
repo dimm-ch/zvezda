@@ -18,7 +18,7 @@
 #include "srv_exec.hpp"
 #include "total.h"
 
-S32 x_DevNum = 0; // No BARDY session until srv:start.
+S32 x_DevNum = 0;
 FuDevs DevicesLid[MAX_LID_DEVICES];
 int x_lid = 1;
 BRD_Handle x_handleDevice = 0;
@@ -103,7 +103,7 @@ int main() try {
 
     serverExecutor.start();
     std::fprintf(stdout, "Server start with - %s\n", ifname.c_str());
-    // Ожидаем завершения; утилитами управляет только поток обработки команд.
+    // Утилитами управляет только поток обработки команд.
     int i = 0;
     while (!is_cancel) {
         std::this_thread::sleep_for(100ms);

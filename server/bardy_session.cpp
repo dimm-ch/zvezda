@@ -38,7 +38,7 @@ bool BardySession::open(json& response) {
     const S32 status = BRD_init(ini.c_str(), &devices);
     if (!BRD_errcmp(status, BRDerr_OK)) {
         x_DevNum = 0;
-#if LOG_LEVEL >= 1
+#if LOG_LEVEL >= 2
         std::fprintf(stderr, "[BardySession] BRD_init failed: status=0x%X\n",
             static_cast<unsigned int>(status));
 #endif
@@ -53,8 +53,7 @@ bool BardySession::open(json& response) {
 }
 
 bool BardySession::close(json& response) {
-    // Reap exited children as well as checking live ones. A remembered tool or
-    // a closed hello socket does not establish whether its process has exited.
+    // Закрытый сокет утилиты не подтверждает выход её процесса.
     const auto activity = ToolHub::inst().inspect_processes();
     if (!activity.running.empty() || !activity.errors.empty()) {
         response["running_tools"] = activity.running;
@@ -67,7 +66,7 @@ bool BardySession::close(json& response) {
                 if (!first) error += ", ";
                 error += entry.first;
                 first = false;
-#if LOG_LEVEL >= 1
+#if LOG_LEVEL >= 2
                 std::fprintf(stderr, "[BardySession] Cannot confirm exit of %s: %s\n",
                     entry.first.c_str(), entry.second.c_str());
 #endif
@@ -78,8 +77,8 @@ bool BardySession::close(json& response) {
     }
     if (state_ == State::Closed) return true;
 
-    // A partial release must not enable more hardware work or claim closed.
-    // Retain failed handles so that a later srv:stop can retry them.
+    // При неполном освобождении запрещаем аппаратные команды и сохраняем
+    // дескрипторы для повторной попытки srv:stop.
     state_ = State::Error;
     bool resourcesReleased = true;
     for (int lid = 0; lid < MAX_LID_DEVICES; ++lid) {
@@ -91,7 +90,7 @@ bool BardySession::close(json& response) {
             if (!service.release_checked(status)) {
                 servicesReleased = false;
                 resourcesReleased = false;
-#if LOG_LEVEL >= 1
+#if LOG_LEVEL >= 2
                 std::fprintf(stderr, "[BardySession] BRD_release failed: lid=%d service=%s status=0x%X\n",
                     lid, service.name().c_str(), static_cast<unsigned int>(status));
 #endif
@@ -106,7 +105,7 @@ bool BardySession::close(json& response) {
             S32 status = BRDerr_OK;
             if (!device.device.close_checked(status)) {
                 resourcesReleased = false;
-#if LOG_LEVEL >= 1
+#if LOG_LEVEL >= 2
                 std::fprintf(stderr, "[BardySession] BRD_close failed: lid=%d status=0x%X\n",
                     lid, static_cast<unsigned int>(status));
 #endif
@@ -121,7 +120,7 @@ bool BardySession::close(json& response) {
             x_DevNum = 0;
         } else {
             resourcesReleased = false;
-#if LOG_LEVEL >= 1
+#if LOG_LEVEL >= 2
             std::fprintf(stderr, "[BardySession] BRD_cleanup failed: status=0x%X\n",
                 static_cast<unsigned int>(status));
 #endif

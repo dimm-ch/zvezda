@@ -2,8 +2,7 @@
 
 #include "json.hpp"
 
-// Used only by the server's command-processing thread. Construction does not
-// initialize BARDY or access hardware.
+// Используется только потоком обработки команд сервера.
 class BardySession {
 public:
     static BardySession& inst();

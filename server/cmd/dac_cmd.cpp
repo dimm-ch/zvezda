@@ -1,6 +1,7 @@
 #include "dac_cmd.hpp"
 #include "tool_hub.hpp"
 #include "server.hpp"
+#include "../../log_level.hpp"
 
 const std::unordered_map<std::string, DacControl::cmd_handler> DacControl::cmd_map {
     {"start", &DacControl::start},
@@ -50,7 +51,7 @@ bool DacControl::ping(const json& request, json& response) {
     auto respOpt = ToolHub::inst().call(toolName, "ping", json(), 1000);
     if (!respOpt) {
         response["error"] = "call error";
-        printf("%s  ping(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+        ZVEZDA_DEBUG_LOG(printf("%s  ping(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
         return false;
     }
 
@@ -74,7 +75,7 @@ bool DacControl::nco(const json& request, json& response) {
 
     if (!request.contains("freq")) {
         response["error"] = "parametr error: freq is missing";
-        printf("%s  nco(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+        ZVEZDA_DEBUG_LOG(printf("%s  nco(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
         return false;
     }
 
@@ -85,19 +86,19 @@ bool DacControl::nco(const json& request, json& response) {
             freq = request["freq"].get<int64_t>();
         } else {
             response["error"] = "parametr error: freq must be integer";
-            printf("%s  nco(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+            ZVEZDA_DEBUG_LOG(printf("%s  nco(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
             return false;
         }
     }
     catch (const std::exception&) {
         response["error"] = "parametr error: freq out of range";
-        printf("%s  nco(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+        ZVEZDA_DEBUG_LOG(printf("%s  nco(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
         return false;
     }
 
     if (freq < kMinFreq || freq > kMaxFreq) {
         response["error"] = "parametr error: freq must be in range 0..6000000000 Hz";
-        printf("%s  nco(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+        ZVEZDA_DEBUG_LOG(printf("%s  nco(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
         return false;
     }
 
@@ -110,7 +111,7 @@ bool DacControl::nco(const json& request, json& response) {
     auto respOpt = ToolHub::inst().call(toolName, "nco", args, 5000);
     if (!respOpt) {
         response["error"] = "call error";
-        printf("%s  nco(): %s\n", printDebugName.c_str(), response["error"].dump().c_str());
+        ZVEZDA_DEBUG_LOG(printf("%s  nco(): %s\n", printDebugName.c_str(), response["error"].dump().c_str()));
         return false;
     }
 

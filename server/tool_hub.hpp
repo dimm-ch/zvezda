@@ -21,7 +21,7 @@ public:
     bool init();
     void shutdown();
     struct StopResult {
-        // Confirms process exit; a forced exit is reported as a command error.
+        // Подтверждает выход процесса; принудительный выход считается ошибкой команды.
         bool success = false;
         bool forced = false;
         bool alreadyStopped = false;

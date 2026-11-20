@@ -17,7 +17,7 @@
 #include "fmc146v_sync.h"
 #include "../../tool_stop.hpp"
 
-// This utility runs under the server and has no interactive error prompt.
+// При работе под сервером ошибка не должна ожидать ввода с клавиатуры.
 #define SYNC_CHECK(success, message) \
     do { \
         if (!(success)) { \
@@ -609,11 +609,11 @@ int BRDC_main(int argc, char* argv[])
         //awaitExit();
         return EXIT_SUCCESS;
     });
-    // Service and device objects have been destroyed by the lambda return.
+    // Службы и устройства уже уничтожены при выходе из лямбды.
     tool_stop::end("service-device-scope", result);
     tool_stop::begin("CBardy_cleanup");
     CBardy::cleanup();
-    // CBardy::cleanup has a void return; this marker does not certify BRD status.
+    // Метод не возвращает статус: эта запись не подтверждает успех BRD_cleanup.
     tool_stop::log("end", "CBardy_cleanup-void");
     return tool_stop::finish(result);
 }
